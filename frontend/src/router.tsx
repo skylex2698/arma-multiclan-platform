@@ -15,6 +15,7 @@ import EventDetailPage from './pages/events/EventDetailPage';
 import ClanesPage from './pages/clanes/ClanesPage';
 import UsersPage from './pages/users/UsersPage';
 import CreateEventPage from './pages/events/CreateEventPage';
+import ClanDetailPage from './pages/clanes/ClanDetailPage';
 
 
 // Protected Route Component
@@ -95,6 +96,10 @@ export const router = createBrowserRouter([
       {
         path: 'clanes',
         element: <ClanesPage />,
+      },
+      {
+        path: 'clanes/:id',
+        element: <ClanDetailPage />,
       },
       {
         path: 'users',

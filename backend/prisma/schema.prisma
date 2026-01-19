@@ -60,6 +60,7 @@ model User {
   auditLogs         AuditLog[]
   clanHistory       ClanHistory[]
   absences          Absence[]
+  clanChangeRequests ClanChangeRequest[]
   
   createdAt         DateTime    @default(now())
   updatedAt         DateTime    @updatedAt
@@ -76,6 +77,7 @@ model Clan {
   description String?
   
   users       User[]
+  clanChangeRequests ClanChangeRequest[]
   
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
@@ -170,6 +172,29 @@ model Absence {
   
   @@unique([userId, eventId])
   @@index([eventId])
+}
+
+model ClanChangeRequest {
+  id              String   @id @default(uuid())
+  
+  userId          String
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  currentClanId   String?
+  targetClanId    String
+  targetClan      Clan     @relation(fields: [targetClanId], references: [id], onDelete: Cascade)
+  
+  status          String   @default("PENDING") // PENDING, APPROVED, REJECTED
+  reason          String?
+  
+  reviewedBy      String?
+  reviewedAt      DateTime?
+  
+  createdAt       DateTime @default(now())
+  
+  @@index([userId])
+  @@index([targetClanId])
+  @@index([status])
 }
 
 model AuditLog {

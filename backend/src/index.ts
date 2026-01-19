@@ -3,6 +3,7 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 import { PrismaClient } from '@prisma/client';
 import authRoutes from './routes/auth.routes';
+import clanRoutes from './routes/clan.routes'; // ← AGREGAR
 
 dotenv.config();
 
@@ -26,7 +27,9 @@ app.get('/health', (req, res) => {
   });
 });
 
+// Rutas
 app.use('/api/auth', authRoutes);
+app.use('/api/clans', clanRoutes); // ← AGREGAR
 
 app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
   console.error('Error:', err);
@@ -42,6 +45,7 @@ app.listen(PORT, () => {
   console.log('Server running on port ' + PORT);
   console.log('Health check: http://localhost:' + PORT + '/health');
   console.log('Auth routes: http://localhost:' + PORT + '/api/auth');
+  console.log('Clan routes: http://localhost:' + PORT + '/api/clans'); // ← AGREGAR
 });
 
 process.on('SIGINT', async () => {

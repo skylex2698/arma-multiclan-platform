@@ -1,0 +1,195 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ===== ENUMS =====
+
+enum UserStatus {
+  PENDING
+  ACTIVE
+  BLOCKED
+  BANNED
+  INACTIVE
+}
+
+enum UserRole {
+  USER
+  CLAN_LEADER
+  ADMIN
+}
+
+enum EventStatus {
+  ACTIVE
+  INACTIVE
+}
+
+enum GameType {
+  ARMA_3
+  ARMA_REFORGER
+}
+
+enum SlotStatus {
+  FREE
+  OCCUPIED
+}
+
+// ===== MODELOS =====
+
+model User {
+  id                String      @id @default(uuid())
+  email             String?     @unique
+  password          String?
+  nickname          String
+  discordId         String?     @unique
+  discordUsername   String?
+  steamId           String?     @unique
+  
+  status            UserStatus  @default(PENDING)
+  role              UserRole    @default(USER)
+  
+  clanId            String?
+  clan              Clan?       @relation(fields: [clanId], references: [id], onDelete: SetNull)
+  
+  slots             Slot[]
+  createdEvents     Event[]     @relation("EventCreator")
+  auditLogs         AuditLog[]
+  clanHistory       ClanHistory[]
+  absences          Absence[]
+  
+  createdAt         DateTime    @default(now())
+  updatedAt         DateTime    @updatedAt
+  
+  @@index([clanId])
+  @@index([status])
+  @@index([discordId])
+}
+
+model Clan {
+  id          String   @id @default(uuid())
+  name        String   @unique
+  tag         String?  // Ej: [ALFA]
+  description String?
+  
+  users       User[]
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model Event {
+  id              String      @id @default(uuid())
+  name            String
+  description     String?
+  briefing        String?     // Contenido HTML del briefing
+  
+  gameType        GameType
+  status          EventStatus @default(ACTIVE)
+  
+  scheduledDate   DateTime
+  
+  creatorId       String
+  creator         User        @relation("EventCreator", fields: [creatorId], references: [id])
+  
+  squads          Squad[]
+  absences        Absence[]
+  auditLogs       AuditLog[]
+  
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+  
+  @@index([status])
+  @@index([scheduledDate])
+  @@index([creatorId])
+}
+
+model Squad {
+  id          String   @id @default(uuid())
+  name        String   // Ej: "Alfa", "Bravo", "Reconocimiento"
+  order       Int      // Para ordenar las escuadras
+  
+  eventId     String
+  event       Event    @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  
+  slots       Slot[]
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  @@index([eventId])
+}
+
+model Slot {
+  id          String      @id @default(uuid())
+  role        String      // Ej: "Fusilero", "Médico", "Líder de escuadra"
+  order       Int         // Para ordenar los slots
+  status      SlotStatus  @default(FREE)
+  
+  squadId     String
+  squad       Squad       @relation(fields: [squadId], references: [id], onDelete: Cascade)
+  
+  userId      String?
+  user        User?       @relation(fields: [userId], references: [id], onDelete: SetNull)
+  
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+  
+  @@index([squadId])
+  @@index([userId])
+}
+
+model ClanHistory {
+  id          String   @id @default(uuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  previousClan String?
+  newClan      String?
+  reason       String?
+  
+  changedAt    DateTime @default(now())
+  
+  @@index([userId])
+}
+
+model Absence {
+  id          String   @id @default(uuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  eventId     String
+  event       Event    @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  
+  reason      String?
+  
+  createdAt   DateTime @default(now())
+  
+  @@unique([userId, eventId])
+  @@index([eventId])
+}
+
+model AuditLog {
+  id          String   @id @default(uuid())
+  
+  action      String   // Ej: "USER_VALIDATED", "SLOT_ASSIGNED", "EVENT_CREATED"
+  entity      String   // Ej: "User", "Event", "Slot"
+  entityId    String
+  
+  userId      String?
+  user        User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  
+  eventId     String?
+  event       Event?   @relation(fields: [eventId], references: [id], onDelete: SetNull)
+  
+  details     String?  // JSON con detalles adicionales
+  
+  createdAt   DateTime @default(now())
+  
+  @@index([entity, entityId])
+  @@index([userId])
+  @@index([createdAt])
+}

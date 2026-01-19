@@ -8,10 +8,11 @@ interface SquadSectionProps {
   onAssignSlot: (slotId: string) => void;
   onUnassignSlot: (slotId: string) => void;
   onAdminAssign?: (slotId: string, userId: string) => void;
+  onAdminUnassign?: (slotId: string) => void;
   isLoading: boolean;
   eventStatus: 'ACTIVE' | 'INACTIVE';
   availableUsers?: User[];
-  getUserSlotInfo?: (userId: string) => { // <-- AGREGAR
+  getUserSlotInfo?: (userId: string) => {
     hasSlot: boolean;
     squadName?: string;
     slotRole?: string;
@@ -23,6 +24,7 @@ export function SquadSection({
   onAssignSlot,
   onUnassignSlot,
   onAdminAssign,
+  onAdminUnassign,
   isLoading,
   eventStatus,
   availableUsers = [],
@@ -52,10 +54,11 @@ export function SquadSection({
               onAssign={onAssignSlot}
               onUnassign={onUnassignSlot}
               onAdminAssign={onAdminAssign}
+              onAdminUnassign={onAdminUnassign}
               isLoading={isLoading}
               eventStatus={eventStatus}
               availableUsers={availableUsers}
-              getUserSlotInfo={getUserSlotInfo} // <-- AGREGAR
+              getUserSlotInfo={getUserSlotInfo}
             />
           ))}
       </div>

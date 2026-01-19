@@ -38,4 +38,12 @@ export const slotService = {
     );
     return response.data.data;
   },
+
+  // Desasignar slot por admin/líder
+  adminUnassign: async (slotId: string): Promise<{ slot: Slot }> => {
+    const response = await api.post<ApiResponse<{ slot: Slot }>>(
+      `/slots/${slotId}/admin-unassign`
+    );
+    return response.data.data;
+  },
 };

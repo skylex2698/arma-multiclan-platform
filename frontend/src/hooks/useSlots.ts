@@ -35,3 +35,15 @@ export function useAdminAssignSlot() {
     },
   });
 }
+
+export function useAdminUnassignSlot() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (slotId: string) => slotService.adminUnassign(slotId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['events'] });
+      queryClient.invalidateQueries({ queryKey: ['event'] });
+    },
+  });
+}

@@ -10,10 +10,11 @@ interface SlotItemProps {
   onAssign: (slotId: string) => void;
   onUnassign: (slotId: string) => void;
   onAdminAssign?: (slotId: string, userId: string) => void;
+  onAdminUnassign?: (slotId: string) => void;
   isLoading: boolean;
   eventStatus: 'ACTIVE' | 'INACTIVE';
   availableUsers?: User[];
-  getUserSlotInfo?: (userId: string) => { // <-- AGREGAR
+  getUserSlotInfo?: (userId: string) => {
     hasSlot: boolean;
     squadName?: string;
     slotRole?: string;
@@ -25,6 +26,7 @@ export function SlotItem({
   onAssign,
   onUnassign,
   onAdminAssign,
+  onAdminUnassign,
   isLoading,
   eventStatus,
   availableUsers = [],
@@ -40,6 +42,13 @@ export function SlotItem({
     (user?.role === 'ADMIN' || user?.role === 'CLAN_LEADER') &&
     onAdminAssign &&
     availableUsers.length > 0;
+
+  const canAdminUnassign =
+    slot.status === 'OCCUPIED' &&
+    !isOccupiedByMe &&
+    onAdminUnassign &&
+    (user?.role === 'ADMIN' ||
+      (user?.role === 'CLAN_LEADER' && slot.user?.clan?.id === user?.clan?.id));
 
   const handleClick = () => {
     if (!canInteract || isLoading || showUserSelector) return;
@@ -137,6 +146,23 @@ export function SlotItem({
               title="Asignar usuario"
             >
               <UserCog className="h-4 w-4" />
+            </button>
+          )}
+
+          {/* Botón de desasignar por admin/líder */}
+          {canAdminUnassign && (
+            <button
+              className="btn btn-danger btn-sm"
+              disabled={isLoading}
+              onClick={(e) => {
+                e.stopPropagation();
+                if (onAdminUnassign) {
+                  onAdminUnassign(slot.id);
+                }
+              }}
+              title="Desapuntar usuario"
+            >
+              <UserMinus className="h-4 w-4" />
             </button>
           )}
 

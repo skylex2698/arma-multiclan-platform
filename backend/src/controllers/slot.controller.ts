@@ -263,6 +263,74 @@ export class SlotController {
       );
     }
   }
+
+  // POST /api/slots/:id/admin-unassign
+  async adminUnassignSlot(req: Request, res: Response) {
+    try {
+      if (!req.user) {
+        return errorResponse(res, 'No autenticado', 401);
+      }
+
+      const slotId = req.params.id as string;
+      const userRole = req.user.role;
+      const userClanId = req.user.clanId;
+
+      if (userRole !== 'ADMIN' && userRole !== 'CLAN_LEADER') {
+        return errorResponse(
+          res,
+          'No tienes permisos para desasignar usuarios',
+          403
+        );
+      }
+
+      // Obtener el slot para verificar el usuario asignado
+      const slot = await prisma.slot.findUnique({
+        where: { id: slotId },
+        include: {
+          user: {
+            select: {
+              id: true,
+              clanId: true,
+            },
+          },
+        },
+      });
+
+      if (!slot) {
+        return errorResponse(res, 'Slot no encontrado', 404);
+      }
+
+      if (!slot.userId) {
+        return errorResponse(res, 'El slot ya está libre', 400);
+      }
+
+      // Si es líder de clan, verificar que el usuario sea de su clan
+      if (userRole === 'CLAN_LEADER') {
+        if (!slot.user || slot.user.clanId !== userClanId) {
+          return errorResponse(
+            res,
+            'Solo puedes desasignar usuarios de tu clan',
+            403
+          );
+        }
+      }
+
+      const updatedSlot = await slotService.adminUnassignSlot(slotId, req.user.id);
+
+      return successResponse(
+        res,
+        { slot: updatedSlot },
+        'Usuario desasignado del slot correctamente'
+      );
+    } catch (error: any) {
+      logger.error('Error in adminUnassignSlot', error);
+      return errorResponse(
+        res,
+        error.message || 'Error al desasignar usuario',
+        500
+      );
+    }
+  }
 }
 
 export const slotController = new SlotController();

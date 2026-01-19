@@ -667,6 +667,76 @@ export class SlotService {
 
     return updatedSlot;
   }
+
+  async adminUnassignSlot(slotId: string, unassignedBy: string) {
+    // Verificar que el slot existe y está ocupado
+    const slot = await prisma.slot.findUnique({
+      where: { id: slotId },
+      include: {
+        user: {
+          select: {
+            id: true,
+            nickname: true,
+          },
+        },
+        squad: {
+          include: {
+            event: {
+              select: {
+                id: true,
+                name: true,
+              },
+            },
+          },
+        },
+      },
+    });
+
+    if (!slot) {
+      throw new Error('Slot no encontrado');
+    }
+
+    if (slot.status !== 'OCCUPIED' || !slot.userId) {
+      throw new Error('El slot ya está libre');
+    }
+
+    const previousUserId = slot.userId;
+    const previousUserNickname = slot.user?.nickname;
+
+    // Liberar el slot
+    const updatedSlot = await prisma.slot.update({
+      where: { id: slotId },
+      data: {
+        userId: null,
+        status: 'FREE',
+      },
+    });
+
+    // Registrar en audit log
+    await prisma.auditLog.create({
+      data: {
+        action: 'SLOT_ADMIN_UNASSIGNED',
+        entity: 'SLOT',
+        entityId: slotId,
+        userId: unassignedBy,
+        details: JSON.stringify({
+          slotId,
+          unassignedUserId: previousUserId,
+          unassignedUserNickname: previousUserNickname,
+          eventId: slot.squad.event.id,
+          eventName: slot.squad.event.name,
+        }),
+      },
+    });
+
+    logger.info('Slot unassigned by admin/leader', {
+      slotId,
+      unassignedUserId: previousUserId,
+      unassignedBy,
+    });
+
+    return updatedSlot;
+  }
 }
 
 export const slotService = new SlotService();

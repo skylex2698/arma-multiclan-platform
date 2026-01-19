@@ -18,7 +18,7 @@ import { es } from 'date-fns/locale';
 import { useState } from 'react';
 import { Edit } from 'lucide-react';
 import { useAuthStore } from '../../store/authStore';
-import { useAdminAssignSlot } from '../../hooks/useSlots';
+import { useAdminAssignSlot, useAdminUnassignSlot } from '../../hooks/useSlots';
 import { useUsers } from '../../hooks/useUsers';
 
 export default function EventDetailPage() {
@@ -29,6 +29,7 @@ export default function EventDetailPage() {
   const unassignSlot = useUnassignSlot(id!);
   const [actionError, setActionError] = useState('');
   const adminAssignSlot = useAdminAssignSlot();
+  const adminUnassignSlot = useAdminUnassignSlot();
 
   // Obtener usuarios disponibles para asignación (AGREGAR)
   const { data: usersData } = useUsers(
@@ -51,6 +52,14 @@ export default function EventDetailPage() {
       await adminAssignSlot.mutateAsync({ slotId, userId });
     } catch (err) {
       console.error('Error al asignar usuario:', err);
+    }
+  };
+
+  const handleAdminUnassign = async (slotId: string) => {
+    try {
+      await adminUnassignSlot.mutateAsync(slotId);
+    } catch (err) {
+      console.error('Error al desasignar usuario:', err);
     }
   };
 
@@ -261,14 +270,16 @@ export default function EventDetailPage() {
               squad={squad}
               onAssignSlot={handleAssignSlot}
               onUnassignSlot={handleUnassignSlot}
-              onAdminAssign={handleAdminAssign} // <-- AGREGAR
+              onAdminAssign={handleAdminAssign}
+              onAdminUnassign={handleAdminUnassign}
               isLoading={
                 assignSlot.isPending ||
                 unassignSlot.isPending ||
-                adminAssignSlot.isPending // <-- AGREGAR
+                adminAssignSlot.isPending ||
+                adminUnassignSlot.isPending
               }
               eventStatus={event.status}
-              availableUsers={availableUsers} // <-- AGREGAR
+              availableUsers={availableUsers}
               getUserSlotInfo={getUserSlotInfo}
             />
           ))}

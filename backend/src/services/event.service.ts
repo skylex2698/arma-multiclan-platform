@@ -374,30 +374,15 @@ export class EventService {
   async deleteEvent(id: string) {
     const event = await prisma.event.findUnique({
       where: { id },
-      include: {
-        squads: {
-          include: {
-            slots: true,
-          },
-        },
-      },
     });
 
     if (!event) {
       throw new Error('Evento no encontrado');
     }
 
-    // Verificar si hay usuarios inscritos
-    const hasUsers = event.squads.some((squad) =>
-      squad.slots.some((slot) => slot.userId !== null)
-    );
-
-    if (hasUsers) {
-      throw new Error(
-        'No se puede eliminar un evento con usuarios inscritos. Primero desapunta a todos los usuarios.'
-      );
-    }
-
+    // Simplemente eliminar el evento
+    // Prisma eliminará automáticamente las escuadras y slots relacionados
+    // gracias a la cascada definida en el schema
     await prisma.event.delete({
       where: { id },
     });

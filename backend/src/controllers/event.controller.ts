@@ -183,16 +183,21 @@ export class EventController {
   // DELETE /api/events/:id
   async deleteEvent(req: Request, res: Response) {
     try {
-      const id = req.params.id as string; // <-- ARREGLADO
+      const id = req.params.id as string;
       const userId = req.user!.id;
       const userRole = req.user!.role;
+      const userClanId = req.user!.clanId;
 
       // Obtener el evento para verificar permisos
       const event = await prisma.event.findUnique({
         where: { id },
-        select: {
-          id: true,
-          creatorId: true,
+        include: {
+          creator: {
+            select: {
+              id: true,
+              clanId: true,
+            },
+          },
         },
       });
 
@@ -200,9 +205,22 @@ export class EventController {
         return errorResponse(res, 'Evento no encontrado', 404);
       }
 
-      // Solo el creador o admin pueden eliminar
-      if (event.creatorId !== userId && userRole !== 'ADMIN') {
-        return errorResponse(res, 'No tienes permisos para eliminar este evento', 403);
+      // Verificar permisos:
+      // - Admin puede eliminar cualquier evento
+      // - Creador puede eliminar su propio evento
+      // - Líder de clan puede eliminar eventos de su clan
+      const isAdmin = userRole === 'ADMIN';
+      const isCreator = event.creatorId === userId;
+      const isClanLeader =
+        userRole === 'CLAN_LEADER' &&
+        userClanId === event.creator?.clanId;
+
+      if (!isAdmin && !isCreator && !isClanLeader) {
+        return errorResponse(
+          res,
+          'No tienes permisos para eliminar este evento',
+          403
+        );
       }
 
       await eventService.deleteEvent(id);

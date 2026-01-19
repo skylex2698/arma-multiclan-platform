@@ -1,15 +1,18 @@
 import { Outlet, Link, useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../../store/authStore';
-import { 
-  Home, 
-  Calendar, 
-  Users, 
-  Shield, 
+import {
+  Home,
+  Calendar,
+  Users,
+  Shield,
   LogOut,
   Menu,
-  X
+  X,
+  GitBranch,
 } from 'lucide-react';
 import { useState } from 'react';
+
+
 
 export default function MainLayout() {
   const { user, logout } = useAuthStore();
@@ -29,6 +32,14 @@ export default function MainLayout() {
 
   if (user?.role === 'ADMIN' || user?.role === 'CLAN_LEADER') {
     navigation.push({ name: 'Usuarios', href: '/users', icon: Users });
+  }
+
+  if (user?.role === 'ADMIN') {
+    navigation.push({ 
+      name: 'Solicitudes', 
+      href: '/users/requests', 
+      icon: GitBranch 
+    });
   }
 
   return (

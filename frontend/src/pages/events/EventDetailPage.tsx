@@ -42,22 +42,32 @@ export default function EventDetailPage() {
       : undefined
   );
 
+  // CAMBIO: NO filtrar usuarios que ya están en el evento
   // Filtrar usuarios que NO están ya en el evento (AGREGAR)
-  const availableUsers = usersData?.users.filter((u) => {
-    // Verificar si el usuario ya tiene un slot en este evento
-    const hasSlot = data?.event?.squads.some((squad) =>
-      squad.slots.some((slot) => slot.userId === u.id)
-    );
-    return !hasSlot;
-  }) || [];
+  const availableUsers = usersData?.users || [];
 
   const handleAdminAssign = async (slotId: string, userId: string) => {
-  try {
-    await adminAssignSlot.mutateAsync({ slotId, userId });
-  } catch (err) {
-    console.error('Error al asignar usuario:', err);
-  }
-};
+    try {
+      await adminAssignSlot.mutateAsync({ slotId, userId });
+    } catch (err) {
+      console.error('Error al asignar usuario:', err);
+    }
+  };
+
+  // Opcional: Marcar visualmente cuáles ya están asignados
+  const getUserSlotInfo = (userId: string) => {
+    for (const squad of data?.event?.squads || []) {
+      const slot = squad.slots.find((s) => s.userId === userId);
+      if (slot) {
+        return {
+          hasSlot: true,
+          squadName: squad.name,
+          slotRole: slot.role,
+        };
+      }
+    }
+    return { hasSlot: false };
+  };
 
   const handleAssignSlot = async (slotId: string) => {
     setActionError('');
@@ -259,6 +269,7 @@ export default function EventDetailPage() {
               }
               eventStatus={event.status}
               availableUsers={availableUsers} // <-- AGREGAR
+              getUserSlotInfo={getUserSlotInfo}
             />
           ))}
       </div>

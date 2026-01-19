@@ -13,6 +13,11 @@ interface SlotItemProps {
   isLoading: boolean;
   eventStatus: 'ACTIVE' | 'INACTIVE';
   availableUsers?: User[];
+  getUserSlotInfo?: (userId: string) => { // <-- AGREGAR
+    hasSlot: boolean;
+    squadName?: string;
+    slotRole?: string;
+  };
 }
 
 export function SlotItem({
@@ -23,6 +28,7 @@ export function SlotItem({
   isLoading,
   eventStatus,
   availableUsers = [],
+  getUserSlotInfo,
 }: SlotItemProps) {
   const user = useAuthStore((state) => state.user);
   const [showUserSelector, setShowUserSelector] = useState(false);
@@ -154,22 +160,31 @@ export function SlotItem({
                 No hay usuarios disponibles
               </p>
             ) : (
-              availableUsers.map((availableUser) => (
-                <button
-                  key={availableUser.id}
-                  onClick={() => handleAdminAssign(availableUser.id)}
-                  className="w-full text-left px-3 py-2 hover:bg-military-50 rounded text-sm flex items-center gap-2"
-                  disabled={isLoading}
-                >
-                  <UserAvatar user={availableUser} size="sm" showBorder={true} />
-                  <div>
-                    <p className="font-medium">
-                      {availableUser.clan?.tag && `${availableUser.clan.tag} `}
-                      {availableUser.nickname}
-                    </p>
-                  </div>
-                </button>
-              ))
+              availableUsers.map((availableUser) => {
+                const slotInfo = getUserSlotInfo?.(availableUser.id) || { hasSlot: false };
+                
+                return (
+                  <button
+                    key={availableUser.id}
+                    onClick={() => handleAdminAssign(availableUser.id)}
+                    className="w-full text-left px-3 py-2 hover:bg-military-50 rounded text-sm flex items-center gap-2"
+                    disabled={isLoading}
+                  >
+                    <UserAvatar user={availableUser} size="sm" showBorder={true} />
+                    <div className="flex-1">
+                      <p className="font-medium">
+                        {availableUser.clan?.tag && `${availableUser.clan.tag} `}
+                        {availableUser.nickname}
+                      </p>
+                      {slotInfo.hasSlot && (
+                        <p className="text-xs text-amber-600">
+                          Ya en: {slotInfo.squadName} - {slotInfo.slotRole}
+                        </p>
+                      )}
+                    </div>
+                  </button>
+                );
+              })
             )}
           </div>
           <div className="p-2 border-t border-military-200">

@@ -11,6 +11,11 @@ interface SquadSectionProps {
   isLoading: boolean;
   eventStatus: 'ACTIVE' | 'INACTIVE';
   availableUsers?: User[];
+  getUserSlotInfo?: (userId: string) => { // <-- AGREGAR
+    hasSlot: boolean;
+    squadName?: string;
+    slotRole?: string;
+  };
 }
 
 export function SquadSection({
@@ -21,6 +26,7 @@ export function SquadSection({
   isLoading,
   eventStatus,
   availableUsers = [],
+  getUserSlotInfo
 }: SquadSectionProps) {
   const occupiedSlots = squad.slots.filter((slot) => slot.status === 'OCCUPIED').length;
 
@@ -49,6 +55,7 @@ export function SquadSection({
               isLoading={isLoading}
               eventStatus={eventStatus}
               availableUsers={availableUsers}
+              getUserSlotInfo={getUserSlotInfo} // <-- AGREGAR
             />
           ))}
       </div>

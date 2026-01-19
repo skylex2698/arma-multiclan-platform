@@ -581,7 +581,7 @@ export class SlotService {
       throw new Error('El usuario no está activo');
     }
 
-    // Verificar que el usuario no tenga ya un slot en este evento
+    // CAMBIO: Si el usuario ya tiene un slot en este evento, liberarlo primero
     const existingSlot = await prisma.slot.findFirst({
       where: {
         userId: userId,
@@ -592,10 +592,23 @@ export class SlotService {
     });
 
     if (existingSlot) {
-      throw new Error('El usuario ya tiene un slot asignado en este evento');
+      // Liberar el slot anterior
+      await prisma.slot.update({
+        where: { id: existingSlot.id },
+        data: {
+          userId: null,
+          status: 'FREE',
+        },
+      });
+
+      logger.info('Previous slot freed for user movement', {
+        oldSlotId: existingSlot.id,
+        userId,
+        eventId: slot.squad.eventId,
+      });
     }
 
-    // Asignar el slot
+    // Asignar el nuevo slot
     const updatedSlot = await prisma.slot.update({
       where: { id: slotId },
       data: {
@@ -628,7 +641,7 @@ export class SlotService {
     // Registrar en audit log
     await prisma.auditLog.create({
       data: {
-        action: 'SLOT_ADMIN_ASSIGNED',
+        action: existingSlot ? 'SLOT_MOVED' : 'SLOT_ADMIN_ASSIGNED',
         entity: 'SLOT',
         entityId: slotId,
         userId: assignedBy,
@@ -637,15 +650,20 @@ export class SlotService {
           assignedUserId: userId,
           eventId: slot.squad.eventId,
           eventName: slot.squad.event.name,
+          ...(existingSlot && { previousSlotId: existingSlot.id }),
         }),
       },
     });
 
-    logger.info('Slot assigned by admin/leader', {
-      slotId,
-      userId,
-      assignedBy,
-    });
+    logger.info(
+      existingSlot ? 'Slot moved by admin/leader' : 'Slot assigned by admin/leader',
+      {
+        slotId,
+        userId,
+        assignedBy,
+        ...(existingSlot && { previousSlotId: existingSlot.id }),
+      }
+    );
 
     return updatedSlot;
   }

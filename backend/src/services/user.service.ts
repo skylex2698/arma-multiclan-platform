@@ -1,6 +1,7 @@
 import { prisma } from '../index';
 import { logger } from '../utils/logger';
 import { UserRole, UserStatus } from '@prisma/client';
+import { hashPassword, comparePassword } from '../utils/password';
 
 export class UserService {
   // Listar usuarios con filtros
@@ -443,6 +444,84 @@ export class UserService {
     }
 
     return updatedRequest;
+  }
+
+  async updateProfile(
+    userId: string,
+    data: {
+      nickname?: string;
+      email?: string;
+    }
+  ) {
+    const updatedUser = await prisma.user.update({
+      where: { id: userId },
+      data: {
+        ...(data.nickname && { nickname: data.nickname }),
+        ...(data.email && { email: data.email }),
+      },
+      select: {
+        id: true,
+        email: true,
+        nickname: true,
+        role: true,
+        status: true,
+        clanId: true,
+        avatarUrl: true,
+        createdAt: true,
+        updatedAt: true,
+        clan: {
+          select: {
+            id: true,
+            name: true,
+            tag: true,
+            description: true,
+            avatarUrl: true,
+          },
+        },
+      },
+    });
+
+    logger.info('User profile updated', { userId });
+
+    return updatedUser;
+  }
+
+  async changePassword(
+    userId: string,
+    currentPassword: string,
+    newPassword: string
+  ) {
+    // Obtener usuario con password
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        id: true,
+        password: true,
+      },
+    });
+
+    if (!user || !user.password) {
+      throw new Error('Usuario no encontrado');
+    }
+
+    // Verificar contraseña actual
+    const isPasswordValid = await comparePassword(currentPassword, user.password);
+    if (!isPasswordValid) {
+      throw new Error('La contraseña actual es incorrecta');
+    }
+
+    // Hash de la nueva contraseña
+    const hashedPassword = await hashPassword(newPassword);
+
+    // Actualizar contraseña
+    await prisma.user.update({
+      where: { id: userId },
+      data: {
+        password: hashedPassword,
+      },
+    });
+
+    logger.info('User password changed', { userId });
   }
 }
 

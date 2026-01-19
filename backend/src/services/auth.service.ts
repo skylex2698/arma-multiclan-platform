@@ -80,6 +80,7 @@ export class AuthService {
         status: true,
         clanId: true,
         avatarUrl: true,
+        createdAt: true,
         clan: {
           select: {
             id: true,

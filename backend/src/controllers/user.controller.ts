@@ -3,6 +3,8 @@ import { userService } from '../services/user.service';
 import { successResponse, errorResponse } from '../utils/responses';
 import { logger } from '../utils/logger';
 import { UserRole, UserStatus } from '@prisma/client';
+import { isValidEmail, sanitizeNickname, isStrongPassword } from '../utils/validators';
+import { prisma } from '../config/database';
 
 export class UserController {
   // GET /api/users
@@ -213,6 +215,106 @@ export class UserController {
     } catch (error: any) {
       logger.error('Error in reviewClanChangeRequest', error);
       return errorResponse(res, error.message || 'Error al revisar solicitud', 500);
+    }
+  }
+
+  // PUT /api/users/profile
+  async updateProfile(req: Request, res: Response) {
+    try {
+      if (!req.user) {
+        return errorResponse(res, 'No autenticado', 401);
+      }
+
+      const userId = req.user.id;
+      const { nickname, email } = req.body;
+
+      // Validaciones
+      if (email) {
+        if (!isValidEmail(email)) {
+          return errorResponse(res, 'Email inválido', 400);
+        }
+
+        // Verificar si el email ya está en uso por otro usuario
+        const existingUser = await prisma.user.findFirst({
+          where: {
+            email,
+            NOT: { id: userId },
+          },
+        });
+
+        if (existingUser) {
+          return errorResponse(res, 'El email ya está en uso', 400);
+        }
+      }
+
+      if (nickname) {
+        const cleanNickname = sanitizeNickname(nickname);
+        if (cleanNickname.length < 3) {
+          return errorResponse(
+            res,
+            'El nickname debe tener al menos 3 caracteres',
+            400
+          );
+        }
+      }
+
+      // Actualizar usuario
+      const updatedUser = await userService.updateProfile(userId, {
+        nickname,
+        email,
+      });
+
+      return successResponse(
+        res,
+        { user: updatedUser },
+        'Perfil actualizado correctamente'
+      );
+    } catch (error: any) {
+      logger.error('Error in updateProfile', error);
+      return errorResponse(
+        res,
+        error.message || 'Error al actualizar perfil',
+        500
+      );
+    }
+  }
+
+  // PUT /api/users/change-password
+  async changePassword(req: Request, res: Response) {
+    try {
+      if (!req.user) {
+        return errorResponse(res, 'No autenticado', 401);
+      }
+
+      const userId = req.user.id;
+      const { currentPassword, newPassword } = req.body;
+
+      if (!currentPassword || !newPassword) {
+        return errorResponse(
+          res,
+          'La contraseña actual y nueva son obligatorias',
+          400
+        );
+      }
+
+      if (!isStrongPassword(newPassword)) {
+        return errorResponse(
+          res,
+          'La contraseña debe tener mínimo 8 caracteres, una mayúscula, una minúscula y un número',
+          400
+        );
+      }
+
+      await userService.changePassword(userId, currentPassword, newPassword);
+
+      return successResponse(res, {}, 'Contraseña actualizada correctamente');
+    } catch (error: any) {
+      logger.error('Error in changePassword', error);
+      return errorResponse(
+        res,
+        error.message || 'Error al cambiar contraseña',
+        400
+      );
     }
   }
 }

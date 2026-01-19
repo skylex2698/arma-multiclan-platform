@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { userService } from '../services/userService';
 import type { UserRole, UserStatus } from '../types';
+import { useAuthStore } from '../store/authStore';
 
 export function useUsers(filters?: {
   clanId?: string;
@@ -107,5 +108,30 @@ export function useAvailableUsers(clanId?: string) {
       const params = clanId ? { clanId, status: 'ACTIVE' } : { status: 'ACTIVE' };
       return userService.getAll(params);
     },
+  });
+}
+
+export function useUpdateProfile() {
+  const queryClient = useQueryClient();
+  const setAuth = useAuthStore((state) => state.setAuth);
+
+  return useMutation({
+    mutationFn: (data: { nickname?: string; email?: string }) =>
+      userService.updateProfile(data),
+    onSuccess: (response) => {
+      // Actualizar el usuario en el store
+      const token = localStorage.getItem('token');
+      if (token) {
+        setAuth(response.user, token);
+      }
+      queryClient.invalidateQueries({ queryKey: ['users'] });
+    },
+  });
+}
+
+export function useChangePassword() {
+  return useMutation({
+    mutationFn: (data: { currentPassword: string; newPassword: string }) =>
+      userService.changePassword(data),
   });
 }

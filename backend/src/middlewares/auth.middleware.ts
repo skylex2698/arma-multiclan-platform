@@ -119,3 +119,22 @@ export const requireClan = (
 
   next();
 };
+
+// Middleware para requerir rol de admin
+export const requireAdmin = (req: Request, res: Response, next: NextFunction) => {
+  if (!req.user) {
+    return res.status(401).json({
+      success: false,
+      message: 'No autenticado',
+    });
+  }
+
+  if (req.user.role !== 'ADMIN') {
+    return res.status(403).json({
+      success: false,
+      message: 'Se requieren permisos de administrador',
+    });
+  }
+
+  next();
+};

@@ -123,3 +123,41 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 - **Agregado** - Para nuevas características
 - **Cambiado** - Para cambios en fu
+
+## [1.1.0] - 2025-01-20
+
+### ✨ Agregado
+
+**Perfil de Usuario:**
+- Página de perfil completa con avatar, rol y badges
+- Edición de información personal (nickname y email)
+- Cambio de contraseña con validaciones robustas
+- Visualización de fecha de registro
+- Enlace "Mi Perfil" en menú de usuario (navbar)
+
+**Backend:**
+- Endpoints PUT /users/profile y /users/change-password
+- Middleware requireAdmin para rutas de administración
+- Validación de email único en actualización
+- Logging de cambios de perfil y contraseña
+
+**Frontend:**
+- Componente ProfilePage con secciones editables
+- Mensajes de éxito/error en tiempo real
+- Validaciones de formulario
+- UI consistente con el resto de la app
+
+### 🔧 Cambiado
+
+- Router simplificado sin AuthLayout
+- Layout de login mejorado y corregido
+- MainLayout con dropdown de usuario mejorado
+
+### 🐛 Corregido
+
+- Manejo de fechas undefined en ProfilePage
+- Imports de módulos en backend
+- Router con rutas anidadas correctas
+- Tipos TypeScript en hooks
+
+---

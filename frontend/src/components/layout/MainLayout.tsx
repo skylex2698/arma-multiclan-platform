@@ -1,172 +1,221 @@
-import { Outlet, Link, useNavigate } from 'react-router-dom';
-import { useAuthStore } from '../../store/authStore';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
+import { useState } from 'react';
 import {
-  Home,
+  Shield,
   Calendar,
   Users,
-  Shield,
-  LogOut,
+  Home,
   Menu,
   X,
-  GitBranch,
+  LogOut,
+  ChevronDown,
+  User as UserIcon,
 } from 'lucide-react';
-import { useState } from 'react';
+import { useAuthStore } from '../../store/authStore';
 import { UserAvatar } from '../ui/UserAvatar';
 
-export default function MainLayout() {
-  const { user, logout } = useAuthStore();
+interface MainLayoutProps {
+  children: React.ReactNode;
+}
+
+export function MainLayout({ children }: MainLayoutProps) {
   const navigate = useNavigate();
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const location = useLocation();
+  const user = useAuthStore((state) => state.user);
+  const logout = useAuthStore((state) => state.logout);
+  const [showMobileMenu, setShowMobileMenu] = useState(false);
+  const [showUserMenu, setShowUserMenu] = useState(false);
 
   const handleLogout = () => {
     logout();
     navigate('/login');
   };
 
-  const navigation = [
-    { name: 'Dashboard', href: '/dashboard', icon: Home },
-    { name: 'Eventos', href: '/events', icon: Calendar },
-    { name: 'Clanes', href: '/clanes', icon: Shield },
+  const isActive = (path: string) => {
+    return location.pathname === path || location.pathname.startsWith(path + '/');
+  };
+
+  const navLinks = [
+    { path: '/dashboard', label: 'Dashboard', icon: Home },
+    { path: '/events', label: 'Eventos', icon: Calendar },
+    { path: '/clanes', label: 'Clanes', icon: Shield },
+    ...(user?.role === 'ADMIN'
+      ? [{ path: '/users', label: 'Usuarios', icon: Users }]
+      : []),
   ];
-
-  if (user?.role === 'ADMIN' || user?.role === 'CLAN_LEADER') {
-    navigation.push({ name: 'Usuarios', href: '/users', icon: Users });
-  }
-
-  if (user?.role === 'ADMIN') {
-    navigation.push({
-      name: 'Solicitudes',
-      href: '/users/requests',
-      icon: GitBranch,
-    });
-  }
 
   return (
     <div className="min-h-screen bg-military-50">
       {/* Navbar */}
-      <nav className="bg-white shadow-md">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between h-16">
-            <div className="flex">
-              <div className="flex-shrink-0 flex items-center">
-                <Shield className="h-8 w-8 text-primary-600" />
-                <span className="ml-2 text-xl font-bold text-military-900">
-                  Arma Events
-                </span>
-              </div>
-              <div className="hidden sm:ml-6 sm:flex sm:space-x-8">
-                {navigation.map((item) => (
+      <nav className="bg-white border-b border-military-200 sticky top-0 z-40">
+        <div className="container mx-auto px-4">
+          <div className="flex items-center justify-between h-16">
+            {/* Logo */}
+            <Link to="/dashboard" className="flex items-center gap-2">
+              <Shield className="h-8 w-8 text-primary-600" />
+              <span className="text-xl font-bold text-military-900 hidden sm:inline">
+                Arma Platform
+              </span>
+            </Link>
+
+            {/* Desktop Navigation */}
+            <div className="hidden lg:flex items-center gap-1">
+              {navLinks.map((link) => {
+                const Icon = link.icon;
+                return (
                   <Link
-                    key={item.name}
-                    to={item.href}
-                    className="inline-flex items-center px-1 pt-1 border-b-2 border-transparent text-sm font-medium text-military-500 hover:border-primary-500 hover:text-military-700 transition-colors"
+                    key={link.path}
+                    to={link.path}
+                    className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-colors ${
+                      isActive(link.path)
+                        ? 'bg-primary-50 text-primary-700 font-medium'
+                        : 'text-military-700 hover:bg-military-50'
+                    }`}
                   >
-                    <item.icon className="h-4 w-4 mr-2" />
-                    {item.name}
+                    <Icon className="h-5 w-5" />
+                    {link.label}
                   </Link>
-                ))}
-              </div>
+                );
+              })}
             </div>
 
-            {/* Usuario info - Desktop */}
-            <div className="hidden sm:ml-6 sm:flex sm:items-center space-x-4">
-              {user && (
-                <div className="flex items-center gap-3">
+            {/* User menu - Desktop */}
+            {user && (
+              <div className="hidden lg:block relative">
+                <button
+                  onClick={() => setShowUserMenu(!showUserMenu)}
+                  className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-military-100 transition-colors"
+                >
                   <UserAvatar user={user} size="md" showBorder={true} />
-                  <div className="text-right">
-                    <p className="text-sm font-medium text-military-900">
-                      {user.nickname}
-                    </p>
+                  <div className="text-left">
+                    <p className="font-medium text-military-900">{user.nickname}</p>
                     <p className="text-xs text-military-600">
-                      {user.clan?.tag && `${user.clan.tag} `}
                       {user.role === 'ADMIN'
-                        ? 'Admin'
+                        ? 'Administrador'
                         : user.role === 'CLAN_LEADER'
-                        ? 'Líder'
-                        : 'Miembro'}
+                        ? 'Líder de Clan'
+                        : 'Usuario'}
                     </p>
                   </div>
-                  <button
-                    onClick={handleLogout}
-                    className="btn btn-outline btn-sm flex items-center ml-2"
-                  >
-                    <LogOut className="h-4 w-4 mr-1" />
-                    Salir
-                  </button>
-                </div>
-              )}
-            </div>
+                  <ChevronDown className="h-4 w-4 text-military-600" />
+                </button>
+
+                {/* Dropdown menu */}
+                {showUserMenu && (
+                  <>
+                    <div
+                      className="fixed inset-0 z-40"
+                      onClick={() => setShowUserMenu(false)}
+                    />
+                    <div className="absolute right-0 mt-2 w-56 bg-white rounded-lg shadow-lg border border-military-200 py-2 z-50">
+                      <Link
+                        to="/profile"
+                        className="flex items-center gap-2 px-4 py-2 hover:bg-military-50 text-military-700"
+                        onClick={() => setShowUserMenu(false)}
+                      >
+                        <UserIcon className="h-4 w-4" />
+                        Mi Perfil
+                      </Link>
+                      <div className="border-t border-military-200 my-2"></div>
+                      <button
+                        onClick={handleLogout}
+                        className="w-full flex items-center gap-2 px-4 py-2 hover:bg-red-50 text-red-600"
+                      >
+                        <LogOut className="h-4 w-4" />
+                        Salir
+                      </button>
+                    </div>
+                  </>
+                )}
+              </div>
+            )}
 
             {/* Mobile menu button */}
-            <div className="flex items-center sm:hidden">
-              <button
-                onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-                className="inline-flex items-center justify-center p-2 rounded-md text-military-400 hover:text-military-500 hover:bg-military-100"
-              >
-                {mobileMenuOpen ? (
-                  <X className="h-6 w-6" />
-                ) : (
-                  <Menu className="h-6 w-6" />
-                )}
-              </button>
-            </div>
+            <button
+              onClick={() => setShowMobileMenu(!showMobileMenu)}
+              className="lg:hidden p-2 text-military-700 hover:bg-military-50 rounded-lg"
+            >
+              {showMobileMenu ? (
+                <X className="h-6 w-6" />
+              ) : (
+                <Menu className="h-6 w-6" />
+              )}
+            </button>
           </div>
         </div>
 
         {/* Mobile menu */}
-        {mobileMenuOpen && (
-          <div className="sm:hidden">
-            <div className="pt-2 pb-3 space-y-1">
-              {navigation.map((item) => (
-                <Link
-                  key={item.name}
-                  to={item.href}
-                  onClick={() => setMobileMenuOpen(false)}
-                  className="flex items-center px-4 py-2 text-base font-medium text-military-500 hover:bg-military-50 hover:text-military-700"
-                >
-                  <item.icon className="h-5 w-5 mr-3" />
-                  {item.name}
-                </Link>
-              ))}
-            </div>
-            <div className="pt-4 pb-3 border-t border-military-200">
-              {user && (
-                <div className="px-4 flex items-center gap-3 mb-3">
+        {showMobileMenu && (
+          <div className="lg:hidden border-t border-military-200 py-4">
+            {/* User info - Mobile */}
+            {user && (
+              <div className="px-4 mb-4">
+                <div className="flex items-center gap-3 mb-4 pb-4 border-b border-military-200">
                   <UserAvatar user={user} size="lg" showBorder={true} />
                   <div>
-                    <p className="text-base font-medium text-military-900">
-                      {user.nickname}
-                    </p>
-                    <p className="text-sm text-military-500">{user.email}</p>
-                    <p className="text-xs text-military-600">
-                      {user.clan?.tag && `${user.clan.tag} `}
+                    <p className="font-medium text-military-900">{user.nickname}</p>
+                    <p className="text-sm text-military-600">
                       {user.role === 'ADMIN'
-                        ? 'Admin'
+                        ? 'Administrador'
                         : user.role === 'CLAN_LEADER'
-                        ? 'Líder'
-                        : 'Miembro'}
+                        ? 'Líder de Clan'
+                        : 'Usuario'}
                     </p>
+                    {user.clan && (
+                      <p className="text-xs text-military-500">
+                        {user.clan.tag && `${user.clan.tag} `}
+                        {user.clan.name}
+                      </p>
+                    )}
                   </div>
                 </div>
-              )}
-              <div className="px-4">
+
+                <Link
+                  to="/profile"
+                  className="flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-military-50 text-military-700 mb-2"
+                  onClick={() => setShowMobileMenu(false)}
+                >
+                  <UserIcon className="h-5 w-5" />
+                  Mi Perfil
+                </Link>
+
                 <button
                   onClick={handleLogout}
-                  className="w-full btn btn-outline flex items-center justify-center"
+                  className="w-full flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-red-50 text-red-600"
                 >
-                  <LogOut className="h-4 w-4 mr-2" />
-                  Cerrar sesión
+                  <LogOut className="h-5 w-5" />
+                  Salir
                 </button>
               </div>
-            </div>
+            )}
+
+            {/* Navigation - Mobile */}
+            <nav className="space-y-1 px-4">
+              {navLinks.map((link) => {
+                const Icon = link.icon;
+                return (
+                  <Link
+                    key={link.path}
+                    to={link.path}
+                    onClick={() => setShowMobileMenu(false)}
+                    className={`flex items-center gap-2 px-3 py-2 rounded-lg transition-colors ${
+                      isActive(link.path)
+                        ? 'bg-primary-50 text-primary-700 font-medium'
+                        : 'text-military-700 hover:bg-military-50'
+                    }`}
+                  >
+                    <Icon className="h-5 w-5" />
+                    {link.label}
+                  </Link>
+                );
+              })}
+            </nav>
           </div>
         )}
       </nav>
 
       {/* Main content */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <Outlet />
-      </main>
+      <main className="container mx-auto px-4 py-6">{children}</main>
     </div>
   );
 }

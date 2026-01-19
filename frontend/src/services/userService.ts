@@ -90,4 +90,24 @@ export const userService = {
     );
     return response.data.data;
   },
+
+  // Actualizar perfil
+  updateProfile: async (data: {
+    nickname?: string;
+    email?: string;
+  }): Promise<{ user: User }> => {
+    const response = await api.put<ApiResponse<{ user: User }>>(
+      '/users/profile',
+      data
+    );
+    return response.data.data;
+  },
+
+  // Cambiar contraseña
+  changePassword: async (data: {
+    currentPassword: string;
+    newPassword: string;
+  }): Promise<void> => {
+    await api.put('/users/change-password', data);
+  },
 };

@@ -5,7 +5,7 @@ import dotenv from 'dotenv';
 import { PrismaClient } from '@prisma/client';
 import { authRoutes } from './routes/auth.routes';
 import { clanRoutes } from './routes/clan.routes';
-import userRoutes from './routes/user.routes';
+import { userRoutes } from './routes/user.routes';
 import eventRoutes from './routes/event.routes';
 import { slotRoutes, squadRouter } from './routes/slot.routes';
 

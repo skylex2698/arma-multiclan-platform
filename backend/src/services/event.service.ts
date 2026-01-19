@@ -326,43 +326,210 @@ export class EventService {
 
   // Editar evento
   async updateEvent(
-    eventId: string,
+    id: string,
     data: {
       name?: string;
       description?: string;
       briefing?: string;
+      gameType?: GameType;
       scheduledDate?: Date;
+      squads?: Array<{
+        id?: string;
+        name: string;
+        order: number;
+        slots: Array<{
+          id?: string;
+          role: string;
+          order: number;
+        }>;
+      }>;
     },
     userId: string
   ) {
     const event = await prisma.event.findUnique({
-      where: { id: eventId }
+      where: { id },
+      include: {
+        squads: {
+          include: {
+            slots: true,
+          },
+        },
+      },
     });
 
     if (!event) {
       throw new Error('Evento no encontrado');
     }
 
-    const updatedEvent = await prisma.event.update({
-      where: { id: eventId },
-      data
-    });
+    // Si se envían escuadras, actualizar estructura completa
+    if (data.squads) {
+      // 1. Eliminar escuadras y slots que ya no existen
+      const newSquadIds = data.squads
+        .filter((s) => s.id)
+        .map((s) => s.id as string);
+      const squadsToDelete = event.squads.filter(
+        (s) => !newSquadIds.includes(s.id)
+      );
 
-    // Audit log
-    await prisma.auditLog.create({
-      data: {
-        action: 'EVENT_UPDATED',
-        entity: 'Event',
-        entityId: eventId,
-        userId,
-        eventId,
-        details: JSON.stringify(data)
+      for (const squad of squadsToDelete) {
+        await prisma.squad.delete({
+          where: { id: squad.id },
+        });
       }
+
+      // 2. Actualizar o crear escuadras
+      for (const squadData of data.squads) {
+        if (squadData.id) {
+          // Actualizar escuadra existente
+          const existingSquad = event.squads.find((s) => s.id === squadData.id);
+          
+          if (existingSquad) {
+            // Actualizar nombre y orden
+            await prisma.squad.update({
+              where: { id: squadData.id },
+              data: {
+                name: squadData.name,
+                order: squadData.order,
+              },
+            });
+
+            // Manejar slots
+            const newSlotIds = squadData.slots
+              .filter((sl) => sl.id)
+              .map((sl) => sl.id as string);
+            const slotsToDelete = existingSquad.slots.filter(
+              (sl) => !newSlotIds.includes(sl.id)
+            );
+
+            // Eliminar slots que ya no existen
+            for (const slot of slotsToDelete) {
+              await prisma.slot.delete({
+                where: { id: slot.id },
+              });
+            }
+
+            // Actualizar o crear slots
+            for (const slotData of squadData.slots) {
+              if (slotData.id) {
+                // Actualizar slot existente
+                await prisma.slot.update({
+                  where: { id: slotData.id },
+                  data: {
+                    role: slotData.role,
+                    order: slotData.order,
+                  },
+                });
+              } else {
+                // Crear nuevo slot
+                await prisma.slot.create({
+                  data: {
+                    role: slotData.role,
+                    order: slotData.order,
+                    status: 'FREE',
+                    squadId: squadData.id,
+                  },
+                });
+              }
+            }
+          }
+        } else {
+          // Crear nueva escuadra con sus slots
+          await prisma.squad.create({
+            data: {
+              name: squadData.name,
+              order: squadData.order,
+              eventId: id,
+              slots: {
+                create: squadData.slots.map((slot) => ({
+                  role: slot.role,
+                  order: slot.order,
+                  status: 'FREE',
+                })),
+              },
+            },
+          });
+        }
+      }
+    }
+
+    // Actualizar información básica del evento
+    const updatedEvent = await prisma.event.update({
+      where: { id },
+      data: {
+        name: data.name,
+        description: data.description,
+        briefing: data.briefing,
+        gameType: data.gameType,
+        scheduledDate: data.scheduledDate,
+      },
+      include: {
+        creator: {
+          select: {
+            id: true,
+            nickname: true,
+            clan: {
+              select: {
+                name: true,
+                tag: true,
+              },
+            },
+          },
+        },
+        squads: {
+          include: {
+            slots: {
+              include: {
+                user: {
+                  select: {
+                    id: true,
+                    nickname: true,
+                    email: true,
+                    role: true,
+                    status: true,
+                    clanId: true,
+                    avatarUrl: true,
+                    clan: {
+                      select: {
+                        id: true,
+                        name: true,
+                        tag: true,
+                        avatarUrl: true,
+                      },
+                    },
+                  },
+                },
+              },
+              orderBy: { order: 'asc' },
+            },
+          },
+          orderBy: { order: 'asc' },
+        },
+      },
     });
 
-    logger.info('Event updated', { eventId, userId });
+    // Calcular slots ocupados
+    const occupiedSlots = updatedEvent.squads.reduce(
+      (acc, squad) =>
+        acc + squad.slots.filter((slot) => slot.status === 'OCCUPIED').length,
+      0
+    );
 
-    return updatedEvent;
+    const totalSlots = updatedEvent.squads.reduce(
+      (acc, squad) => acc + squad.slots.length,
+      0
+    );
+
+    logger.info('Event updated', {
+      eventId: id,
+      userId,
+      squadsUpdated: !!data.squads,
+    });
+
+    return {
+      ...updatedEvent,
+      totalSlots,
+      occupiedSlots,
+    };
   }
 
   // Cambiar estado del evento

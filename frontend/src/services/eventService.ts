@@ -47,15 +47,25 @@ export const eventService = {
     return response.data.data;
   },
 
-  // Editar evento
+  // Actualizar evento
   update: async (
     id: string,
     data: {
       name?: string;
       description?: string;
       briefing?: string;
-      gameType?: GameType; // <-- Debe ser GameType, no string
+      gameType?: GameType;
       scheduledDate?: Date;
+      squads?: Array<{
+        id?: string;
+        name: string;
+        order: number;
+        slots: Array<{
+          id?: string;
+          role: string;
+          order: number;
+        }>;
+      }>;
     }
   ): Promise<{ event: Event }> => {
     const response = await api.put<ApiResponse<{ event: Event }>>(

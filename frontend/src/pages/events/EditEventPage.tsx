@@ -2,10 +2,25 @@ import { useState, useEffect } from 'react';
 import { useNavigate, useParams, Link } from 'react-router-dom';
 import { useEvent, useUpdateEvent, useDeleteEvent } from '../../hooks/useEvents';
 import { useAuthStore } from '../../store/authStore';
-import { ArrowLeft, Trash2, Save } from 'lucide-react';
+import { ArrowLeft, Trash2, Save, Plus, X, Edit2 } from 'lucide-react';
 import { Card } from '../../components/ui/Card';
 import { LoadingSpinner } from '../../components/ui/LoadingSpinner';
 import type { GameType } from '../../types';
+
+interface SlotForm {
+  id?: string;
+  role: string;
+  order: number;
+  isNew?: boolean;
+}
+
+interface SquadForm {
+  id?: string;
+  name: string;
+  order: number;
+  slots: SlotForm[];
+  isNew?: boolean;
+}
 
 export default function EditEventPage() {
   const { id } = useParams<{ id: string }>();
@@ -21,6 +36,7 @@ export default function EditEventPage() {
   const [gameType, setGameType] = useState<GameType>('ARMA_3' as GameType);
   const [scheduledDate, setScheduledDate] = useState('');
   const [scheduledTime, setScheduledTime] = useState('');
+  const [squads, setSquads] = useState<SquadForm[]>([]);
   const [error, setError] = useState('');
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
@@ -28,7 +44,6 @@ export default function EditEventPage() {
   useEffect(() => {
     if (eventData?.event) {
       const event = eventData.event;
-      // eslint-disable-next-line react-hooks/set-state-in-effect
       setName(event.name);
       setDescription(event.description || '');
       setBriefing(event.briefing || '');
@@ -38,6 +53,21 @@ export default function EditEventPage() {
       const date = new Date(event.scheduledDate);
       setScheduledDate(date.toISOString().split('T')[0]);
       setScheduledTime(date.toTimeString().slice(0, 5));
+
+      // Convertir escuadras y slots
+      const formattedSquads = event.squads.map((squad) => ({
+        id: squad.id,
+        name: squad.name,
+        order: squad.order,
+        slots: squad.slots.map((slot) => ({
+          id: slot.id,
+          role: slot.role,
+          order: slot.order,
+          isNew: false,
+        })),
+        isNew: false,
+      }));
+      setSquads(formattedSquads);
     }
   }, [eventData]);
 
@@ -54,6 +84,61 @@ export default function EditEventPage() {
     (user?.role === 'CLAN_LEADER' &&
       user?.clan?.id === eventData?.event?.creator?.clanId);
 
+  // Funciones de manejo de escuadras
+  const addSquad = () => {
+    const newOrder = squads.length + 1;
+    setSquads([
+      ...squads,
+      {
+        name: `Escuadra ${newOrder}`,
+        order: newOrder,
+        slots: [
+          {
+            role: 'Líder de Escuadra',
+            order: 1,
+            isNew: true,
+          },
+        ],
+        isNew: true,
+      },
+    ]);
+  };
+
+  const removeSquad = (index: number) => {
+    setSquads(squads.filter((_, i) => i !== index));
+  };
+
+  const updateSquadName = (index: number, name: string) => {
+    const updated = [...squads];
+    updated[index].name = name;
+    setSquads(updated);
+  };
+
+  const addSlot = (squadIndex: number) => {
+    const updated = [...squads];
+    const newOrder = updated[squadIndex].slots.length + 1;
+    updated[squadIndex].slots.push({
+      role: 'Fusilero',
+      order: newOrder,
+      isNew: true,
+    });
+    setSquads(updated);
+  };
+
+  const removeSlot = (squadIndex: number, slotIndex: number) => {
+    const updated = [...squads];
+    updated[squadIndex].slots = updated[squadIndex].slots.filter(
+      (_, i) => i !== slotIndex
+    );
+    setSquads(updated);
+  };
+
+  const updateSlotRole = (squadIndex: number, slotIndex: number, role: string) => {
+    const updated = [...squads];
+    updated[squadIndex].slots[slotIndex].role = role;
+    setSquads(updated);
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
@@ -62,6 +147,18 @@ export default function EditEventPage() {
     if (!name || !scheduledDate || !scheduledTime) {
       setError('Por favor completa todos los campos obligatorios');
       return;
+    }
+
+    if (squads.length === 0) {
+      setError('Debes tener al menos una escuadra');
+      return;
+    }
+
+    for (const squad of squads) {
+      if (squad.slots.length === 0) {
+        setError(`La escuadra "${squad.name}" debe tener al menos un slot`);
+        return;
+      }
     }
 
     try {
@@ -73,6 +170,16 @@ export default function EditEventPage() {
         briefing: briefing || undefined,
         gameType,
         scheduledDate: dateTime,
+        squads: squads.map((squad, index) => ({
+          id: squad.isNew ? undefined : squad.id,
+          name: squad.name,
+          order: index + 1,
+          slots: squad.slots.map((slot, slotIndex) => ({
+            id: slot.isNew ? undefined : slot.id,
+            role: slot.role,
+            order: slotIndex + 1,
+          })),
+        })),
       });
 
       navigate(`/events/${id}`);
@@ -241,16 +348,102 @@ export default function EditEventPage() {
           </div>
         </Card>
 
-        {/* Nota sobre escuadras */}
-        <Card className="mb-6 bg-yellow-50 border-yellow-200">
-          <p className="text-sm text-yellow-800">
-            <strong>Nota:</strong> La edición de escuadras y slots no está disponible
-            por ahora para evitar problemas con usuarios ya inscritos. Si necesitas
-            modificar la estructura, contacta con un administrador.
-          </p>
+        {/* Escuadras y Slots */}
+        <Card className="mb-6">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-xl font-bold text-military-900">
+              Escuadras y Slots
+            </h2>
+            <button
+              type="button"
+              onClick={addSquad}
+              className="btn btn-secondary btn-sm flex items-center"
+            >
+              <Plus className="h-4 w-4 mr-1" />
+              Agregar Escuadra
+            </button>
+          </div>
+
+          <div className="space-y-4">
+            {squads.map((squad, squadIndex) => (
+              <div
+                key={squadIndex}
+                className="p-4 border-2 border-military-200 rounded-lg bg-military-50"
+              >
+                <div className="flex items-center gap-2 mb-3">
+                  <input
+                    type="text"
+                    value={squad.name}
+                    onChange={(e) => updateSquadName(squadIndex, e.target.value)}
+                    className="input flex-1"
+                    placeholder="Nombre de la escuadra"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => addSlot(squadIndex)}
+                    className="btn btn-primary btn-sm flex items-center"
+                  >
+                    <Plus className="h-4 w-4 mr-1" />
+                    Slot
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => removeSquad(squadIndex)}
+                    className="btn btn-danger btn-sm"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </button>
+                </div>
+
+                <div className="space-y-2">
+                  {squad.slots.map((slot, slotIndex) => (
+                    <div key={slotIndex} className="flex items-center gap-2">
+                      <span className="text-sm text-military-600 w-8">
+                        {slotIndex + 1}.
+                      </span>
+                      <input
+                        type="text"
+                        value={slot.role}
+                        onChange={(e) =>
+                          updateSlotRole(squadIndex, slotIndex, e.target.value)
+                        }
+                        className="input flex-1"
+                        placeholder="Rol del slot"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => removeSlot(squadIndex, slotIndex)}
+                        className="btn btn-outline btn-sm text-red-600 hover:text-red-700"
+                      >
+                        <X className="h-4 w-4" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))}
+
+            {squads.length === 0 && (
+              <div className="text-center py-8 text-military-500">
+                No hay escuadras. Click en "Agregar Escuadra" para empezar.
+              </div>
+            )}
+          </div>
         </Card>
 
-        {/* Zona de peligro - Solo creador, admin o líder del clan */}
+        {/* Advertencia sobre usuarios asignados */}
+        {eventData.event.occupiedSlots > 0 && (
+          <Card className="mb-6 bg-amber-50 border-amber-200">
+            <p className="text-sm text-amber-800">
+              <strong>⚠️ Advertencia:</strong> Este evento tiene {eventData.event.occupiedSlots} usuario
+              {eventData.event.occupiedSlots !== 1 ? 's' : ''} asignado
+              {eventData.event.occupiedSlots !== 1 ? 's' : ''}. Si eliminas escuadras o slots,
+              los usuarios asignados a esos slots perderán su asignación.
+            </p>
+          </Card>
+        )}
+
+        {/* Zona de peligro */}
         {canDelete && (
           <Card className="mb-6 bg-red-50 border-red-200">
             <h3 className="text-lg font-bold text-red-900 mb-2">Zona de Peligro</h3>

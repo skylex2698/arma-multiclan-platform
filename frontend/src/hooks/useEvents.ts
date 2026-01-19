@@ -41,8 +41,18 @@ export function useUpdateEvent(id: string) {
       name?: string;
       description?: string;
       briefing?: string;
-      gameType?: GameType; // <-- CAMBIAR de string a GameType
+      gameType?: GameType;
       scheduledDate?: Date;
+      squads?: Array<{
+        id?: string;
+        name: string;
+        order: number;
+        slots: Array<{
+          id?: string;
+          role: string;
+          order: number;
+        }>;
+      }>;
     }) => eventService.update(id, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['events'] });

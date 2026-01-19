@@ -6,10 +6,12 @@ export function useUsers(filters?: {
   clanId?: string;
   role?: string;
   status?: string;
+  search?: string;
 }) {
   return useQuery({
     queryKey: ['users', filters],
     queryFn: () => userService.getAll(filters),
+    enabled: !!filters,
   });
 }
 
@@ -94,6 +96,16 @@ export function useReviewClanChangeRequest() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['clan-change-requests'] });
       queryClient.invalidateQueries({ queryKey: ['users'] });
+    },
+  });
+}
+
+export function useAvailableUsers(clanId?: string) {
+  return useQuery({
+    queryKey: ['users', 'available', clanId],
+    queryFn: async () => {
+      const params = clanId ? { clanId, status: 'ACTIVE' } : { status: 'ACTIVE' };
+      return userService.getAll(params);
     },
   });
 }

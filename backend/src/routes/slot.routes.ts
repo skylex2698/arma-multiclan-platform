@@ -48,4 +48,6 @@ squadRouter.post(
   slotController.createSlot.bind(slotController)
 );
 
+router.post('/:id/admin-assign', slotController.adminAssignSlot.bind(slotController)); // <-- AGREGAR
+
 export { router as slotRoutes, squadRouter };

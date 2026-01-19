@@ -546,6 +546,109 @@ export class SlotService {
       message: 'Slot eliminado correctamente'
     };
   }
+
+  async adminAssignSlot(slotId: string, userId: string, assignedBy: string) {
+    // Verificar que el slot existe y está libre
+    const slot = await prisma.slot.findUnique({
+      where: { id: slotId },
+      include: {
+        squad: {
+          include: {
+            event: true,
+          },
+        },
+      },
+    });
+
+    if (!slot) {
+      throw new Error('Slot no encontrado');
+    }
+
+    if (slot.status !== 'FREE') {
+      throw new Error('El slot ya está ocupado');
+    }
+
+    // Verificar que el usuario existe y está activo
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+    });
+
+    if (!user) {
+      throw new Error('Usuario no encontrado');
+    }
+
+    if (user.status !== 'ACTIVE') {
+      throw new Error('El usuario no está activo');
+    }
+
+    // Verificar que el usuario no tenga ya un slot en este evento
+    const existingSlot = await prisma.slot.findFirst({
+      where: {
+        userId: userId,
+        squad: {
+          eventId: slot.squad.eventId,
+        },
+      },
+    });
+
+    if (existingSlot) {
+      throw new Error('El usuario ya tiene un slot asignado en este evento');
+    }
+
+    // Asignar el slot
+    const updatedSlot = await prisma.slot.update({
+      where: { id: slotId },
+      data: {
+        userId: userId,
+        status: 'OCCUPIED',
+      },
+      include: {
+        user: {
+          select: {
+            id: true,
+            nickname: true,
+            email: true,
+            role: true,
+            status: true,
+            clanId: true,
+            avatarUrl: true,
+            clan: {
+              select: {
+                id: true,
+                name: true,
+                tag: true,
+                avatarUrl: true,
+              },
+            },
+          },
+        },
+      },
+    });
+
+    // Registrar en audit log
+    await prisma.auditLog.create({
+      data: {
+        action: 'SLOT_ADMIN_ASSIGNED',
+        entity: 'SLOT',
+        entityId: slotId,
+        userId: assignedBy,
+        details: JSON.stringify({
+          slotId,
+          assignedUserId: userId,
+          eventId: slot.squad.eventId,
+          eventName: slot.squad.event.name,
+        }),
+      },
+    });
+
+    logger.info('Slot assigned by admin/leader', {
+      slotId,
+      userId,
+      assignedBy,
+    });
+
+    return updatedSlot;
+  }
 }
 
 export const slotService = new SlotService();

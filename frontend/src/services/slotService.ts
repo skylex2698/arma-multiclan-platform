@@ -29,4 +29,13 @@ export const slotService = {
     >(`/events/${eventId}/absence`, { reason });
     return response.data.data;
   },
+
+  // Asignar slot por admin/líder
+  adminAssign: async (slotId: string, userId: string): Promise<{ slot: Slot }> => {
+    const response = await api.post<ApiResponse<{ slot: Slot }>>(
+      `/slots/${slotId}/admin-assign`,
+      { userId }
+    );
+    return response.data.data;
+  },
 };

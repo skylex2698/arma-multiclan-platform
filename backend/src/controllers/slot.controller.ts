@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 import { slotService } from '../services/slot.service';
 import { successResponse, errorResponse } from '../utils/responses';
 import { logger } from '../utils/logger';
+import { prisma } from '../config/database';
 
 export class SlotController {
   // POST /api/slots/:id/assign
@@ -201,6 +202,65 @@ export class SlotController {
     } catch (error: any) {
       logger.error('Error in deleteSlot', error);
       return errorResponse(res, error.message || 'Error al eliminar slot', 500);
+    }
+  }
+
+  // POST /api/slots/:id/admin-assign
+  async adminAssignSlot(req: Request, res: Response) {
+    try {
+      if (!req.user) {
+        return errorResponse(res, 'No autenticado', 401);
+      }
+
+      const slotId = req.params.id as string;
+      const { userId } = req.body;
+
+      if (!userId) {
+        return errorResponse(res, 'userId es obligatorio', 400);
+      }
+
+      // Verificar permisos
+      const userRole = req.user.role;
+      const userClanId = req.user.clanId;
+
+      if (userRole !== 'ADMIN' && userRole !== 'CLAN_LEADER') {
+        return errorResponse(
+          res,
+          'No tienes permisos para asignar usuarios',
+          403
+        );
+      }
+
+      // Si es líder de clan, verificar que el usuario sea de su clan
+      if (userRole === 'CLAN_LEADER') {
+        const targetUser = await prisma.user.findUnique({
+          where: { id: userId },
+          select: { clanId: true },
+        });
+
+        if (!targetUser || targetUser.clanId !== userClanId) {
+          return errorResponse(
+            res,
+            'Solo puedes asignar usuarios de tu clan',
+            403
+          );
+        }
+      }
+
+      const slot = await slotService.adminAssignSlot(slotId, userId, req.user.id);
+
+      return successResponse(
+        res,
+        { slot },
+        'Usuario asignado al slot correctamente'
+      );
+    } catch (error: any) {
+      logger.error('Error in adminAssignSlot', error);
+      return errorResponse(
+        res,
+        error.message || 'Error al asignar usuario',
+        500
+      );
     }
   }
 }

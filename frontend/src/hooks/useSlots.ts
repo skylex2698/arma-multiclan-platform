@@ -22,3 +22,16 @@ export function useUnassignSlot(eventId: string) {
     },
   });
 }
+
+export function useAdminAssignSlot() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ slotId, userId }: { slotId: string; userId: string }) =>
+      slotService.adminAssign(slotId, userId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['events'] });
+      queryClient.invalidateQueries({ queryKey: ['event'] });
+    },
+  });
+}

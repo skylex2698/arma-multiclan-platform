@@ -1,50 +1,39 @@
 import { Users } from 'lucide-react';
 import { Card } from '../ui/Card';
 import { SlotItem } from './SlotItem';
-import type { Squad } from '../../types';
+import type { Squad, User } from '../../types';
 
 interface SquadSectionProps {
   squad: Squad;
   onAssignSlot: (slotId: string) => void;
   onUnassignSlot: (slotId: string) => void;
+  onAdminAssign?: (slotId: string, userId: string) => void;
   isLoading: boolean;
   eventStatus: 'ACTIVE' | 'INACTIVE';
+  availableUsers?: User[];
 }
 
 export function SquadSection({
   squad,
   onAssignSlot,
   onUnassignSlot,
+  onAdminAssign,
   isLoading,
   eventStatus,
+  availableUsers = [],
 }: SquadSectionProps) {
-  const occupiedSlots = squad.slots.filter((s) => s.status === 'OCCUPIED').length;
-  const totalSlots = squad.slots.length;
+  const occupiedSlots = squad.slots.filter((slot) => slot.status === 'OCCUPIED').length;
 
   return (
     <Card>
       <div className="flex items-center justify-between mb-4">
-        <div className="flex items-center gap-3">
-          <div className="bg-primary-100 p-2 rounded-lg">
-            <Users className="h-5 w-5 text-primary-600" />
-          </div>
-          <div>
-            <h3 className="text-lg font-bold text-military-900">{squad.name}</h3>
-            <p className="text-sm text-military-600">
-              {occupiedSlots}/{totalSlots} slots ocupados
-            </p>
-          </div>
+        <div className="flex items-center gap-2">
+          <Users className="h-5 w-5 text-primary-600" />
+          <h3 className="text-lg font-bold text-military-900">{squad.name}</h3>
         </div>
-        <div className="text-right">
-          <div className="w-24 bg-military-200 rounded-full h-2">
-            <div
-              className="bg-primary-600 h-2 rounded-full transition-all"
-              style={{
-                width: `${totalSlots ? (occupiedSlots / totalSlots) * 100 : 0}%`,
-              }}
-            />
-          </div>
-        </div>
+        <span className="text-sm text-military-600">
+          {occupiedSlots}/{squad.slots.length} slots
+        </span>
       </div>
 
       <div className="space-y-2">
@@ -56,8 +45,10 @@ export function SquadSection({
               slot={slot}
               onAssign={onAssignSlot}
               onUnassign={onUnassignSlot}
+              onAdminAssign={onAdminAssign}
               isLoading={isLoading}
               eventStatus={eventStatus}
+              availableUsers={availableUsers}
             />
           ))}
       </div>

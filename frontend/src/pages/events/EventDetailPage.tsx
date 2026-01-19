@@ -18,6 +18,8 @@ import { es } from 'date-fns/locale';
 import { useState } from 'react';
 import { Edit } from 'lucide-react';
 import { useAuthStore } from '../../store/authStore';
+import { useAdminAssignSlot } from '../../hooks/useSlots';
+import { useUsers } from '../../hooks/useUsers';
 
 export default function EventDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -26,6 +28,36 @@ export default function EventDetailPage() {
   const assignSlot = useAssignSlot(id!);
   const unassignSlot = useUnassignSlot(id!);
   const [actionError, setActionError] = useState('');
+  const adminAssignSlot = useAdminAssignSlot();
+
+  // Obtener usuarios disponibles para asignación (AGREGAR)
+  const { data: usersData } = useUsers(
+    user?.role === 'ADMIN' || user?.role === 'CLAN_LEADER'
+      ? {
+          status: 'ACTIVE',
+          ...(user?.role === 'CLAN_LEADER' && user?.clan?.id
+            ? { clanId: user.clan.id }
+            : {}),
+        }
+      : undefined
+  );
+
+  // Filtrar usuarios que NO están ya en el evento (AGREGAR)
+  const availableUsers = usersData?.users.filter((u) => {
+    // Verificar si el usuario ya tiene un slot en este evento
+    const hasSlot = data?.event?.squads.some((squad) =>
+      squad.slots.some((slot) => slot.userId === u.id)
+    );
+    return !hasSlot;
+  }) || [];
+
+  const handleAdminAssign = async (slotId: string, userId: string) => {
+  try {
+    await adminAssignSlot.mutateAsync({ slotId, userId });
+  } catch (err) {
+    console.error('Error al asignar usuario:', err);
+  }
+};
 
   const handleAssignSlot = async (slotId: string) => {
     setActionError('');
@@ -219,8 +251,14 @@ export default function EventDetailPage() {
               squad={squad}
               onAssignSlot={handleAssignSlot}
               onUnassignSlot={handleUnassignSlot}
-              isLoading={assignSlot.isPending || unassignSlot.isPending}
+              onAdminAssign={handleAdminAssign} // <-- AGREGAR
+              isLoading={
+                assignSlot.isPending ||
+                unassignSlot.isPending ||
+                adminAssignSlot.isPending // <-- AGREGAR
+              }
               eventStatus={event.status}
+              availableUsers={availableUsers} // <-- AGREGAR
             />
           ))}
       </div>

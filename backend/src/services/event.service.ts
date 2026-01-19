@@ -238,63 +238,90 @@ export class EventService {
     scheduledDate: Date;
     creatorId: string;
   }) {
-    // Obtener evento plantilla
-    const template = await prisma.event.findUnique({
+    // Obtener el evento plantilla
+    const templateEvent = await prisma.event.findUnique({
       where: { id: data.templateEventId },
       include: {
         squads: {
           include: {
-            slots: true
+            slots: {
+              orderBy: { order: 'asc' },
+            },
           },
-          orderBy: { order: 'asc' }
-        }
-      }
+          orderBy: { order: 'asc' },
+        },
+      },
     });
 
-    if (!template) {
+    if (!templateEvent) {
       throw new Error('Evento plantilla no encontrado');
     }
 
-    // Crear nuevo evento con la estructura de la plantilla
+    // Crear nuevo evento copiando la estructura
     const newEvent = await prisma.event.create({
       data: {
         name: data.name,
         description: data.description,
         briefing: data.briefing,
-        gameType: template.gameType,
+        gameType: templateEvent.gameType,
         scheduledDate: data.scheduledDate,
         creatorId: data.creatorId,
-        status: EventStatus.ACTIVE,
+        status: 'ACTIVE',
         squads: {
-          create: template.squads.map(squad => ({
+          create: templateEvent.squads.map((squad) => ({
             name: squad.name,
             order: squad.order,
             slots: {
-              create: squad.slots.map(slot => ({
+              create: squad.slots.map((slot) => ({
                 role: slot.role,
                 order: slot.order,
-                status: SlotStatus.FREE
-              }))
-            }
-          }))
-        }
+                status: 'FREE', // Los slots empiezan libres
+              })),
+            },
+          })),
+        },
       },
       include: {
+        creator: {
+          select: {
+            id: true,
+            nickname: true,
+            clan: {
+              select: {
+                name: true,
+                tag: true,
+              },
+            },
+          },
+        },
         squads: {
           include: {
-            slots: true
-          }
-        }
-      }
+            slots: {
+              orderBy: { order: 'asc' },
+            },
+          },
+          orderBy: { order: 'asc' },
+        },
+      },
     });
+
+    // Calcular slots
+    const totalSlots = newEvent.squads.reduce(
+      (acc, squad) => acc + squad.slots.length,
+      0
+    );
 
     logger.info('Event created from template', {
-      newEventId: newEvent.id,
-      templateId: template.id,
-      creatorId: data.creatorId
+      eventId: newEvent.id,
+      templateId: data.templateEventId,
+      creatorId: data.creatorId,
     });
 
-    return newEvent;
+    return {
+      ...newEvent,
+      totalSlots,
+      occupiedSlots: 0,
+    };
   }
 
   // Editar evento

@@ -61,3 +61,20 @@ export function useDeleteEvent() {
     },
   });
 }
+
+export function useCreateEventFromTemplate() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (data: {
+      templateEventId: string;
+      name: string;
+      description?: string;
+      briefing?: string;
+      scheduledDate: Date;
+    }) => eventService.createFromTemplate(data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['events'] });
+    },
+  });
+}

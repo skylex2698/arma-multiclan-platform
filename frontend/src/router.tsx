@@ -20,6 +20,8 @@ import ClanRequestsPage from './pages/users/ClanRequestsPage';
 import CreateClanPage from './pages/clanes/CreateClanPage';
 import EditClanPage from './pages/clanes/EditClanPage';
 import EditEventPage from './pages/events/EditEventPage';
+import CreateEventFromTemplatePage from './pages/events/CreateEventFromTemplatePage';
+
 
 
 // Protected Route Component
@@ -96,16 +98,24 @@ export const router = createBrowserRouter([
         ),
       },
       {
+        path: 'events/from-template/:templateId',
+        element: (
+          <AdminRoute>
+            <CreateEventFromTemplatePage />
+          </AdminRoute>
+        ),
+      },
+      {
         path: 'events/:id/edit',
         element: <EditEventPage />,
       },
       {
-        path: 'clanes/:id/edit',
-        element: <EditClanPage />,
-      },
-      {
         path: 'events/:id',
         element: <EventDetailPage />,
+      },
+      {
+        path: 'clanes/:id/edit',
+        element: <EditClanPage />,
       },
       {
         path: 'clanes',

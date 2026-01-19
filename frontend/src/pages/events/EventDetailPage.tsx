@@ -16,10 +16,10 @@ import { SquadSection } from '../../components/events/SquadSection';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { useState } from 'react';
-import { Edit } from 'lucide-react';
 import { useAuthStore } from '../../store/authStore';
 import { useAdminAssignSlot, useAdminUnassignSlot } from '../../hooks/useSlots';
 import { useUsers } from '../../hooks/useUsers';
+import { Edit, Copy } from 'lucide-react';
 
 export default function EventDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -156,13 +156,22 @@ export default function EventDetailPage() {
             )}
 
             {canEditEvent && (
-              <Link
-                to={`/events/${event.id}/edit`}
-                className="btn btn-secondary btn-sm flex items-center ml-2"
-              >
-                <Edit className="h-4 w-4 mr-1" />
-                Editar
-              </Link>
+              <>
+                <Link
+                  to={`/events/${event.id}/edit`}
+                  className="btn btn-secondary btn-sm flex items-center ml-2"
+                >
+                  <Edit className="h-4 w-4 mr-1" />
+                  Editar
+                </Link>
+                <Link
+                  to={`/events/from-template/${event.id}`}
+                  className="btn btn-outline btn-sm flex items-center ml-2"
+                >
+                  <Copy className="h-4 w-4 mr-1" />
+                  Usar como Plantilla
+                </Link>
+              </>
             )}
 
           </div>

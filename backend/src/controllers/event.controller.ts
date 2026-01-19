@@ -3,6 +3,7 @@ import { eventService } from '../services/event.service';
 import { successResponse, errorResponse } from '../utils/responses';
 import { logger } from '../utils/logger';
 import { EventStatus, GameType } from '@prisma/client';
+import { prisma } from '../config/database';
 
 export class EventController {
   // GET /api/events
@@ -109,32 +110,50 @@ export class EventController {
   // PUT /api/events/:id
   async updateEvent(req: Request, res: Response) {
     try {
-      if (!req.user) {
-        return errorResponse(res, 'No autenticado', 401);
-      }
+      const id = req.params.id as string; // <-- ARREGLADO
+      const data = req.body;
+      const userId = req.user!.id;
+      const userRole = req.user!.role;
 
-      const id = req.params.id as string;
-      const { name, description, briefing, scheduledDate } = req.body;
-
-      if (!name && !description && !briefing && !scheduledDate) {
-        return errorResponse(res, 'Debes proporcionar al menos un campo para actualizar', 400);
-      }
-
-      const event = await eventService.updateEvent(
-        id,
-        {
-          name,
-          description,
-          briefing,
-          scheduledDate: scheduledDate ? new Date(scheduledDate) : undefined
+      // Obtener el evento para verificar permisos
+      const event = await prisma.event.findUnique({
+        where: { id },
+        include: {
+          creator: {
+            select: {
+              id: true,
+              clanId: true,
+            },
+          },
         },
-        req.user.id
-      );
+      });
 
-      return successResponse(res, { event }, 'Evento actualizado correctamente');
+      if (!event) {
+        return errorResponse(res, 'Evento no encontrado', 404);
+      }
+
+      // Verificar permisos
+      const isCreator = event.creatorId === userId;
+      const isAdmin = userRole === 'ADMIN';
+      const isClanLeader =
+        userRole === 'CLAN_LEADER' &&
+        req.user!.clanId === event.creator?.clanId;
+
+      if (!isCreator && !isAdmin && !isClanLeader) {
+        return errorResponse(res, 'No tienes permisos para editar este evento', 403);
+      }
+
+      // Actualizar evento
+      const updatedEvent = await eventService.updateEvent(id, data, userId); // <-- ARREGLADO: agregar userId
+
+      return successResponse(res, { event: updatedEvent }, 'Evento actualizado exitosamente');
     } catch (error: any) {
       logger.error('Error in updateEvent', error);
-      return errorResponse(res, error.message || 'Error al actualizar evento', 500);
+      return errorResponse(
+        res,
+        error.message || 'Error al actualizar evento',
+        500
+      );
     }
   }
 
@@ -164,17 +183,38 @@ export class EventController {
   // DELETE /api/events/:id
   async deleteEvent(req: Request, res: Response) {
     try {
-      if (!req.user) {
-        return errorResponse(res, 'No autenticado', 401);
+      const id = req.params.id as string; // <-- ARREGLADO
+      const userId = req.user!.id;
+      const userRole = req.user!.role;
+
+      // Obtener el evento para verificar permisos
+      const event = await prisma.event.findUnique({
+        where: { id },
+        select: {
+          id: true,
+          creatorId: true,
+        },
+      });
+
+      if (!event) {
+        return errorResponse(res, 'Evento no encontrado', 404);
       }
 
-      const id = req.params.id as string;
-      const result = await eventService.deleteEvent(id, req.user.id);
+      // Solo el creador o admin pueden eliminar
+      if (event.creatorId !== userId && userRole !== 'ADMIN') {
+        return errorResponse(res, 'No tienes permisos para eliminar este evento', 403);
+      }
 
-      return successResponse(res, result, 'Evento eliminado correctamente');
+      await eventService.deleteEvent(id);
+
+      return successResponse(res, {}, 'Evento eliminado exitosamente');
     } catch (error: any) {
       logger.error('Error in deleteEvent', error);
-      return errorResponse(res, error.message || 'Error al eliminar evento', 500);
+      return errorResponse(
+        res,
+        error.message || 'Error al eliminar evento',
+        500
+      );
     }
   }
 }

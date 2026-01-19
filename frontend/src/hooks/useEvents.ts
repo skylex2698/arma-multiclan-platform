@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { eventService } from '../services/eventService';
 import type { CreateEventForm } from '../types';
+import type { GameType } from '../types';
 
 export function useEvents(filters?: {
   status?: string;
@@ -36,11 +37,27 @@ export function useUpdateEvent(id: string) {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (data: Partial<CreateEventForm>) =>
-      eventService.update(id, data),
+    mutationFn: (data: {
+      name?: string;
+      description?: string;
+      briefing?: string;
+      gameType?: GameType; // <-- CAMBIAR de string a GameType
+      scheduledDate?: Date;
+    }) => eventService.update(id, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['events'] });
       queryClient.invalidateQueries({ queryKey: ['event', id] });
+    },
+  });
+}
+
+export function useDeleteEvent() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (id: string) => eventService.delete(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['events'] });
     },
   });
 }

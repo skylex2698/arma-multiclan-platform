@@ -18,10 +18,7 @@ export enum EventStatus {
   INACTIVE = 'INACTIVE'
 }
 
-export enum GameType {
-  ARMA_3 = 'ARMA_3',
-  ARMA_REFORGER = 'ARMA_REFORGER'
-}
+export type GameType = 'ARMA_3' | 'ARMA_REFORGER';
 
 export enum SlotStatus {
   FREE = 'FREE',

@@ -19,9 +19,11 @@ import ClanDetailPage from './pages/clanes/ClanDetailPage';
 import ClanRequestsPage from './pages/users/ClanRequestsPage';
 import CreateClanPage from './pages/clanes/CreateClanPage';
 import EditClanPage from './pages/clanes/EditClanPage';
+import EditEventPage from './pages/events/EditEventPage';
 
 
 // Protected Route Component
+// eslint-disable-next-line react-refresh/only-export-components
 function ProtectedRoute({ children }: { children: ReactNode }) {
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
   
@@ -33,6 +35,7 @@ function ProtectedRoute({ children }: { children: ReactNode }) {
 }
 
 // Admin Route Component
+// eslint-disable-next-line react-refresh/only-export-components
 function AdminRoute({ children }: { children: ReactNode }) {
   const user = useAuthStore((state) => state.user);
   
@@ -91,6 +94,10 @@ export const router = createBrowserRouter([
             <CreateEventPage />
           </AdminRoute>
         ),
+      },
+      {
+        path: 'events/:id/edit',
+        element: <EditEventPage />,
       },
       {
         path: 'clanes/:id/edit',

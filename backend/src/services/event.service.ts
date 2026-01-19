@@ -371,33 +371,36 @@ export class EventService {
   }
 
   // Eliminar evento
-  async deleteEvent(eventId: string, userId: string) {
+  async deleteEvent(id: string) {
     const event = await prisma.event.findUnique({
-      where: { id: eventId },
+      where: { id },
       include: {
         squads: {
           include: {
-            slots: true
-          }
-        }
-      }
+            slots: true,
+          },
+        },
+      },
     });
 
     if (!event) {
       throw new Error('Evento no encontrado');
     }
 
+    // Verificar si hay usuarios inscritos
+    const hasUsers = event.squads.some((squad) =>
+      squad.slots.some((slot) => slot.userId !== null)
+    );
+
+    if (hasUsers) {
+      throw new Error(
+        'No se puede eliminar un evento con usuarios inscritos. Primero desapunta a todos los usuarios.'
+      );
+    }
+
     await prisma.event.delete({
-      where: { id: eventId }
+      where: { id },
     });
-
-    logger.info('Event deleted', { eventId, userId });
-
-    return {
-      message: 'Evento eliminado correctamente',
-      deletedSquads: event.squads.length,
-      deletedSlots: event.squads.reduce((acc, s) => acc + s.slots.length, 0)
-    };
   }
 }
 

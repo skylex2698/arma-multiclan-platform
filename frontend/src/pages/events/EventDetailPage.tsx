@@ -16,9 +16,12 @@ import { SquadSection } from '../../components/events/SquadSection';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { useState } from 'react';
+import { Edit } from 'lucide-react';
+import { useAuthStore } from '../../store/authStore';
 
 export default function EventDetailPage() {
   const { id } = useParams<{ id: string }>();
+  const user = useAuthStore((state) => state.user);
   const { data, isLoading, error } = useEvent(id!);
   const assignSlot = useAssignSlot(id!);
   const unassignSlot = useUnassignSlot(id!);
@@ -63,8 +66,14 @@ export default function EventDetailPage() {
     );
   }
 
+  const canEditEvent =
+    user?.role === 'ADMIN' ||
+    data?.event?.creatorId === user?.id ||
+    (user?.role === 'CLAN_LEADER' &&
+      user?.clan?.id === data?.event?.creator?.clanId);
+
+  const isPast = data?.event ? new Date(data.event.scheduledDate) < new Date() : false;
   const event = data.event;
-  const isPast = new Date(event.scheduledDate) < new Date();
 
   return (
     <div>
@@ -94,6 +103,17 @@ export default function EventDetailPage() {
             {isPast && event.status === 'ACTIVE' && (
               <Badge variant="warning">Finalizado</Badge>
             )}
+
+            {canEditEvent && (
+              <Link
+                to={`/events/${event.id}/edit`}
+                className="btn btn-secondary btn-sm flex items-center ml-2"
+              >
+                <Edit className="h-4 w-4 mr-1" />
+                Editar
+              </Link>
+            )}
+
           </div>
         </div>
 

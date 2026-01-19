@@ -1,5 +1,6 @@
 import { api } from './api';
 import type { ApiResponse, Event, CreateEventForm } from '../types';
+import type { GameType } from '../types';
 
 export const eventService = {
   // Obtener todos los eventos
@@ -49,9 +50,18 @@ export const eventService = {
   // Editar evento
   update: async (
     id: string,
-    data: Partial<CreateEventForm>
+    data: {
+      name?: string;
+      description?: string;
+      briefing?: string;
+      gameType?: GameType; // <-- Debe ser GameType, no string
+      scheduledDate?: Date;
+    }
   ): Promise<{ event: Event }> => {
-    const response = await api.put<ApiResponse<{ event: Event }>>(`/events/${id}`, data);
+    const response = await api.put<ApiResponse<{ event: Event }>>(
+      `/events/${id}`,
+      data
+    );
     return response.data.data;
   },
 

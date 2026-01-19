@@ -1,5 +1,5 @@
 import { useParams, Link } from 'react-router-dom';
-import { ArrowLeft, Users, Shield, Edit, Trash2 } from 'lucide-react';
+import { ArrowLeft, Users, Shield, Edit } from 'lucide-react';
 import { useClan, useClanMembers } from '../../hooks/useClans';
 import { useAuthStore } from '../../store/authStore';
 import { LoadingSpinner } from '../../components/ui/LoadingSpinner';
@@ -15,7 +15,8 @@ export default function ClanDetailPage() {
   const { data: clanData, isLoading: loadingClan } = useClan(id!);
   const { data: membersData, isLoading: loadingMembers } = useClanMembers(id!);
 
-  const canManage = user?.role === 'ADMIN';
+  const canManage = user?.role === 'ADMIN' || 
+  (user?.role === 'CLAN_LEADER' && user?.clanId === id);
   const isLoading = loadingClan || loadingMembers;
 
   if (isLoading) {
@@ -53,9 +54,20 @@ export default function ClanDetailPage() {
       <Card className="mb-6">
         <div className="flex items-start justify-between mb-4">
           <div className="flex items-center gap-4">
-            <div className="bg-primary-100 p-4 rounded-full">
-              <Shield className="h-8 w-8 text-primary-600" />
-            </div>
+            {clan.avatarUrl ? (
+              <img
+                src={`http://localhost:3000${clan.avatarUrl}`}
+                alt={clan.name}
+                className="w-20 h-20 rounded-full object-cover border-4 border-primary-200"
+                onError={(e) => {
+                  e.currentTarget.style.display = 'none';
+                }}
+              />
+            ) : (
+              <div className="bg-primary-100 p-4 rounded-full">
+                <Shield className="h-8 w-8 text-primary-600" />
+              </div>
+            )}
             <div>
               <h1 className="text-3xl font-bold text-military-900">
                 {clan.name}
@@ -77,10 +89,6 @@ export default function ClanDetailPage() {
                 <Edit className="h-4 w-4 mr-1" />
                 Editar
               </Link>
-              <button className="btn btn-danger btn-sm flex items-center">
-                <Trash2 className="h-4 w-4 mr-1" />
-                Eliminar
-              </button>
             </div>
           )}
         </div>

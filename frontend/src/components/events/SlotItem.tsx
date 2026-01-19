@@ -1,5 +1,6 @@
-import { User, UserPlus, UserMinus } from 'lucide-react';
+import { UserPlus, UserMinus } from 'lucide-react';
 import { Badge } from '../ui/Badge';
+import { UserAvatar } from '../ui/UserAvatar';
 import type { Slot } from '../../types';
 import { useAuthStore } from '../../store/authStore';
 
@@ -46,20 +47,13 @@ export function SlotItem({
       onClick={handleClick}
     >
       <div className="flex items-center gap-3 flex-1">
-        <div
-          className={`
-          w-10 h-10 rounded-full flex items-center justify-center
-          ${isFree ? 'bg-military-100' : ''}
-          ${isOccupiedByMe ? 'bg-primary-500' : ''}
-          ${slot.status === 'OCCUPIED' && !isOccupiedByMe ? 'bg-military-400' : ''}
-        `}
-        >
-          <User
-            className={`h-5 w-5 ${
-              isOccupiedByMe ? 'text-white' : 'text-military-600'
-            }`}
-          />
-        </div>
+        {slot.user ? (
+          <UserAvatar user={slot.user} size="md" showBorder={true} />
+        ) : (
+          <div className="w-10 h-10 rounded-full bg-military-100 flex items-center justify-center border-2 border-military-200">
+            <UserPlus className="h-5 w-5 text-military-400" />
+          </div>
+        )}
 
         <div className="flex-1">
           <p className="font-medium text-military-900">{slot.role}</p>

@@ -19,11 +19,14 @@ export default function LoginPage() {
 
     try {
       const response = await authService.login({ email, password });
+      console.log('🔐 Login response:', response); // <-- AGREGAR ESTA LÍNEA
       setAuth(response.user, response.token);
       navigate('/dashboard');
     } catch (err) {
       const error = err as { response?: { data?: { message?: string } } };
-      setError(error.response?.data?.message || 'Error al iniciar sesión');
+      setError(
+        error.response?.data?.message || 'Error al iniciar sesión'
+      );
     } finally {
       setLoading(false);
     }

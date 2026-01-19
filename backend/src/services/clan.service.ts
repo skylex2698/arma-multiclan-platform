@@ -1,38 +1,72 @@
-import { prisma } from '../index';
-import { logger } from '../utils/logger';
-import { UserRole } from '@prisma/client';
+import { prisma } from '../config/database';
 
-export class ClanService {
-  // Listar todos los clanes
+class ClanService {
   async getAllClans() {
     const clans = await prisma.clan.findMany({
       include: {
         _count: {
-          select: { users: true }
-        }
+          select: { users: true },
+        },
       },
-      orderBy: { name: 'asc' }
+      orderBy: {
+        name: 'asc',
+      },
     });
 
-    return clans.map(clan => ({
-      id: clan.id,
-      name: clan.name,
-      tag: clan.tag,
-      description: clan.description,
-      memberCount: clan._count.users,
-      createdAt: clan.createdAt
-    }));
+    return {
+      clans: clans.map((clan) => ({
+        ...clan,
+        memberCount: clan._count.users,
+      })),
+      count: clans.length,
+    };
   }
 
-  // Obtener clan por ID
-  async getClanById(clanId: string) {
+  async getClanById(id: string) {
     const clan = await prisma.clan.findUnique({
-      where: { id: clanId },
+      where: { id },
       include: {
         _count: {
-          select: { users: true }
-        }
-      }
+          select: { users: true },
+        },
+      },
+    });
+
+    if (!clan) {
+      throw new Error('Clan no encontrado');
+    }
+
+    return clan;
+  }
+
+  async getClanMembers(id: string) {
+    const clan = await prisma.clan.findUnique({
+      where: { id },
+      include: {
+        users: {
+          select: {
+            id: true,
+            email: true,
+            nickname: true,
+            role: true,
+            status: true,
+            clanId: true,
+            avatarUrl: true,
+            createdAt: true,
+            clan: {
+              select: {
+                id: true,
+                name: true,
+                tag: true,
+                avatarUrl: true,
+              },
+            },
+          },
+          orderBy: {
+            role: 'desc',
+          },
+        },
+      },
     });
 
     if (!clan) {
@@ -40,147 +74,75 @@ export class ClanService {
     }
 
     return {
-      id: clan.id,
-      name: clan.name,
-      tag: clan.tag,
-      description: clan.description,
-      memberCount: clan._count.users,
-      createdAt: clan.createdAt,
-      updatedAt: clan.updatedAt
+      members: clan.users,
+      count: clan.users.length,
     };
   }
 
-  // Crear clan (solo ADMIN)
   async createClan(data: {
     name: string;
     tag?: string;
     description?: string;
+    avatarUrl?: string;
   }) {
-    // Verificar si ya existe un clan con ese nombre
-    const existingClan = await prisma.clan.findUnique({
-      where: { name: data.name }
-    });
-
-    if (existingClan) {
-      throw new Error('Ya existe un clan con ese nombre');
-    }
-
     const clan = await prisma.clan.create({
       data: {
         name: data.name,
         tag: data.tag,
-        description: data.description
-      }
+        description: data.description,
+        avatarUrl: data.avatarUrl,
+      },
     });
-
-    logger.info('Clan created', { clanId: clan.id, name: clan.name });
 
     return clan;
   }
 
-  // Editar clan (solo ADMIN)
   async updateClan(
-    clanId: string,
+    id: string,
     data: {
       name?: string;
       tag?: string;
       description?: string;
+      avatarUrl?: string;
     }
   ) {
-    // Verificar que el clan existe
-    const existingClan = await prisma.clan.findUnique({
-      where: { id: clanId }
+    const clan = await prisma.clan.findUnique({
+      where: { id },
     });
 
-    if (!existingClan) {
+    if (!clan) {
       throw new Error('Clan no encontrado');
     }
 
-    // Si cambia el nombre, verificar que no exista otro clan con ese nombre
-    if (data.name && data.name !== existingClan.name) {
-      const nameExists = await prisma.clan.findUnique({
-        where: { name: data.name }
-      });
-
-      if (nameExists) {
-        throw new Error('Ya existe un clan con ese nombre');
-      }
-    }
-
-    const clan = await prisma.clan.update({
-      where: { id: clanId },
-      data
+    const updatedClan = await prisma.clan.update({
+      where: { id },
+      data,
     });
 
-    logger.info('Clan updated', { clanId: clan.id });
-
-    return clan;
+    return updatedClan;
   }
 
-  // Eliminar clan (solo ADMIN)
-  async deleteClan(clanId: string) {
-    // Verificar que el clan existe
+  async deleteClan(id: string) {
     const clan = await prisma.clan.findUnique({
-      where: { id: clanId },
+      where: { id },
       include: {
-        users: true
-      }
-    });
-
-    if (!clan) {
-      throw new Error('Clan no encontrado');
-    }
-
-    // Actualizar usuarios del clan (quitarles el clan y el rol de líder si lo tienen)
-    await prisma.user.updateMany({
-      where: { clanId: clanId },
-      data: {
-        clanId: null,
-        role: UserRole.USER // Si era líder, pasa a usuario normal
-      }
-    });
-
-    // Eliminar el clan
-    await prisma.clan.delete({
-      where: { id: clanId }
-    });
-
-    logger.info('Clan deleted', { clanId, memberCount: clan.users.length });
-
-    return {
-      message: 'Clan eliminado correctamente',
-      affectedUsers: clan.users.length
-    };
-  }
-
-  // Listar usuarios de un clan
-  async getClanMembers(clanId: string) {
-    const clan = await prisma.clan.findUnique({
-      where: { id: clanId }
-    });
-
-    if (!clan) {
-      throw new Error('Clan no encontrado');
-    }
-
-    const members = await prisma.user.findMany({
-      where: { clanId },
-      select: {
-        id: true,
-        nickname: true,
-        email: true,
-        role: true,
-        status: true,
-        discordUsername: true,
-        createdAt: true
+        users: true,
       },
-      orderBy: [
-        { role: 'desc' }, // ADMINs primero, luego CLAN_LEADERs, luego USERs
-        { nickname: 'asc' }
-      ]
     });
 
-    return members;
+    if (!clan) {
+      throw new Error('Clan no encontrado');
+    }
+
+    if (clan.users.length > 0) {
+      throw new Error(
+        'No se puede eliminar un clan con miembros. Primero remueve a todos los miembros.'
+      );
+    }
+
+    await prisma.clan.delete({
+      where: { id },
+    });
   }
 }
 

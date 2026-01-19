@@ -11,8 +11,7 @@ import {
   GitBranch,
 } from 'lucide-react';
 import { useState } from 'react';
-
-
+import { UserAvatar } from '../ui/UserAvatar';
 
 export default function MainLayout() {
   const { user, logout } = useAuthStore();
@@ -35,10 +34,10 @@ export default function MainLayout() {
   }
 
   if (user?.role === 'ADMIN') {
-    navigation.push({ 
-      name: 'Solicitudes', 
-      href: '/users/requests', 
-      icon: GitBranch 
+    navigation.push({
+      name: 'Solicitudes',
+      href: '/users/requests',
+      icon: GitBranch,
     });
   }
 
@@ -69,25 +68,33 @@ export default function MainLayout() {
               </div>
             </div>
 
+            {/* Usuario info - Desktop */}
             <div className="hidden sm:ml-6 sm:flex sm:items-center space-x-4">
-              <div className="flex items-center space-x-3">
-                <div className="text-right">
-                  <p className="text-sm font-medium text-military-900">
-                    {user?.nickname}
-                  </p>
-                  <p className="text-xs text-military-500">
-                    {user?.clan?.tag && `${user.clan.tag} `}
-                    {user?.role}
-                  </p>
+              {user && (
+                <div className="flex items-center gap-3">
+                  <UserAvatar user={user} size="md" showBorder={true} />
+                  <div className="text-right">
+                    <p className="text-sm font-medium text-military-900">
+                      {user.nickname}
+                    </p>
+                    <p className="text-xs text-military-600">
+                      {user.clan?.tag && `${user.clan.tag} `}
+                      {user.role === 'ADMIN'
+                        ? 'Admin'
+                        : user.role === 'CLAN_LEADER'
+                        ? 'Líder'
+                        : 'Miembro'}
+                    </p>
+                  </div>
+                  <button
+                    onClick={handleLogout}
+                    className="btn btn-outline btn-sm flex items-center ml-2"
+                  >
+                    <LogOut className="h-4 w-4 mr-1" />
+                    Salir
+                  </button>
                 </div>
-                <button
-                  onClick={handleLogout}
-                  className="btn btn-outline flex items-center"
-                >
-                  <LogOut className="h-4 w-4 mr-2" />
-                  Salir
-                </button>
-              </div>
+              )}
             </div>
 
             {/* Mobile menu button */}
@@ -123,13 +130,26 @@ export default function MainLayout() {
               ))}
             </div>
             <div className="pt-4 pb-3 border-t border-military-200">
+              {user && (
+                <div className="px-4 flex items-center gap-3 mb-3">
+                  <UserAvatar user={user} size="lg" showBorder={true} />
+                  <div>
+                    <p className="text-base font-medium text-military-900">
+                      {user.nickname}
+                    </p>
+                    <p className="text-sm text-military-500">{user.email}</p>
+                    <p className="text-xs text-military-600">
+                      {user.clan?.tag && `${user.clan.tag} `}
+                      {user.role === 'ADMIN'
+                        ? 'Admin'
+                        : user.role === 'CLAN_LEADER'
+                        ? 'Líder'
+                        : 'Miembro'}
+                    </p>
+                  </div>
+                </div>
+              )}
               <div className="px-4">
-                <p className="text-base font-medium text-military-900">
-                  {user?.nickname}
-                </p>
-                <p className="text-sm text-military-500">{user?.email}</p>
-              </div>
-              <div className="mt-3 px-4">
                 <button
                   onClick={handleLogout}
                   className="w-full btn btn-outline flex items-center justify-center"

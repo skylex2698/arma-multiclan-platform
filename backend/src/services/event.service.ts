@@ -75,22 +75,28 @@ export class EventService {
   }
 
   // Obtener evento por ID
-  async getEventById(eventId: string) {
+  async getEventById(id: string) {
     const event = await prisma.event.findUnique({
-      where: { id: eventId },
+      where: { id },
       include: {
         creator: {
           select: {
             id: true,
             nickname: true,
             email: true,
+            role: true,
+            status: true,
+            clanId: true,
+            avatarUrl: true,
             clan: {
               select: {
+                id: true,
                 name: true,
-                tag: true
-              }
-            }
-          }
+                tag: true,
+                avatarUrl: true,
+              },
+            },
+          },
         },
         squads: {
           include: {
@@ -102,44 +108,47 @@ export class EventService {
                     nickname: true,
                     email: true,
                     role: true,
+                    status: true,
+                    clanId: true,
+                    avatarUrl: true,
                     clan: {
                       select: {
+                        id: true,
                         name: true,
-                        tag: true
-                      }
-                    }
-                  }
-                }
+                        tag: true,
+                        avatarUrl: true,
+                      },
+                    },
+                  },
+                },
               },
-              orderBy: { order: 'asc' }
-            }
+              orderBy: {
+                order: 'asc',
+              },
+            },
           },
-          orderBy: { order: 'asc' }
+          orderBy: {
+            order: 'asc',
+          },
         },
-        absences: {
-          include: {
-            user: {
-              select: {
-                id: true,
-                nickname: true
-              }
-            }
-          }
-        }
-      }
+      },
     });
 
     if (!event) {
       throw new Error('Evento no encontrado');
     }
 
+    // Calcular slots ocupados
+    const totalSlots = event.squads.reduce((acc, squad) => acc + squad.slots.length, 0);
+    const occupiedSlots = event.squads.reduce(
+      (acc, squad) => acc + squad.slots.filter((slot) => slot.userId !== null).length,
+      0
+    );
+
     return {
       ...event,
-      totalSlots: event.squads.reduce((acc, squad) => acc + squad.slots.length, 0),
-      occupiedSlots: event.squads.reduce(
-        (acc, squad) => acc + squad.slots.filter(s => s.status === SlotStatus.OCCUPIED).length,
-        0
-      )
+      totalSlots,
+      occupiedSlots,
     };
   }
 

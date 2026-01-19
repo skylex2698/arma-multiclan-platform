@@ -1,4 +1,4 @@
-import { prisma } from '../index';
+import { prisma } from '../config/database';
 import { hashPassword, comparePassword } from '../utils/password';
 import { generateToken } from '../utils/jwt';
 import { logger } from '../utils/logger';
@@ -52,8 +52,10 @@ export class AuthService {
         clanId: true,
         clan: {
           select: {
+            id: true,
             name: true,
-            tag: true
+            tag: true,
+            avatarUrl: true,
           }
         }
       }
@@ -69,48 +71,57 @@ export class AuthService {
     // Buscar usuario
     const user = await prisma.user.findUnique({
       where: { email },
-      include: {
+      select: {
+        id: true,
+        email: true,
+        password: true,
+        nickname: true,
+        role: true,
+        status: true,
+        clanId: true,
+        avatarUrl: true,
         clan: {
           select: {
+            id: true,
             name: true,
-            tag: true
-          }
-        }
-      }
+            tag: true,
+            description: true,
+            avatarUrl: true,
+          },
+        },
+      },
     });
 
-    if (!user || !user.password) {
+    if (!user) {
+      throw new Error('Credenciales inválidas');
+    }
+
+    // Verificar que el usuario tenga password
+    if (!user.password) {
       throw new Error('Credenciales inválidas');
     }
 
     // Verificar contraseña
-    const isValidPassword = await comparePassword(password, user.password);
-
-    if (!isValidPassword) {
+    const isPasswordValid = await comparePassword(password, user.password);
+    if (!isPasswordValid) {
       throw new Error('Credenciales inválidas');
     }
 
-    // Verificar estado ANTES de generar token
+    // Verificar estado del usuario
     if (user.status === UserStatus.BANNED) {
-      throw new Error('Usuario baneado');
-    }
-
-    if (user.status === UserStatus.PENDING) {
-      throw new Error('Usuario pendiente de validación');
+      throw new Error('Tu cuenta ha sido baneada');
     }
 
     if (user.status === UserStatus.BLOCKED) {
-      throw new Error('Usuario bloqueado');
+      throw new Error('Tu cuenta está bloqueada');
     }
 
-    if (user.status === UserStatus.INACTIVE) {
-      throw new Error('Usuario inactivo');
+    if (user.status === UserStatus.PENDING) {
+      throw new Error('Tu cuenta está pendiente de validación');
     }
 
-    // Solo usuarios ACTIVE pueden hacer login
-    if (user.status !== UserStatus.ACTIVE) {
-      throw new Error('Usuario no puede iniciar sesión');
-    }
+    // Remover password antes de devolver
+    const { password: _, ...userWithoutPassword } = user;
 
     // Generar token
     const token = generateToken({
@@ -119,19 +130,9 @@ export class AuthService {
       clanId: user.clanId || undefined
     });
 
-    logger.info('User logged in', { userId: user.id });
-
     return {
+      user: userWithoutPassword,
       token,
-      user: {
-        id: user.id,
-        email: user.email,
-        nickname: user.nickname,
-        role: user.role,
-        status: user.status,
-        clanId: user.clanId,
-        clan: user.clan
-      }
     };
   }
 
@@ -173,8 +174,10 @@ export class AuthService {
         discordId: true,
         clan: {
           select: {
+            id: true,
             name: true,
-            tag: true
+            tag: true,
+            avatarUrl: true,
           }
         }
       }
@@ -192,8 +195,10 @@ export class AuthService {
       include: {
         clan: {
           select: {
+            id: true,
             name: true,
-            tag: true
+            tag: true,
+            avatarUrl: true,
           }
         }
       }
@@ -225,6 +230,7 @@ export class AuthService {
         role: user.role,
         status: user.status,
         clanId: user.clanId,
+        avatarUrl: user.avatarUrl,
         clan: user.clan
       }
     };

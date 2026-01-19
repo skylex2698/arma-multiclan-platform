@@ -1,5 +1,6 @@
-import { User, Crown, Shield } from 'lucide-react';
+import { Crown, Shield } from 'lucide-react';
 import { Badge } from '../ui/Badge';
+import { UserAvatar } from '../ui/UserAvatar';
 import type { User as UserType } from '../../types';
 
 interface MembersListProps {
@@ -42,7 +43,7 @@ export function MembersList({ members }: MembersListProps) {
       case 'CLAN_LEADER':
         return <Shield className="h-4 w-4 text-yellow-600" />;
       default:
-        return <User className="h-4 w-4 text-military-600" />;
+        return null;
     }
   };
 
@@ -59,8 +60,13 @@ export function MembersList({ members }: MembersListProps) {
             className="flex items-center justify-between p-4 bg-military-50 rounded-lg hover:bg-military-100 transition-colors"
           >
             <div className="flex items-center gap-3">
-              <div className="bg-military-200 p-2 rounded-full">
-                {getRoleIcon(member.role)}
+              <div className="relative">
+                <UserAvatar user={member} size="md" />
+                {getRoleIcon(member.role) && (
+                  <div className="absolute -bottom-1 -right-1 bg-white rounded-full p-0.5">
+                    {getRoleIcon(member.role)}
+                  </div>
+                )}
               </div>
               <div>
                 <p className="font-medium text-military-900">

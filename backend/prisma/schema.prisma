@@ -47,9 +47,9 @@ model User {
   nickname          String
   discordId         String?     @unique
   discordUsername   String?
-  steamId           String?     @unique
   
   status            UserStatus  @default(PENDING)
+  avatarUrl         String?
   role              UserRole    @default(USER)
   
   clanId            String?
@@ -73,14 +73,16 @@ model User {
 model Clan {
   id          String   @id @default(uuid())
   name        String   @unique
-  tag         String?  // Ej: [ALFA]
+  tag         String?
   description String?
-  
-  users       User[]
-  clanChangeRequests ClanChangeRequest[]
-  
+  avatarUrl   String?  // <-- AGREGAR ESTA LÍNEA
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+
+  users              User[]
+  clanChangeRequests ClanChangeRequest[]
+
+  @@index([name])
 }
 
 model Event {

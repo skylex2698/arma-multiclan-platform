@@ -1,20 +1,24 @@
 import { Router } from 'express';
 import { clanController } from '../controllers/clan.controller';
-import { authenticate, authorize } from '../middlewares/auth.middleware';
-import { UserRole } from '@prisma/client';
+import { authenticate } from '../middlewares/auth.middleware';
+import { uploadClanAvatar } from '../config/multer.config';
 
 const router = Router();
 
-// Rutas públicas
-router.get('/', clanController.getAllClans.bind(clanController));
-router.get('/:id', clanController.getClanById.bind(clanController));
+router.get('/', clanController.getAll);
+router.get('/:id', clanController.getById);
+router.get('/:id/members', clanController.getMembers);
 
-// Rutas protegidas (requieren autenticación)
-router.get('/:id/members', authenticate, clanController.getClanMembers.bind(clanController));
+router.post('/', authenticate, clanController.create);
+router.put('/:id', authenticate, clanController.updateClan);
+router.delete('/:id', authenticate, clanController.deleteClan);
 
-// Rutas solo para ADMIN
-router.post('/', authenticate, authorize(UserRole.ADMIN), clanController.createClan.bind(clanController));
-router.put('/:id', authenticate, authorize(UserRole.ADMIN), clanController.updateClan.bind(clanController));
-router.delete('/:id', authenticate, authorize(UserRole.ADMIN), clanController.deleteClan.bind(clanController));
+// Nueva ruta para subir avatar
+router.post(
+  '/:id/avatar',
+  authenticate,
+  uploadClanAvatar.single('avatar'),
+  clanController.uploadAvatar
+);
 
-export default router;
+export { router as clanRoutes };

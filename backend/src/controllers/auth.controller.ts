@@ -3,6 +3,7 @@ import { authService } from '../services/auth.service';
 import { successResponse, errorResponse } from '../utils/responses';
 import { isValidEmail, isStrongPassword, sanitizeNickname } from '../utils/validators';
 import { logger } from '../utils/logger';
+import { prisma } from '../config/database';
 
 export class AuthController {
   // POST /api/auth/register/local
@@ -109,14 +110,40 @@ export class AuthController {
   // GET /api/auth/me - Obtener usuario actual
   async getMe(req: Request, res: Response) {
     try {
-      if (!req.user) {
-        return errorResponse(res, 'No autenticado', 401);
+      const userId = req.user!.id;
+
+      const user = await prisma.user.findUnique({
+        where: { id: userId },
+        select: {
+          id: true,
+          email: true,
+          nickname: true,
+          role: true,
+          status: true,
+          clanId: true,
+          avatarUrl: true,
+          createdAt: true,
+          updatedAt: true,
+          clan: {
+            select: {
+              id: true,
+              name: true,
+              tag: true,
+              description: true,
+              avatarUrl: true,
+            },
+          },
+        },
+      });
+
+      if (!user) {
+        return errorResponse(res, 'Usuario no encontrado', 404);
       }
 
-      return successResponse(res, { user: req.user }, 'Usuario autenticado');
+      return successResponse(res, { user }, 'Usuario obtenido exitosamente');
     } catch (error: any) {
       logger.error('Error in getMe', error);
-      return errorResponse(res, 'Error al obtener usuario', 500);
+      return errorResponse(res, error.message || 'Error al obtener usuario', 500);
     }
   }
 }

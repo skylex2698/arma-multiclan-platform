@@ -35,6 +35,7 @@ export interface User {
   nickname: string;
   role: UserRole;
   status: UserStatus;
+  avatarUrl?: string | null;
   clanId: string | null;
   discordId: string | null;
   discordUsername: string | null;
@@ -48,6 +49,7 @@ export interface Clan {
   name: string;
   tag: string | null;
   description: string | null;
+  avatarUrl: string | null;
   memberCount?: number;
   createdAt: string;
   updatedAt?: string;
@@ -92,16 +94,9 @@ export interface Slot {
   role: string;
   order: number;
   status: SlotStatus;
-  squadId: string;
   userId: string | null;
-  user?: {
-    id: string;
-    nickname: string;
-    clan?: {
-      name: string;
-      tag: string;
-    };
-  };
+  squadId: string;
+  user?: User | null;
   createdAt: string;
   updatedAt?: string;
 }

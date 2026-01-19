@@ -29,6 +29,7 @@ export const clanService = {
     name: string;
     tag?: string;
     description?: string;
+    avatarUrl?: string;  // <-- AGREGAR
   }): Promise<{ clan: Clan }> => {
     const response = await api.post<ApiResponse<{ clan: Clan }>>('/clans', data);
     return response.data.data;
@@ -41,6 +42,7 @@ export const clanService = {
       name?: string;
       tag?: string;
       description?: string;
+      avatarUrl?: string;  // <-- AGREGAR
     }
   ): Promise<{ clan: Clan }> => {
     const response = await api.put<ApiResponse<{ clan: Clan }>>(
@@ -53,5 +55,22 @@ export const clanService = {
   // Eliminar clan (Admin)
   delete: async (id: string): Promise<void> => {
     await api.delete(`/clans/${id}`);
+  },
+
+  // Subir avatar
+  uploadAvatar: async (id: string, file: File): Promise<{ clan: Clan; avatarUrl: string }> => {
+    const formData = new FormData();
+    formData.append('avatar', file);
+
+    const response = await api.post<ApiResponse<{ clan: Clan; avatarUrl: string }>>(
+      `/clans/${id}/avatar`,
+      formData,
+      {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      }
+    );
+    return response.data.data;
   },
 };

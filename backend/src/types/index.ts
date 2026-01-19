@@ -2,12 +2,12 @@ import { UserRole, UserStatus } from '@prisma/client';
 
 export interface AuthUser {
   id: string;
-  email?: string;
+  email: string | null;
   nickname: string;
   role: UserRole;
   status: UserStatus;
-  clanId?: string;
-  discordId?: string;
+  clanId: string | null;
+  discordId: string | null;
 }
 
 export interface JWTPayload {

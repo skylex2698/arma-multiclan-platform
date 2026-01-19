@@ -90,9 +90,26 @@ export class AuthService {
       throw new Error('Credenciales inválidas');
     }
 
-    // Verificar estado
+    // Verificar estado ANTES de generar token
     if (user.status === UserStatus.BANNED) {
       throw new Error('Usuario baneado');
+    }
+
+    if (user.status === UserStatus.PENDING) {
+      throw new Error('Usuario pendiente de validación');
+    }
+
+    if (user.status === UserStatus.BLOCKED) {
+      throw new Error('Usuario bloqueado');
+    }
+
+    if (user.status === UserStatus.INACTIVE) {
+      throw new Error('Usuario inactivo');
+    }
+
+    // Solo usuarios ACTIVE pueden hacer login
+    if (user.status !== UserStatus.ACTIVE) {
+      throw new Error('Usuario no puede iniciar sesión');
     }
 
     // Generar token

@@ -14,6 +14,8 @@ import EventsPage from './pages/events/EventsPage';
 import EventDetailPage from './pages/events/EventDetailPage';
 import ClanesPage from './pages/clanes/ClanesPage';
 import UsersPage from './pages/users/UsersPage';
+import CreateEventPage from './pages/events/CreateEventPage';
+
 
 // Protected Route Component
 function ProtectedRoute({ children }: { children: ReactNode }) {
@@ -77,6 +79,14 @@ export const router = createBrowserRouter([
       {
         path: 'events',
         element: <EventsPage />,
+      },
+      {
+        path: 'events/create',
+        element: (
+          <AdminRoute>
+            <CreateEventPage />
+          </AdminRoute>
+        ),
       },
       {
         path: 'events/:id',

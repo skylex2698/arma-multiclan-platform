@@ -1,306 +1,200 @@
-# 🎮 Arma Events Platform
+# 🎮 Arma Multiclan Platform
 
-Plataforma web para la gestión de eventos multiclan de Arma 3 y Arma Reforger. Sistema completo de inscripciones, gestión de escuadras, slots y clanes.
+Plataforma web para gestión de eventos multijugador de Arma 3 y Arma Reforger entre múltiples clanes.
 
-![Node.js](https://img.shields.io/badge/Node.js-24.13.0-green)
-![TypeScript](https://img.shields.io/badge/TypeScript-5.x-blue)
-![React](https://img.shields.io/badge/React-18.x-blue)
-![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16.x-blue)
-![License](https://img.shields.io/badge/License-MIT-yellow)
-
----
+![Version](https://img.shields.io/badge/version-1.0.0-blue.svg)
+![License](https://img.shields.io/badge/license-MIT-green.svg)
 
 ## 📋 Características
 
-### ✅ Gestión de Eventos
-- Crear eventos con múltiples escuadras y slots
-- Sistema de inscripciones en tiempo real
-- Apuntarse/desapuntarse de slots
-- Cambio automático de slot
-- Briefing en formato HTML
-- Filtros avanzados (juego, estado, fecha)
-- Vista detallada de eventos
+### 🛡️ Gestión de Clanes
+- **Crear y administrar clanes** con nombre, tag y descripción
+- **Subir logos personalizados** (.jpg, .png, .webp)
+- **Sistema de miembros** con roles diferenciados
+- **Permisos por rol**: Admin, Líder de Clan, Usuario
 
-### ✅ Sistema de Usuarios
-- Autenticación con JWT
-- Roles: Usuario, Líder de Clan, Administrador
-- Estados: Pendiente, Activo, Bloqueado, Baneado, Inactivo
-- Validación de usuarios por admins/líderes
-- Solicitudes de cambio de clan
-- Historial de cambios
+### 👤 Sistema de Avatares
+- **Avatares basados en logos de clan**
+- **Bordes de colores** según rol:
+  - 🔴 Rojo = Administrador
+  - 🟡 Amarillo = Líder de Clan
+  - 🔵 Azul = Usuario
+- Visible en navbar, eventos, clanes y gestión de usuarios
 
-### ✅ Gestión de Clanes
-- CRUD completo de clanes
-- Asignación de usuarios a clanes
-- Ver miembros por clan
-- Control de permisos por rol
+### 📅 Gestión de Eventos
+- **Crear eventos** con fecha, hora, tipo de juego y briefing
+- **Plantillas reutilizables** - Crea eventos basados en eventos anteriores
+- **Edición completa**:
+  - Información básica (nombre, fecha, descripción)
+  - Estructura de escuadras y slots
+  - Agregar/eliminar escuadras dinámicamente
+  - Modificar roles de slots
+- **Sistema de inscripción**:
+  - Usuarios se apuntan/desapuntan
+  - Admin/Líder asignan usuarios a slots
+  - Mover usuarios entre slots
+  - Desapuntar usuarios
 
-### ✅ Auditoría
-- Registro de todas las acciones críticas
-- Historial completo de cambios
-- Trazabilidad de eventos
+### 👥 Gestión de Usuarios
+- **Registro con validación de clan**
+- **Login seguro** con JWT
+- **Estados de usuario**: Activo, Pendiente, Bloqueado, Baneado
+- **Panel de administración**:
+  - Validar usuarios pendientes
+  - Cambiar roles
+  - Bloquear/desbloquear cuentas
+  - Eliminar usuarios
+
+### 🔐 Sistema de Permisos
+- **Administrador**: Control total
+- **Líder de Clan**: Gestiona su clan y asigna miembros a eventos
+- **Usuario**: Participa en eventos
 
 ---
 
-## 🛠️ Stack Tecnológico
+## 🚀 Tecnologías
 
 ### Backend
-- **Node.js** v24.13.0
-- **TypeScript** 5.x
+- **Node.js** + **TypeScript**
 - **Express** - Framework web
-- **Prisma** 5.22.0 - ORM
+- **Prisma** - ORM para PostgreSQL
 - **PostgreSQL** - Base de datos
 - **JWT** - Autenticación
 - **Bcrypt** - Encriptación de contraseñas
+- **Multer** - Subida de archivos
+- **Winston** - Logging
 
 ### Frontend
-- **React** 18.x
-- **TypeScript** 5.x
+- **React** + **TypeScript**
 - **Vite** - Build tool
-- **TailwindCSS** - Estilos
 - **React Router** - Navegación
-- **React Query** - Estado del servidor
+- **TanStack Query** - Estado del servidor
 - **Zustand** - Estado global
 - **Axios** - HTTP client
-- **date-fns** - Manejo de fechas
+- **Tailwind CSS** - Estilos
 - **Lucide React** - Iconos
+- **date-fns** - Manejo de fechas
 
 ---
 
 ## 📦 Instalación
 
-### Prerequisitos
-
-- Node.js v24.x o superior
-- PostgreSQL 16.x o superior
-- npm o yarn
+### Requisitos Previos
+- Node.js 18+ y npm
+- PostgreSQL 14+
 - Git
 
 ### 1. Clonar el repositorio
 ```bash
-git clone https://github.com/TU_USUARIO/arma-multiclan-platform.git
+git clone <tu-repo>
 cd arma-multiclan-platform
 ```
 
 ### 2. Configurar Backend
 ```bash
 cd backend
-
-# Instalar dependencias
 npm install
-
-# Configurar variables de entorno
-cp .env.example .env
-# Edita el archivo .env con tus credenciales
 ```
 
-**Archivo `.env` del backend:**
+Crea `.env`:
 ```env
-DATABASE_URL="postgresql://postgres:TU_PASSWORD@localhost:5432/arma_events?schema=public"
-JWT_SECRET="tu_clave_secreta_muy_segura_cambiala_en_produccion"
+DATABASE_URL="postgresql://usuario:contraseña@localhost:5432/arma_platform"
+JWT_SECRET="tu-secreto-super-seguro-cambialo-en-produccion"
 JWT_EXPIRES_IN="7d"
-DISCORD_CLIENT_ID=""
-DISCORD_CLIENT_SECRET=""
-DISCORD_CALLBACK_URL="http://localhost:3000/auth/discord/callback"
-DISCORD_BOT_TOKEN=""
-DISCORD_GUILD_ID=""
-DISCORD_NOTIFICATION_CHANNEL_ID=""
 PORT=3000
 NODE_ENV="development"
-FRONTEND_URL="http://localhost:5173"
 ```
 
-### 3. Configurar Base de Datos
+Ejecutar migraciones:
 ```bash
-# Ejecutar migraciones
 npx prisma migrate dev
-
-# Cargar datos de prueba (opcional)
-npm run prisma:seed
+npx prisma db seed  # Datos de prueba
 ```
 
-### 4. Configurar Frontend
+Iniciar servidor:
+```bash
+npm run dev
+```
+
+### 3. Configurar Frontend
 ```bash
 cd ../frontend
-
-# Instalar dependencias
 npm install
-
-# Configurar variables de entorno
-cp .env.example .env
 ```
 
-**Archivo `.env` del frontend:**
+Crea `.env`:
 ```env
 VITE_API_URL=http://localhost:3000/api
 ```
 
----
-
-## 🚀 Iniciar el Proyecto
-
-### Opción 1: Iniciar todo (3 terminales)
-
-**Terminal 1 - Backend:**
+Iniciar aplicación:
 ```bash
-cd backend
 npm run dev
 ```
 
-**Terminal 2 - Frontend:**
-```bash
-cd frontend
-npm run dev
-```
+---
 
-**Terminal 3 - Prisma Studio (opcional):**
-```bash
-cd backend
-npm run prisma:studio
-```
+## 🎮 Uso
 
-### Opción 2: Modo producción
+### Acceso Inicial
 
-**Backend:**
-```bash
-cd backend
-npm run build
-npm start
-```
+**Usuarios de prueba creados automáticamente:**
 
-**Frontend:**
-```bash
-cd frontend
-npm run build
-npm run preview
-```
+| Email | Contraseña | Rol | Clan |
+|-------|-----------|-----|------|
+| admin@arma.com | Admin123! | Admin | Clan Alfa |
+| leader@arma.com | Leader123! | Líder | Clan Alfa |
+| user@arma.com | User123! | Usuario | Clan Alfa |
+
+### Flujo de Trabajo
+
+1. **Login** con una de las cuentas de prueba
+2. **Explorar clanes** - Ver información y miembros
+3. **Crear eventos**:
+   - Desde cero: Define escuadras y slots manualmente
+   - Desde plantilla: Usa un evento existente como base
+4. **Gestionar eventos**:
+   - Editar información básica
+   - Modificar estructura de escuadras/slots
+   - Asignar usuarios (Admin/Líder)
+5. **Participar**:
+   - Apuntarse a slots disponibles
+   - Ver quién está asignado
 
 ---
 
-## 🌐 URLs de Acceso
-
-| Servicio | URL | Descripción |
-|----------|-----|-------------|
-| **Frontend** | http://localhost:5173 | Interfaz de usuario |
-| **Backend API** | http://localhost:3000/api | API REST |
-| **Health Check** | http://localhost:3000/health | Estado del servidor |
-| **Prisma Studio** | http://localhost:5555 | Visualizador de BD |
-
----
-
-## 👤 Usuarios de Prueba
-
-El seed crea automáticamente los siguientes usuarios:
-
-| Email | Password | Rol | Clan |
-|-------|----------|-----|------|
-| admin@arma.com | Admin123! | ADMIN | Clan Alfa |
-| leader@arma.com | Leader123! | CLAN_LEADER | Clan Alfa |
-| user@arma.com | User123! | USER | Clan Bravo |
-
-**Clanes creados:**
-- Clan Alfa [ALFA]
-- Clan Bravo [BRAVO]
-- Clan Charlie [CHARLIE]
-
----
-
-## 📚 Documentación de API
-
-### Endpoints principales
-
-#### Autenticación
-```
-POST   /api/auth/register/local     - Registro de usuario
-POST   /api/auth/login/local        - Login
-GET    /api/auth/me                 - Usuario actual
-```
-
-#### Eventos
-```
-GET    /api/events                  - Listar eventos
-GET    /api/events/:id              - Detalle de evento
-POST   /api/events                  - Crear evento (Admin/Líder)
-PUT    /api/events/:id              - Editar evento (Admin/Líder)
-DELETE /api/events/:id              - Eliminar evento (Admin)
-POST   /api/events/from-template    - Crear desde plantilla
-PUT    /api/events/:id/status       - Cambiar estado
-```
-
-#### Slots
-```
-POST   /api/slots/:id/assign        - Apuntarse a slot
-POST   /api/slots/:id/unassign      - Desapuntarse
-POST   /api/events/:id/absence      - Marcar ausencia
-```
-
-#### Clanes
-```
-GET    /api/clans                   - Listar clanes
-GET    /api/clans/:id               - Detalle de clan
-GET    /api/clans/:id/members       - Miembros del clan
-POST   /api/clans                   - Crear clan (Admin)
-PUT    /api/clans/:id               - Editar clan (Admin)
-DELETE /api/clans/:id               - Eliminar clan (Admin)
-```
-
-#### Usuarios
-```
-GET    /api/users                   - Listar usuarios
-GET    /api/users/:id               - Detalle de usuario
-POST   /api/users/:id/validate      - Validar usuario (Admin/Líder)
-PUT    /api/users/:id/role          - Cambiar rol (Admin)
-PUT    /api/users/:id/status        - Cambiar estado (Admin)
-PUT    /api/users/:id/clan          - Cambiar clan (Admin)
-POST   /api/users/clan-change-request           - Solicitar cambio de clan
-GET    /api/users/clan-change-requests          - Ver solicitudes
-POST   /api/users/clan-change-requests/:id/review - Aprobar/rechazar
-```
-
----
-
-## 🗂️ Estructura del Proyecto
+## 📁 Estructura del Proyecto
 ```
 arma-multiclan-platform/
 ├── backend/
 │   ├── prisma/
-│   │   ├── schema.prisma          # Modelo de datos
-│   │   ├── seed.ts                # Datos de prueba
-│   │   └── migrations/            # Migraciones
+│   │   ├── schema.prisma      # Modelo de datos
+│   │   └── seed.ts            # Datos iniciales
 │   ├── src/
-│   │   ├── config/                # Configuraciones
-│   │   ├── controllers/           # Controladores
-│   │   ├── middlewares/           # Middlewares
-│   │   ├── routes/                # Rutas de la API
-│   │   ├── services/              # Lógica de negocio
-│   │   ├── types/                 # Tipos TypeScript
-│   │   ├── utils/                 # Utilidades
-│   │   └── index.ts               # Servidor principal
-│   ├── .env                       # Variables de entorno
-│   └── package.json
+│   │   ├── config/            # Configuración (DB, Multer)
+│   │   ├── controllers/       # Lógica de endpoints
+│   │   ├── middlewares/       # Auth, validaciones
+│   │   ├── routes/            # Rutas de API
+│   │   ├── services/          # Lógica de negocio
+│   │   ├── types/             # TypeScript types
+│   │   ├── utils/             # Utilidades
+│   │   └── index.ts           # Entry point
+│   └── public/uploads/        # Archivos subidos
 │
 ├── frontend/
 │   ├── src/
-│   │   ├── components/
-│   │   │   ├── events/           # Componentes de eventos
-│   │   │   ├── layout/           # Layouts
-│   │   │   └── ui/               # Componentes reutilizables
-│   │   ├── hooks/                # Custom hooks
-│   │   ├── pages/
-│   │   │   ├── auth/             # Páginas de autenticación
-│   │   │   ├── events/           # Páginas de eventos
-│   │   │   ├── clanes/           # Páginas de clanes
-│   │   │   ├── users/            # Páginas de usuarios
-│   │   │   └── dashboard/        # Dashboard
-│   │   ├── services/             # Servicios de API
-│   │   ├── store/                # Estado global
-│   │   ├── types/                # Tipos TypeScript
-│   │   ├── utils/                # Utilidades
-│   │   ├── router.tsx            # Configuración de rutas
-│   │   ├── App.tsx
-│   │   └── main.tsx
-│   ├── .env                      # Variables de entorno
-│   └── package.json
+│   │   ├── components/        # Componentes React
+│   │   │   ├── clanes/
+│   │   │   ├── events/
+│   │   │   ├── layout/
+│   │   │   └── ui/
+│   │   ├── hooks/             # Custom hooks
+│   │   ├── pages/             # Páginas
+│   │   ├── services/          # API calls
+│   │   ├── store/             # Estado global
+│   │   ├── types/             # TypeScript types
+│   │   └── App.tsx
+│   └── public/
 │
 └── README.md
 ```
@@ -309,148 +203,65 @@ arma-multiclan-platform/
 
 ## 🔒 Seguridad
 
-- Contraseñas encriptadas con bcrypt (10 rounds)
-- Autenticación JWT con expiración
-- Validación de inputs en backend
-- Sanitización de datos
-- CORS configurado
-- Protección de rutas por roles
-- Tokens almacenados en localStorage (cliente)
+- ✅ Contraseñas encriptadas con bcrypt
+- ✅ Tokens JWT con expiración
+- ✅ Validación de entrada en frontend y backend
+- ✅ Sanitización de datos
+- ✅ Subida de archivos restringida (tipos y tamaños)
+- ✅ CORS configurado
+- ✅ Logs de auditoría para acciones importantes
 
 ---
 
-## 🧪 Testing
-```bash
-# Backend
-cd backend
-npm test
+## 🛣️ Roadmap
 
-# Frontend
-cd frontend
-npm test
-```
+### Próximas Funcionalidades
+- [ ] **Perfil de usuario** - Ver y editar perfil personal
+- [ ] **Estadísticas** - Dashboard con métricas de eventos
+- [ ] **Notificaciones** - Alertas de eventos y cambios
+- [ ] **Integración Discord** - OAuth y bot de notificaciones
+- [ ] **Calendario visual** - Vista de eventos en calendario
+- [ ] **Modo oscuro** - Tema oscuro para la interfaz
+- [ ] **Exportar reportes** - Excel/PDF de eventos y asistencia
 
----
-
-## 🚢 Deployment
-
-### Backend (Railway / Render)
-
-1. Crear cuenta en Railway/Render
-2. Conectar repositorio
-3. Configurar variables de entorno
-4. Agregar base de datos PostgreSQL
-5. Deploy automático
-
-### Frontend (Vercel / Netlify)
-
-1. Crear cuenta en Vercel/Netlify
-2. Conectar repositorio
-3. Configurar build:
-   - Build command: `npm run build`
-   - Output directory: `dist`
-4. Configurar variable `VITE_API_URL` con URL del backend
-5. Deploy automático
-
----
-
-## 📝 Scripts Disponibles
-
-### Backend
-```bash
-npm run dev              # Modo desarrollo (nodemon)
-npm run build            # Compilar TypeScript
-npm start                # Iniciar en producción
-npm run prisma:studio    # Abrir Prisma Studio
-npm run prisma:migrate   # Crear migración
-npm run prisma:seed      # Cargar datos de prueba
-```
-
-### Frontend
-```bash
-npm run dev              # Modo desarrollo (Vite)
-npm run build            # Compilar para producción
-npm run preview          # Preview de producción
-npm run lint             # Ejecutar ESLint
-```
-
----
-
-## 🤝 Contribuir
-
-1. Fork el proyecto
-2. Crea una rama (`git checkout -b feature/nueva-funcionalidad`)
-3. Commit tus cambios (`git commit -m 'Agregar nueva funcionalidad'`)
-4. Push a la rama (`git push origin feature/nueva-funcionalidad`)
-5. Abre un Pull Request
+### Deployment
+- [ ] Backend en Railway/Render
+- [ ] Frontend en Vercel
+- [ ] Base de datos en Supabase/Neon
+- [ ] CDN para imágenes
 
 ---
 
 ## 📄 Licencia
 
-Este proyecto está bajo la licencia MIT. Ver el archivo `LICENSE` para más detalles.
+Este proyecto está bajo la Licencia MIT. Ver `LICENSE` para más detalles.
 
 ---
 
-## 👥 Autor
+## 👥 Contribuir
 
-**Tu Nombre**
-- GitHub: [@tu-usuario](https://github.com/tu-usuario)
-- Email: tu-email@ejemplo.com
+Las contribuciones son bienvenidas. Por favor:
+
+1. Fork el proyecto
+2. Crea una rama (`git checkout -b feature/NuevaCaracteristica`)
+3. Commit tus cambios (`git commit -m 'Agregar nueva característica'`)
+4. Push a la rama (`git push origin feature/NuevaCaracteristica`)
+5. Abre un Pull Request
+
+---
+
+## 📧 Contacto
+
+Para preguntas o sugerencias, por favor abre un issue en GitHub.
 
 ---
 
 ## 🙏 Agradecimientos
 
-- Comunidad de Arma
-- Anthropic (Claude AI)
-- Todos los contribuidores
+- Comunidad de Arma 3/Reforger
+- Todos los clanes que inspiran este proyecto
+- Contribuidores y testers
 
 ---
 
-## 📞 Soporte
-
-Si encuentras algún problema o tienes sugerencias:
-
-1. Abre un [Issue](https://github.com/TU_USUARIO/arma-multiclan-platform/issues)
-2. Contacta por email
-3. Únete a nuestro Discord (próximamente)
-
----
-
-## 🗺️ Roadmap
-
-### v1.0 (Actual)
-- ✅ Sistema de autenticación
-- ✅ Gestión de eventos completa
-- ✅ Sistema de inscripciones
-- ✅ Gestión de clanes y usuarios
-
-### v1.1 (Próximamente)
-- [ ] Integración con Discord OAuth
-- [ ] Bot de Discord para notificaciones
-- [ ] Exportación a Excel
-- [ ] Estadísticas avanzadas
-
-### v2.0 (Futuro)
-- [ ] Sistema de roles personalizados
-- [ ] Templates de eventos
-- [ ] Sistema de permisos granular
-- [ ] Modo oscuro
-- [ ] App móvil
-
----
-
-## 📊 Estado del Proyecto
-
-- **Backend:** ████████████████████ 100%
-- **Frontend:** ██████████████░░░░░░ 70%
-- **Funcionalidad:** ████████████████░░░░ 85%
-
-**Última actualización:** Enero 2026
-
----
-
-## 🎮 ¡Disfruta organizando tus eventos!
-
-Hecho con ❤️ para la comunidad de Arma
+**Hecho con ❤️ para la comunidad de Arma**

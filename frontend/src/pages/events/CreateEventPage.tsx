@@ -1,8 +1,11 @@
+// frontend/src/pages/events/CreateEventPage.tsx - VERSIÓN COMPLETA CON COMUNICACIONES
+
 import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { ArrowLeft, Plus, Trash2, Save, Users } from 'lucide-react';
+import { ArrowLeft, Plus, Trash2, Save, X, ChevronDown, ChevronRight } from 'lucide-react';
 import { useCreateEvent } from '../../hooks/useEvents';
 import { Card } from '../../components/ui/Card';
+import { SquadCommunicationFields } from '../../components/events/SquadCommunicationFields';
 import type { GameType } from '../../types';
 
 interface SlotForm {
@@ -15,6 +18,10 @@ interface SquadForm {
   id: string;
   name: string;
   order: number;
+  frequency?: string;
+  isCommand: boolean;
+  parentSquadId?: string;
+  parentFrequency?: string;
   slots: SlotForm[];
 }
 
@@ -33,6 +40,10 @@ export default function CreateEventPage() {
       id: '1',
       name: 'Alfa',
       order: 1,
+      frequency: '',
+      isCommand: false,
+      parentSquadId: '',
+      parentFrequency: '',
       slots: [
         { id: '1-1', role: 'Líder de Escuadra', order: 1 },
         { id: '1-2', role: 'Fusilero', order: 2 },
@@ -42,34 +53,56 @@ export default function CreateEventPage() {
   ]);
 
   const [error, setError] = useState('');
+  const [expandedSquads, setExpandedSquads] = useState<Set<string>>(new Set(['1']));
+
+  const toggleSquad = (squadId: string) => {
+    setExpandedSquads((prev) => {
+      const next = new Set(prev);
+      if (next.has(squadId)) {
+        next.delete(squadId);
+      } else {
+        next.add(squadId);
+      }
+      return next;
+    });
+  };
 
   const addSquad = () => {
     const newOrder = squads.length + 1;
+    const newId = Date.now().toString();
     setSquads([
       ...squads,
       {
-        id: Date.now().toString(),
+        id: newId,
         name: `Escuadra ${newOrder}`,
         order: newOrder,
+        frequency: '',
+        isCommand: false,
+        parentSquadId: '',
+        parentFrequency: '',
         slots: [
           {
-            id: `${Date.now()}-1`,
+            id: `${newId}-1`,
             role: 'Líder de Escuadra',
             order: 1,
           },
         ],
       },
     ]);
+    setExpandedSquads((prev) => new Set([...prev, newId]));
   };
 
   const removeSquad = (squadId: string) => {
     setSquads(squads.filter((s) => s.id !== squadId));
+    setExpandedSquads((prev) => {
+      const next = new Set(prev);
+      next.delete(squadId);
+      return next;
+    });
   };
 
-  const updateSquadName = (squadId: string, name: string) => {
-    setSquads(
-      squads.map((s) => (s.id === squadId ? { ...s, name } : s))
-    );
+  const updateSquad = (squadId: string, updates: Partial<SquadForm>) => {
+    setSquads(squads.map((s) => (s.id === squadId ? { ...s, ...updates } : s)));
   };
 
   const addSlot = (squadId: string) => {
@@ -108,11 +141,7 @@ export default function CreateEventPage() {
     );
   };
 
-  const updateSlotRole = (
-    squadId: string,
-    slotId: string,
-    role: string
-  ) => {
+  const updateSlotRole = (squadId: string, slotId: string, role: string) => {
     setSquads(
       squads.map((squad) => {
         if (squad.id === squadId) {
@@ -132,7 +161,6 @@ export default function CreateEventPage() {
     e.preventDefault();
     setError('');
 
-    // Validaciones
     if (!name || !scheduledDate || !scheduledTime) {
       setError('Por favor completa todos los campos obligatorios');
       return;
@@ -156,6 +184,10 @@ export default function CreateEventPage() {
       const formattedSquads = squads.map((squad) => ({
         name: squad.name,
         order: squad.order,
+        frequency: squad.frequency || undefined,
+        isCommand: squad.isCommand,
+        parentSquadId: squad.parentSquadId || undefined,
+        parentFrequency: squad.parentFrequency || undefined,
         slots: squad.slots.map((slot) => ({
           role: slot.role,
           order: slot.order,
@@ -174,10 +206,14 @@ export default function CreateEventPage() {
       navigate('/events');
     } catch (err) {
       const error = err as { response?: { data?: { message?: string } } };
-      setError(
-        error.response?.data?.message || 'Error al crear el evento'
-      );
+      setError(error.response?.data?.message || 'Error al crear el evento');
     }
+  };
+
+  const getAvailableParentSquads = (currentSquadId: string) => {
+    return squads
+      .filter((s) => s.id !== currentSquadId)
+      .map((s) => ({ id: s.id, name: s.name }));
   };
 
   return (
@@ -209,41 +245,39 @@ export default function CreateEventPage() {
 
           <div className="space-y-4">
             <div>
-              <label className="block text-sm font-medium text-military-700 mb-1">
+              <label className="block text-sm font-medium text-military-700 mb-2">
                 Nombre del Evento *
               </label>
               <input
                 type="text"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                className="input"
-                placeholder="Operación Tormenta del Desierto"
+                className="input w-full"
                 required
               />
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-military-700 mb-1">
+              <label className="block text-sm font-medium text-military-700 mb-2">
                 Descripción
               </label>
               <textarea
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
-                className="input"
+                className="input w-full"
                 rows={3}
-                placeholder="Breve descripción del evento..."
               />
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div>
-                <label className="block text-sm font-medium text-military-700 mb-1">
+                <label className="block text-sm font-medium text-military-700 mb-2">
                   Tipo de Juego *
                 </label>
                 <select
                   value={gameType}
                   onChange={(e) => setGameType(e.target.value as GameType)}
-                  className="input"
+                  className="input w-full"
                   required
                 >
                   <option value="ARMA_3">Arma 3</option>
@@ -252,52 +286,49 @@ export default function CreateEventPage() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-military-700 mb-1">
+                <label className="block text-sm font-medium text-military-700 mb-2">
                   Fecha *
                 </label>
                 <input
                   type="date"
                   value={scheduledDate}
                   onChange={(e) => setScheduledDate(e.target.value)}
-                  className="input"
+                  className="input w-full"
                   required
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-military-700 mb-1">
+                <label className="block text-sm font-medium text-military-700 mb-2">
                   Hora *
                 </label>
                 <input
                   type="time"
                   value={scheduledTime}
                   onChange={(e) => setScheduledTime(e.target.value)}
-                  className="input"
+                  className="input w-full"
                   required
                 />
               </div>
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-military-700 mb-1">
+              <label className="block text-sm font-medium text-military-700 mb-2">
                 Briefing (HTML)
               </label>
               <textarea
                 value={briefing}
                 onChange={(e) => setBriefing(e.target.value)}
-                className="input font-mono text-sm"
+                className="input w-full font-mono text-sm"
                 rows={6}
-                placeholder="<h1>Briefing</h1><p>Objetivo: Capturar la base enemiga...</p>"
+                placeholder="<h2>Objetivo</h2><p>...</p>"
               />
-              <p className="text-xs text-military-500 mt-1">
-                Puedes usar HTML para dar formato al briefing
-              </p>
             </div>
           </div>
         </Card>
 
         {/* Escuadras y Slots */}
-        <div className="mb-6">
+        <Card className="mb-6">
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-xl font-bold text-military-900">
               Escuadras y Slots
@@ -305,39 +336,49 @@ export default function CreateEventPage() {
             <button
               type="button"
               onClick={addSquad}
-              className="btn btn-secondary flex items-center"
+              className="btn btn-primary btn-sm flex items-center"
             >
-              <Plus className="h-4 w-4 mr-2" />
+              <Plus className="h-4 w-4 mr-1" />
               Agregar Escuadra
             </button>
           </div>
 
           <div className="space-y-4">
-            {squads.map((squad, squadIndex) => (
-              <Card key={squad.id}>
-                <div className="flex items-center justify-between mb-4">
-                  <div className="flex items-center gap-3 flex-1">
-                    <Users className="h-5 w-5 text-primary-600" />
-                    <input
-                      type="text"
-                      value={squad.name}
-                      onChange={(e) =>
-                        updateSquadName(squad.id, e.target.value)
-                      }
-                      className="input"
-                      placeholder="Nombre de la escuadra"
-                    />
-                  </div>
-                  <div className="flex items-center gap-2 ml-4">
-                    <button
-                      type="button"
-                      onClick={() => addSlot(squad.id)}
-                      className="btn btn-primary btn-sm flex items-center"
-                    >
-                      <Plus className="h-4 w-4 mr-1" />
-                      Slot
-                    </button>
-                    {squads.length > 1 && (
+            {squads.map((squad) => {
+              const isExpanded = expandedSquads.has(squad.id);
+              
+              return (
+                <div
+                  key={squad.id}
+                  className="border-2 border-military-200 rounded-lg overflow-hidden"
+                >
+                  {/* Header */}
+                  <div className="p-4 bg-military-100 flex items-center justify-between">
+                    <div className="flex items-center gap-3 flex-1">
+                      <button
+                        type="button"
+                        onClick={() => toggleSquad(squad.id)}
+                        className="p-1 hover:bg-military-200 rounded"
+                      >
+                        {isExpanded ? (
+                          <ChevronDown className="w-5 h-5" />
+                        ) : (
+                          <ChevronRight className="w-5 h-5" />
+                        )}
+                      </button>
+                      <input
+                        type="text"
+                        value={squad.name}
+                        onChange={(e) => updateSquad(squad.id, { name: e.target.value })}
+                        onClick={(e) => e.stopPropagation()}
+                        className="input flex-1"
+                        placeholder="Nombre de la escuadra"
+                      />
+                    </div>
+                    <div className="flex items-center gap-2 ml-4">
+                      <span className="text-sm text-military-600">
+                        {squad.slots.length} slots
+                      </span>
                       <button
                         type="button"
                         onClick={() => removeSquad(squad.id)}
@@ -345,55 +386,86 @@ export default function CreateEventPage() {
                       >
                         <Trash2 className="h-4 w-4" />
                       </button>
-                    )}
-                  </div>
-                </div>
-
-                <div className="space-y-2">
-                  {squad.slots.map((slot, slotIndex) => (
-                    <div
-                      key={slot.id}
-                      className="flex items-center gap-2 p-3 bg-military-50 rounded-lg"
-                    >
-                      <span className="text-sm font-medium text-military-600 w-8">
-                        #{slotIndex + 1}
-                      </span>
-                      <input
-                        type="text"
-                        value={slot.role}
-                        onChange={(e) =>
-                          updateSlotRole(squad.id, slot.id, e.target.value)
-                        }
-                        className="input flex-1"
-                        placeholder="Rol del slot (ej: Fusilero, Médico)"
-                      />
-                      {squad.slots.length > 1 && (
-                        <button
-                          type="button"
-                          onClick={() => removeSlot(squad.id, slot.id)}
-                          className="btn btn-danger btn-sm"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </button>
-                      )}
                     </div>
-                  ))}
-                </div>
+                  </div>
 
-                <div className="mt-3 text-sm text-military-600">
-                  Total: {squad.slots.length} slots
-                </div>
-              </Card>
-            ))}
-          </div>
+                  {/* Contenido expandible */}
+                  {isExpanded && (
+                    <div className="p-4 space-y-4">
+                      {/* Slots */}
+                      <div>
+                        <div className="flex items-center justify-between mb-3">
+                          <h4 className="font-medium text-military-900">Slots</h4>
+                          <button
+                            type="button"
+                            onClick={() => addSlot(squad.id)}
+                            className="btn btn-primary btn-sm flex items-center"
+                          >
+                            <Plus className="h-4 w-4 mr-1" />
+                            Añadir Slot
+                          </button>
+                        </div>
 
-          <div className="mt-4 p-4 bg-primary-50 border border-primary-200 rounded-lg">
-            <p className="text-sm text-primary-900">
-              <strong>Total del evento:</strong> {squads.length} escuadras,{' '}
-              {squads.reduce((acc, s) => acc + s.slots.length, 0)} slots
-            </p>
+                        <div className="space-y-2">
+                          {squad.slots.map((slot) => (
+                            <div key={slot.id} className="flex items-center gap-2">
+                              <span className="text-sm text-military-600 w-8">
+                                {slot.order}.
+                              </span>
+                              <input
+                                type="text"
+                                value={slot.role}
+                                onChange={(e) =>
+                                  updateSlotRole(squad.id, slot.id, e.target.value)
+                                }
+                                className="input flex-1"
+                                placeholder="Rol del slot"
+                              />
+                              <button
+                                type="button"
+                                onClick={() => removeSlot(squad.id, slot.id)}
+                                className="btn btn-outline btn-sm text-red-600 hover:text-red-700"
+                              >
+                                <X className="h-4 w-4" />
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* Campos de Comunicación */}
+                      <SquadCommunicationFields
+                        frequency={squad.frequency || ''}
+                        isCommand={squad.isCommand}
+                        parentSquadId={squad.parentSquadId || ''}
+                        parentFrequency={squad.parentFrequency || ''}
+                        availableSquads={getAvailableParentSquads(squad.id)}
+                        onFrequencyChange={(value) =>
+                          updateSquad(squad.id, { frequency: value })
+                        }
+                        onIsCommandChange={(value) =>
+                          updateSquad(squad.id, { isCommand: value })
+                        }
+                        onParentSquadIdChange={(value) =>
+                          updateSquad(squad.id, { parentSquadId: value })
+                        }
+                        onParentFrequencyChange={(value) =>
+                          updateSquad(squad.id, { parentFrequency: value })
+                        }
+                      />
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+
+            {squads.length === 0 && (
+              <div className="text-center py-8 text-military-500">
+                No hay escuadras. Click en "Agregar Escuadra" para empezar.
+              </div>
+            )}
           </div>
-        </div>
+        </Card>
 
         {/* Botones */}
         <div className="flex gap-4">

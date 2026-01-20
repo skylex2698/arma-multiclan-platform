@@ -51,3 +51,6 @@ backend/public/uploads/*
 .cache/
 .parcel-cache/
 .eslintcache
+
+# Textos para ia
+textoIA.txt

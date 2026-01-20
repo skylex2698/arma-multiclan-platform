@@ -1,3 +1,5 @@
+// backend/src/types/index.ts - VERSIÓN ACTUALIZADA COMPLETA
+
 import { UserRole, UserStatus } from '@prisma/client';
 
 export interface AuthUser {
@@ -24,6 +26,41 @@ export interface DiscordProfile {
   email?: string;
 }
 
+// ========== DTOs DE SLOT ==========
+export interface CreateSlotDTO {
+  role: string;
+  order: number;
+}
+
+export interface UpdateSlotDto {
+  id?: string;
+  role: string;
+  order: number;
+}
+
+// ========== DTOs DE SQUAD CON CAMPOS DE COMUNICACIÓN ==========
+export interface CreateSquadDTO {
+  name: string;
+  order: number;
+  frequency?: string;
+  isCommand?: boolean;
+  parentSquadId?: string;
+  parentFrequency?: string;
+  slots: CreateSlotDTO[];
+}
+
+export interface UpdateSquadDto {
+  id?: string;
+  name: string;
+  order: number;
+  frequency?: string;
+  isCommand?: boolean;
+  parentSquadId?: string;
+  parentFrequency?: string;
+  slots: UpdateSlotDto[];
+}
+
+// ========== DTOs DE EVENT ==========
 export interface CreateEventDTO {
   name: string;
   description?: string;
@@ -33,13 +70,11 @@ export interface CreateEventDTO {
   squads: CreateSquadDTO[];
 }
 
-export interface CreateSquadDTO {
-  name: string;
-  order: number;
-  slots: CreateSlotDTO[];
-}
-
-export interface CreateSlotDTO {
-  role: string;
-  order: number;
+export interface UpdateEventDTO {
+  name?: string;
+  description?: string;
+  briefing?: string;
+  gameType?: 'ARMA_3' | 'ARMA_REFORGER';
+  scheduledDate?: Date;
+  squads?: UpdateSquadDto[];
 }

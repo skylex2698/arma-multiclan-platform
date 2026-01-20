@@ -123,6 +123,13 @@ model Squad {
   id          String   @id @default(uuid())
   name        String   // Ej: "Alfa", "Bravo", "Reconocimiento"
   order       Int      // Para ordenar las escuadras
+
+  frequency        String?  // Frecuencia interna de la escuadra (ej: "42.00")
+  isCommand        Boolean  @default(false) // Si es nodo de mando
+  parentSquadId    String?  // ID de la escuadra padre
+  parentSquad      Squad?   @relation("SquadHierarchy", fields: [parentSquadId], references: [id], onDelete: SetNull)
+  childSquads      Squad[]  @relation("SquadHierarchy")
+  parentFrequency  String?  // Frecuencia para comunicarse con el padre
   
   eventId     String
   event       Event    @relation(fields: [eventId], references: [id], onDelete: Cascade)

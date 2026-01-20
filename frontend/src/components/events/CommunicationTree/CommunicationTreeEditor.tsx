@@ -1,4 +1,5 @@
 // frontend/src/components/events/CommunicationTree/CommunicationTreeEditor.tsx
+// VERSIÓN LIMPIA - SIN DEBUG
 
 import { useState, useCallback, useEffect } from 'react';
 import ReactFlow, {
@@ -31,7 +32,7 @@ interface CommunicationTreeEditorProps {
   eventId: string;
 }
 
-// Definir nodeTypes FUERA del componente para evitar recreación
+// Definir nodeTypes FUERA del componente
 const nodeTypes = {
   custom: CustomNode,
 };
@@ -50,21 +51,11 @@ export default function CommunicationTreeEditor({ eventId }: CommunicationTreeEd
   const [selectedNode, setSelectedNode] = useState<CommunicationNode | undefined>();
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
 
-  // DEBUG: Log cuando cambian los datos del backend
-  useEffect(() => {
-    console.log('🔍 Backend nodes changed:', backendNodes);
-    console.log('🔍 Is array?', Array.isArray(backendNodes));
-    console.log('🔍 Length:', backendNodes?.length);
-  }, [backendNodes]);
-
-  // Convertir nodos del backend a React Flow usando useEffect
+  // Convertir nodos del backend a React Flow
   useEffect(() => {
     if (!backendNodes || !Array.isArray(backendNodes)) {
-      console.log('⚠️ No backend nodes or not an array');
       return;
     }
-
-    console.log('✅ Converting backend nodes to flow nodes:', backendNodes);
 
     const flowNodes: Node[] = backendNodes.map((node) => ({
       id: node.id,
@@ -88,9 +79,6 @@ export default function CommunicationTreeEditor({ eventId }: CommunicationTreeEd
         style: { stroke: '#64748b', strokeWidth: 2 },
       }));
 
-    console.log('✅ Flow nodes created:', flowNodes.length);
-    console.log('✅ Flow edges created:', flowEdges.length);
-
     setNodes(flowNodes);
     setEdges(flowEdges);
     setHasUnsavedChanges(false);
@@ -100,7 +88,6 @@ export default function CommunicationTreeEditor({ eventId }: CommunicationTreeEd
   const handleNodesChange = useCallback(
     (changes: NodeChange[]) => {
       onNodesChange(changes);
-      // Detectar si hubo un cambio de posición
       const hasPositionChange = changes.some((c) => c.type === 'position' && !(c as any).dragging);
       if (hasPositionChange) {
         setHasUnsavedChanges(true);
@@ -120,23 +107,18 @@ export default function CommunicationTreeEditor({ eventId }: CommunicationTreeEd
     try {
       await updatePositions.mutateAsync({ positions });
       setHasUnsavedChanges(false);
-      alert('✅ Posiciones guardadas correctamente');
     } catch (error) {
       console.error('Error saving positions:', error);
-      alert('❌ Error al guardar las posiciones');
     }
   };
 
   // Crear nodo
   const handleCreateNode = async (data: CreateNodeDto | UpdateNodeDto) => {
     try {
-      console.log('Creating node with data:', data);
       await createNode.mutateAsync(data as CreateNodeDto);
       setIsModalOpen(false);
-      alert('✅ Nodo creado correctamente');
     } catch (error) {
       console.error('Error creating node:', error);
-      alert('❌ Error al crear el nodo');
     }
   };
 
@@ -148,10 +130,8 @@ export default function CommunicationTreeEditor({ eventId }: CommunicationTreeEd
       await updateNode.mutateAsync({ nodeId: selectedNode.id, data: data as UpdateNodeDto });
       setIsModalOpen(false);
       setSelectedNode(undefined);
-      alert('✅ Nodo actualizado correctamente');
     } catch (error) {
       console.error('Error updating node:', error);
-      alert('❌ Error al actualizar el nodo');
     }
   };
 
@@ -163,10 +143,8 @@ export default function CommunicationTreeEditor({ eventId }: CommunicationTreeEd
 
     try {
       await deleteNode.mutateAsync(nodeId);
-      alert('✅ Nodo eliminado correctamente');
     } catch (error) {
       console.error('Error deleting node:', error);
-      alert('❌ Error al eliminar el nodo');
     }
   };
 
@@ -181,13 +159,9 @@ export default function CommunicationTreeEditor({ eventId }: CommunicationTreeEd
     }
 
     try {
-      console.log('🔄 Starting auto-generate...');
-      const result = await autoGenerate.mutateAsync();
-      console.log('✅ Auto-generate result:', result);
-      alert('✅ Árbol generado correctamente con ' + (result?.length || 0) + ' nodos');
+      await autoGenerate.mutateAsync();
     } catch (error) {
-      console.error('❌ Error auto-generating tree:', error);
-      alert('❌ Error al generar el árbol automáticamente');
+      console.error('Error auto-generating tree:', error);
     }
   };
 
@@ -206,14 +180,12 @@ export default function CommunicationTreeEditor({ eventId }: CommunicationTreeEd
       link.download = `communication-tree-${eventId}.png`;
       link.href = canvas.toDataURL();
       link.click();
-      alert('✅ Imagen exportada correctamente');
     } catch (error) {
       console.error('Error exporting to PNG:', error);
-      alert('❌ Error al exportar la imagen');
     }
   };
 
-  // Hacer doble click en un nodo para editar
+  // Doble click en un nodo para editar
   const handleNodeDoubleClick = useCallback(
     (_event: React.MouseEvent, node: Node) => {
       const backendNode = backendNodes?.find((n) => n.id === node.id);
@@ -229,7 +201,6 @@ export default function CommunicationTreeEditor({ eventId }: CommunicationTreeEd
     return (
       <div className="flex items-center justify-center h-96">
         <Loader2 className="w-8 h-8 animate-spin text-blue-500" />
-        <p className="ml-3 text-gray-600">Cargando árbol de comunicaciones...</p>
       </div>
     );
   }
@@ -238,20 +209,12 @@ export default function CommunicationTreeEditor({ eventId }: CommunicationTreeEd
     return (
       <div className="flex flex-col items-center justify-center h-96">
         <p className="text-red-500">Error al cargar el árbol</p>
-        <pre className="mt-2 text-xs text-gray-600">{JSON.stringify(error, null, 2)}</pre>
       </div>
     );
   }
 
   return (
     <>
-      {/* DEBUG INFO */}
-      <div className="mb-4 p-4 bg-yellow-50 border border-yellow-200 rounded">
-        <p className="text-sm font-mono">
-          🐛 DEBUG: Backend nodes: {backendNodes?.length || 0} | Flow nodes: {nodes.length} | Flow edges: {edges.length}
-        </p>
-      </div>
-
       <div className="w-full h-[700px] bg-gray-800 rounded-lg overflow-hidden border-2 border-gray-700">
         <ReactFlow
           nodes={nodes}

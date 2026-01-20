@@ -1,3 +1,5 @@
+// backend/src/services/event.service.ts - VERSIÓN COMPLETA ACTUALIZADA
+
 import { prisma } from '../index';
 import { logger } from '../utils/logger';
 import { EventStatus, GameType, UserRole, SlotStatus } from '@prisma/client';
@@ -163,6 +165,10 @@ export class EventService {
     squads: Array<{
       name: string;
       order: number;
+      frequency?: string;
+      isCommand?: boolean;
+      parentSquadId?: string;
+      parentFrequency?: string;
       slots: Array<{
         role: string;
         order: number;
@@ -182,6 +188,12 @@ export class EventService {
           create: data.squads.map(squad => ({
             name: squad.name,
             order: squad.order,
+            // ========== CAMPOS DE COMUNICACIÓN ==========
+            frequency: squad.frequency || null,
+            isCommand: squad.isCommand || false,
+            parentSquadId: squad.parentSquadId || null,
+            parentFrequency: squad.parentFrequency || null,
+            // ============================================
             slots: {
               create: squad.slots.map(slot => ({
                 role: slot.role,
@@ -271,11 +283,17 @@ export class EventService {
           create: templateEvent.squads.map((squad) => ({
             name: squad.name,
             order: squad.order,
+            // ========== COPIAR CAMPOS DE COMUNICACIÓN ==========
+            frequency: squad.frequency,
+            isCommand: squad.isCommand,
+            parentSquadId: null, // No copiar relaciones entre escuadras
+            parentFrequency: squad.parentFrequency,
+            // ===================================================
             slots: {
               create: squad.slots.map((slot) => ({
                 role: slot.role,
                 order: slot.order,
-                status: 'FREE', // Los slots empiezan libres
+                status: 'FREE',
               })),
             },
           })),
@@ -337,6 +355,10 @@ export class EventService {
         id?: string;
         name: string;
         order: number;
+        frequency?: string;
+        isCommand?: boolean;
+        parentSquadId?: string;
+        parentFrequency?: string;
         slots: Array<{
           id?: string;
           role: string;
@@ -384,12 +406,18 @@ export class EventService {
           const existingSquad = event.squads.find((s) => s.id === squadData.id);
           
           if (existingSquad) {
-            // Actualizar nombre y orden
+            // Actualizar nombre, orden y CAMPOS DE COMUNICACIÓN
             await prisma.squad.update({
               where: { id: squadData.id },
               data: {
                 name: squadData.name,
                 order: squadData.order,
+                // ========== CAMPOS DE COMUNICACIÓN ==========
+                frequency: squadData.frequency || null,
+                isCommand: squadData.isCommand || false,
+                parentSquadId: squadData.parentSquadId || null,
+                parentFrequency: squadData.parentFrequency || null,
+                // ============================================
               },
             });
 
@@ -439,6 +467,12 @@ export class EventService {
               name: squadData.name,
               order: squadData.order,
               eventId: id,
+              // ========== CAMPOS DE COMUNICACIÓN ==========
+              frequency: squadData.frequency || null,
+              isCommand: squadData.isCommand || false,
+              parentSquadId: squadData.parentSquadId || null,
+              parentFrequency: squadData.parentFrequency || null,
+              // ============================================
               slots: {
                 create: squadData.slots.map((slot) => ({
                   role: slot.role,
@@ -574,9 +608,6 @@ export class EventService {
       throw new Error('Evento no encontrado');
     }
 
-    // Simplemente eliminar el evento
-    // Prisma eliminará automáticamente las escuadras y slots relacionados
-    // gracias a la cascada definida en el schema
     await prisma.event.delete({
       where: { id },
     });

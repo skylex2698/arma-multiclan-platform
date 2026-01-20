@@ -81,6 +81,14 @@ export interface Squad {
   name: string;
   order: number;
   eventId: string;
+
+  frequency?: string;         // Frecuencia interna (ej: "42.00")
+  isCommand: boolean;         // Si es nodo de mando
+  parentSquadId?: string;     // ID de la escuadra padre
+  parentSquad?: Squad;        // Referencia a la escuadra padre
+  childSquads?: Squad[];      // Escuadras hijas
+  parentFrequency?: string;   // Frecuencia para comunicarse con el padre
+
   slots: Slot[];
   createdAt: string;
   updatedAt?: string;
@@ -163,4 +171,32 @@ export interface CreateEventForm {
       order: number;
     }[];
   }[];
+}
+
+export interface CreateSquadDto {
+  name: string;
+  order: number;
+  frequency?: string;
+  isCommand?: boolean;
+  parentSquadId?: string;
+  parentFrequency?: string;
+  slots: Array<{
+    role: string;
+    order: number;
+  }>;
+}
+
+export interface UpdateSquadDto {
+  name?: string;
+  order?: number;
+  frequency?: string;
+  isCommand?: boolean;
+  parentSquadId?: string;
+  parentFrequency?: string;
+  slots?: Array<{
+    id?: string;
+    role: string;
+    order: number;
+    isNew?: boolean;
+  }>;
 }

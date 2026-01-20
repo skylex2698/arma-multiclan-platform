@@ -174,7 +174,11 @@ class CommunicationTreeService {
       where: { id: eventId },
       include: {
         squads: {
-          orderBy: { order: 'asc' }
+          orderBy: { order: 'asc' },
+          include: {
+            parentSquad: true,
+            childSquads: true
+          }
         }
       }
     });
@@ -188,36 +192,69 @@ class CommunicationTreeService {
       where: { eventId }
     });
 
-    // Crear nodo raíz (COMANDO)
-    const rootNode = await prisma.communicationNode.create({
-      data: {
-        eventId,
-        name: 'COMANDO CENTRAL',
-        frequency: '41.00',
-        type: 'COMMAND',
-        positionX: 0,
-        positionY: 0,
-        order: 0
-      }
-    });
+    const createdNodes: Record<string, any> = {}; // Mapa de squadId -> nodeId
 
-    // Crear nodo para cada escuadra
-    const frequencyBase = 42;
-    for (let i = 0; i < event.squads.length; i++) {
-      const squad = event.squads[i];
+    // PASO 1: Crear nodos de comando primero
+    const commandSquads = event.squads.filter(s => s.isCommand);
+    for (let i = 0; i < commandSquads.length; i++) {
+      const squad = commandSquads[i];
       
-      await prisma.communicationNode.create({
+      const node = await prisma.communicationNode.create({
         data: {
           eventId,
           name: squad.name.toUpperCase(),
-          frequency: `${frequencyBase + i}.00`,
-          type: 'SQUAD',
-          parentId: rootNode.id,
-          positionX: (i - (event.squads.length - 1) / 2) * 200,
-          positionY: 200,
-          order: i + 1
+          frequency: squad.frequency || '41.00',
+          type: 'COMMAND',
+          positionX: i * 300,
+          positionY: 0,
+          order: i
         }
       });
+
+      createdNodes[squad.id] = node;
+    }
+
+    // PASO 2: Crear nodos normales (escuadras sin padre o con padre ya creado)
+    const normalSquads = event.squads.filter(s => !s.isCommand);
+    
+    // Ordenar por jerarquía (primero los que no tienen padre, luego sus hijos)
+    const sortedSquads = sortByHierarchy(normalSquads);
+    
+    for (let i = 0; i < sortedSquads.length; i++) {
+      const squad = sortedSquads[i];
+      
+      // Determinar el padre del nodo
+      let parentNodeId: string | undefined = undefined;
+      
+      if (squad.parentSquadId && createdNodes[squad.parentSquadId]) {
+        // Si tiene padre y ya fue creado, usarlo
+        parentNodeId = createdNodes[squad.parentSquadId].id;
+      } else if (commandSquads.length > 0) {
+        // Si no tiene padre asignado pero hay comandos, conectar al primer comando
+        parentNodeId = createdNodes[commandSquads[0].id]?.id;
+      }
+
+      // Determinar el tipo de nodo
+      const nodeType = squad.childSquads.length > 0 ? 'SQUAD' : 'ELEMENT';
+
+      // Calcular posición
+      const level = getHierarchyLevel(squad, event.squads);
+      const indexAtLevel = getIndexAtLevel(squad, sortedSquads, level);
+      
+      const node = await prisma.communicationNode.create({
+        data: {
+          eventId,
+          name: squad.name.toUpperCase(),
+          frequency: squad.frequency || undefined,
+          type: nodeType,
+          parentId: parentNodeId,
+          positionX: (indexAtLevel - 1) * 250,
+          positionY: level * 200,
+          order: i + commandSquads.length
+        }
+      });
+
+      createdNodes[squad.id] = node;
     }
 
     // Audit log
@@ -229,12 +266,17 @@ class CommunicationTreeService {
         userId,
         eventId,
         details: JSON.stringify({
-          squadCount: event.squads.length
+          squadCount: event.squads.length,
+          nodeCount: Object.keys(createdNodes).length
         })
       }
     });
 
-    logger.info('Communication tree auto-generated', { eventId, userId });
+    logger.info('Communication tree auto-generated', { 
+      eventId, 
+      userId,
+      nodeCount: Object.keys(createdNodes).length 
+    });
 
     return this.getEventTree(eventId);
   }
@@ -264,6 +306,57 @@ class CommunicationTreeService {
 
     return { message: 'Posiciones actualizadas correctamente' };
   }
+}
+
+// Funciones auxiliares para el auto-generador:
+function sortByHierarchy(squads: any[]): any[] {
+  const sorted: any[] = [];
+  const processed = new Set<string>();
+  
+  // Función recursiva para añadir una escuadra y sus hijos
+  function addSquadWithChildren(squad: any) {
+    if (processed.has(squad.id)) return;
+    
+    sorted.push(squad);
+    processed.add(squad.id);
+    
+    // Añadir hijos
+    const children = squads.filter(s => s.parentSquadId === squad.id);
+    children.forEach(child => addSquadWithChildren(child));
+  }
+  
+  // Primero añadir las escuadras sin padre
+  const rootSquads = squads.filter(s => !s.parentSquadId);
+  rootSquads.forEach(squad => addSquadWithChildren(squad));
+  
+  // Añadir cualquier escuadra que quedó sin procesar
+  squads.forEach(squad => {
+    if (!processed.has(squad.id)) {
+      addSquadWithChildren(squad);
+    }
+  });
+  
+  return sorted;
+}
+
+function getHierarchyLevel(squad: any, allSquads: any[]): number {
+  let level = 1; // Comandos están en nivel 0, escuadras normales empiezan en 1
+  let current = squad;
+  
+  while (current.parentSquadId) {
+    level++;
+    current = allSquads.find(s => s.id === current.parentSquadId);
+    if (!current) break;
+  }
+  
+  return level;
+}
+
+function getIndexAtLevel(squad: any, sortedSquads: any[], level: number): number {
+  const squadsAtLevel = sortedSquads.filter(s => 
+    getHierarchyLevel(s, sortedSquads) === level
+  );
+  return squadsAtLevel.indexOf(squad);
 }
 
 export const communicationTreeService = new CommunicationTreeService();

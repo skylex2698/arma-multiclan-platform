@@ -1,10 +1,13 @@
+// frontend/src/pages/events/EditEventPage.tsx - VERSIÓN COMPLETA CON COMUNICACIONES
+
 import { useState, useEffect } from 'react';
 import { useNavigate, useParams, Link } from 'react-router-dom';
 import { useEvent, useUpdateEvent, useDeleteEvent } from '../../hooks/useEvents';
 import { useAuthStore } from '../../store/authStore';
-import { ArrowLeft, Trash2, Save, Plus, X, Edit2 } from 'lucide-react';
+import { ArrowLeft, Trash2, Save, Plus, X, ChevronDown, ChevronRight } from 'lucide-react';
 import { Card } from '../../components/ui/Card';
 import { LoadingSpinner } from '../../components/ui/LoadingSpinner';
+import { SquadCommunicationFields } from '../../components/events/SquadCommunicationFields';
 import type { GameType } from '../../types';
 
 interface SlotForm {
@@ -18,6 +21,10 @@ interface SquadForm {
   id?: string;
   name: string;
   order: number;
+  frequency?: string;
+  isCommand: boolean;
+  parentSquadId?: string;
+  parentFrequency?: string;
   slots: SlotForm[];
   isNew?: boolean;
 }
@@ -33,14 +40,26 @@ export default function EditEventPage() {
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [briefing, setBriefing] = useState('');
-  const [gameType, setGameType] = useState<GameType>('ARMA_3' as GameType);
+  const [gameType, setGameType] = useState<GameType>('ARMA_3');
   const [scheduledDate, setScheduledDate] = useState('');
   const [scheduledTime, setScheduledTime] = useState('');
   const [squads, setSquads] = useState<SquadForm[]>([]);
   const [error, setError] = useState('');
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [expandedSquads, setExpandedSquads] = useState<Set<string>>(new Set());
 
-  // Cargar datos del evento
+  const toggleSquad = (squadId: string) => {
+    setExpandedSquads((prev) => {
+      const next = new Set(prev);
+      if (next.has(squadId)) {
+        next.delete(squadId);
+      } else {
+        next.add(squadId);
+      }
+      return next;
+    });
+  };
+
   useEffect(() => {
     if (eventData?.event) {
       const event = eventData.event;
@@ -49,16 +68,18 @@ export default function EditEventPage() {
       setBriefing(event.briefing || '');
       setGameType(event.gameType);
 
-      // Convertir fecha y hora
       const date = new Date(event.scheduledDate);
       setScheduledDate(date.toISOString().split('T')[0]);
       setScheduledTime(date.toTimeString().slice(0, 5));
 
-      // Convertir escuadras y slots
       const formattedSquads = event.squads.map((squad) => ({
         id: squad.id,
         name: squad.name,
         order: squad.order,
+        frequency: squad.frequency || '',
+        isCommand: squad.isCommand || false,
+        parentSquadId: squad.parentSquadId || '',
+        parentFrequency: squad.parentFrequency || '',
         slots: squad.slots.map((slot) => ({
           id: slot.id,
           role: slot.role,
@@ -68,10 +89,12 @@ export default function EditEventPage() {
         isNew: false,
       }));
       setSquads(formattedSquads);
+      
+      // Expandir todas las escuadras por defecto
+      setExpandedSquads(new Set(formattedSquads.map(s => s.id!)));
     }
   }, [eventData]);
 
-  // Verificar permisos
   const canEdit =
     user?.role === 'ADMIN' ||
     eventData?.event?.creatorId === user?.id ||
@@ -84,33 +107,34 @@ export default function EditEventPage() {
     (user?.role === 'CLAN_LEADER' &&
       user?.clan?.id === eventData?.event?.creator?.clanId);
 
-  // Funciones de manejo de escuadras
   const addSquad = () => {
     const newOrder = squads.length + 1;
-    setSquads([
-      ...squads,
-      {
-        name: `Escuadra ${newOrder}`,
-        order: newOrder,
-        slots: [
-          {
-            role: 'Líder de Escuadra',
-            order: 1,
-            isNew: true,
-          },
-        ],
-        isNew: true,
-      },
-    ]);
+    const newSquad: SquadForm = {
+      name: `Escuadra ${newOrder}`,
+      order: newOrder,
+      frequency: '',
+      isCommand: false,
+      parentSquadId: '',
+      parentFrequency: '',
+      slots: [
+        {
+          role: 'Líder de Escuadra',
+          order: 1,
+          isNew: true,
+        },
+      ],
+      isNew: true,
+    };
+    setSquads([...squads, newSquad]);
   };
 
   const removeSquad = (index: number) => {
     setSquads(squads.filter((_, i) => i !== index));
   };
 
-  const updateSquadName = (index: number, name: string) => {
+  const updateSquad = (index: number, updates: Partial<SquadForm>) => {
     const updated = [...squads];
-    updated[index].name = name;
+    updated[index] = { ...updated[index], ...updates };
     setSquads(updated);
   };
 
@@ -143,7 +167,6 @@ export default function EditEventPage() {
     e.preventDefault();
     setError('');
 
-    // Validaciones
     if (!name || !scheduledDate || !scheduledTime) {
       setError('Por favor completa todos los campos obligatorios');
       return;
@@ -174,6 +197,10 @@ export default function EditEventPage() {
           id: squad.isNew ? undefined : squad.id,
           name: squad.name,
           order: index + 1,
+          frequency: squad.frequency || undefined,
+          isCommand: squad.isCommand,
+          parentSquadId: squad.parentSquadId || undefined,
+          parentFrequency: squad.parentFrequency || undefined,
           slots: squad.slots.map((slot, slotIndex) => ({
             id: slot.isNew ? undefined : slot.id,
             role: slot.role,
@@ -198,6 +225,12 @@ export default function EditEventPage() {
       setError(error.response?.data?.message || 'Error al eliminar el evento');
       setShowDeleteConfirm(false);
     }
+  };
+
+  const getAvailableParentSquads = (currentIndex: number) => {
+    return squads
+      .filter((_, index) => index !== currentIndex)
+      .map((s, index) => ({ id: s.id || `temp-${index}`, name: s.name }));
   };
 
   if (loadingEvent) {
@@ -261,41 +294,39 @@ export default function EditEventPage() {
 
           <div className="space-y-4">
             <div>
-              <label className="block text-sm font-medium text-military-700 mb-1">
+              <label className="block text-sm font-medium text-military-700 mb-2">
                 Nombre del Evento *
               </label>
               <input
                 type="text"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                className="input"
-                placeholder="Operación Tormenta del Desierto"
+                className="input w-full"
                 required
               />
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-military-700 mb-1">
+              <label className="block text-sm font-medium text-military-700 mb-2">
                 Descripción
               </label>
               <textarea
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
-                className="input"
+                className="input w-full"
                 rows={3}
-                placeholder="Breve descripción del evento..."
               />
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div>
-                <label className="block text-sm font-medium text-military-700 mb-1">
+                <label className="block text-sm font-medium text-military-700 mb-2">
                   Tipo de Juego *
                 </label>
                 <select
                   value={gameType}
                   onChange={(e) => setGameType(e.target.value as GameType)}
-                  className="input"
+                  className="input w-full"
                   required
                 >
                   <option value="ARMA_3">Arma 3</option>
@@ -304,51 +335,48 @@ export default function EditEventPage() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-military-700 mb-1">
+                <label className="block text-sm font-medium text-military-700 mb-2">
                   Fecha *
                 </label>
                 <input
                   type="date"
                   value={scheduledDate}
                   onChange={(e) => setScheduledDate(e.target.value)}
-                  className="input"
+                  className="input w-full"
                   required
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-military-700 mb-1">
+                <label className="block text-sm font-medium text-military-700 mb-2">
                   Hora *
                 </label>
                 <input
                   type="time"
                   value={scheduledTime}
                   onChange={(e) => setScheduledTime(e.target.value)}
-                  className="input"
+                  className="input w-full"
                   required
                 />
               </div>
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-military-700 mb-1">
+              <label className="block text-sm font-medium text-military-700 mb-2">
                 Briefing (HTML)
               </label>
               <textarea
                 value={briefing}
                 onChange={(e) => setBriefing(e.target.value)}
-                className="input font-mono text-sm"
+                className="input w-full font-mono text-sm"
                 rows={6}
-                placeholder="<h1>Briefing</h1><p>Objetivo: Capturar la base enemiga...</p>"
+                placeholder="<h2>Objetivo</h2><p>...</p>"
               />
-              <p className="text-xs text-military-500 mt-1">
-                Puedes usar HTML para dar formato al briefing
-              </p>
             </div>
           </div>
         </Card>
 
-        {/* Escuadras y Slots */}
+        {/* Escuadras */}
         <Card className="mb-6">
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-xl font-bold text-military-900">
@@ -357,7 +385,7 @@ export default function EditEventPage() {
             <button
               type="button"
               onClick={addSquad}
-              className="btn btn-secondary btn-sm flex items-center"
+              className="btn btn-primary btn-sm flex items-center"
             >
               <Plus className="h-4 w-4 mr-1" />
               Agregar Escuadra
@@ -365,63 +393,120 @@ export default function EditEventPage() {
           </div>
 
           <div className="space-y-4">
-            {squads.map((squad, squadIndex) => (
-              <div
-                key={squadIndex}
-                className="p-4 border-2 border-military-200 dark:border-gray-700 rounded-lg bg-military-50 dark:bg-gray-700"
-              >
-                <div className="flex items-center gap-2 mb-3">
-                  <input
-                    type="text"
-                    value={squad.name}
-                    onChange={(e) => updateSquadName(squadIndex, e.target.value)}
-                    className="input flex-1"
-                    placeholder="Nombre de la escuadra"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => addSlot(squadIndex)}
-                    className="btn btn-primary btn-sm flex items-center"
-                  >
-                    <Plus className="h-4 w-4 mr-1" />
-                    Slot
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => removeSquad(squadIndex)}
-                    className="btn btn-danger btn-sm"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </button>
-                </div>
+            {squads.map((squad, squadIndex) => {
+              const squadKey = squad.id || `temp-${squadIndex}`;
+              const isExpanded = expandedSquads.has(squadKey);
 
-                <div className="space-y-2">
-                  {squad.slots.map((slot, slotIndex) => (
-                    <div key={slotIndex} className="flex items-center gap-2">
-                      <span className="text-sm text-military-600 w-8">
-                        {slotIndex + 1}.
-                      </span>
-                      <input
-                        type="text"
-                        value={slot.role}
-                        onChange={(e) =>
-                          updateSlotRole(squadIndex, slotIndex, e.target.value)
-                        }
-                        className="input flex-1"
-                        placeholder="Rol del slot"
-                      />
+              return (
+                <div
+                  key={squadKey}
+                  className="border-2 border-military-200 rounded-lg overflow-hidden"
+                >
+                  {/* Header */}
+                  <div className="p-4 bg-military-100 flex items-center justify-between">
+                    <div className="flex items-center gap-3 flex-1">
                       <button
                         type="button"
-                        onClick={() => removeSlot(squadIndex, slotIndex)}
-                        className="btn btn-outline btn-sm text-red-600 hover:text-red-700"
+                        onClick={() => toggleSquad(squadKey)}
+                        className="p-1 hover:bg-military-200 rounded"
                       >
-                        <X className="h-4 w-4" />
+                        {isExpanded ? (
+                          <ChevronDown className="w-5 h-5" />
+                        ) : (
+                          <ChevronRight className="w-5 h-5" />
+                        )}
+                      </button>
+                      <input
+                        type="text"
+                        value={squad.name}
+                        onChange={(e) => updateSquad(squadIndex, { name: e.target.value })}
+                        className="input flex-1"
+                        placeholder="Nombre de la escuadra"
+                      />
+                    </div>
+                    <div className="flex items-center gap-2 ml-4">
+                      <span className="text-sm text-military-600">
+                        {squad.slots.length} slots
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => removeSquad(squadIndex)}
+                        className="btn btn-danger btn-sm"
+                      >
+                        <Trash2 className="h-4 w-4" />
                       </button>
                     </div>
-                  ))}
+                  </div>
+
+                  {/* Contenido */}
+                  {isExpanded && (
+                    <div className="p-4 space-y-4">
+                      {/* Slots */}
+                      <div>
+                        <div className="flex items-center justify-between mb-3">
+                          <h4 className="font-medium text-military-900">Slots</h4>
+                          <button
+                            type="button"
+                            onClick={() => addSlot(squadIndex)}
+                            className="btn btn-primary btn-sm flex items-center"
+                          >
+                            <Plus className="h-4 w-4 mr-1" />
+                            Añadir Slot
+                          </button>
+                        </div>
+
+                        <div className="space-y-2">
+                          {squad.slots.map((slot, slotIndex) => (
+                            <div key={slotIndex} className="flex items-center gap-2">
+                              <span className="text-sm text-military-600 w-8">
+                                {slotIndex + 1}.
+                              </span>
+                              <input
+                                type="text"
+                                value={slot.role}
+                                onChange={(e) =>
+                                  updateSlotRole(squadIndex, slotIndex, e.target.value)
+                                }
+                                className="input flex-1"
+                                placeholder="Rol del slot"
+                              />
+                              <button
+                                type="button"
+                                onClick={() => removeSlot(squadIndex, slotIndex)}
+                                className="btn btn-outline btn-sm text-red-600 hover:text-red-700"
+                              >
+                                <X className="h-4 w-4" />
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* Campos de Comunicación */}
+                      <SquadCommunicationFields
+                        frequency={squad.frequency || ''}
+                        isCommand={squad.isCommand}
+                        parentSquadId={squad.parentSquadId || ''}
+                        parentFrequency={squad.parentFrequency || ''}
+                        availableSquads={getAvailableParentSquads(squadIndex)}
+                        onFrequencyChange={(value) =>
+                          updateSquad(squadIndex, { frequency: value })
+                        }
+                        onIsCommandChange={(value) =>
+                          updateSquad(squadIndex, { isCommand: value })
+                        }
+                        onParentSquadIdChange={(value) =>
+                          updateSquad(squadIndex, { parentSquadId: value })
+                        }
+                        onParentFrequencyChange={(value) =>
+                          updateSquad(squadIndex, { parentFrequency: value })
+                        }
+                      />
+                    </div>
+                  )}
                 </div>
-              </div>
-            ))}
+              );
+            })}
 
             {squads.length === 0 && (
               <div className="text-center py-8 text-military-500">
@@ -430,64 +515,6 @@ export default function EditEventPage() {
             )}
           </div>
         </Card>
-
-        {/* Advertencia sobre usuarios asignados */}
-        {eventData.event.occupiedSlots > 0 && (
-          <Card className="mb-6 bg-amber-50 border-amber-200">
-            <p className="text-sm text-amber-800">
-              <strong>⚠️ Advertencia:</strong> Este evento tiene {eventData.event.occupiedSlots} usuario
-              {eventData.event.occupiedSlots !== 1 ? 's' : ''} asignado
-              {eventData.event.occupiedSlots !== 1 ? 's' : ''}. Si eliminas escuadras o slots,
-              los usuarios asignados a esos slots perderán su asignación.
-            </p>
-          </Card>
-        )}
-
-        {/* Zona de peligro */}
-        {canDelete && (
-          <Card className="mb-6 bg-red-50 border-red-200">
-            <h3 className="text-lg font-bold text-red-900 mb-2">Zona de Peligro</h3>
-            <p className="text-sm text-red-700 mb-4">
-              Eliminar este evento es una acción permanente. Todos los usuarios inscritos
-              perderán sus slots.
-            </p>
-
-            {!showDeleteConfirm ? (
-              <button
-                type="button"
-                onClick={() => setShowDeleteConfirm(true)}
-                className="btn btn-danger flex items-center"
-              >
-                <Trash2 className="h-4 w-4 mr-2" />
-                Eliminar Evento
-              </button>
-            ) : (
-              <div className="space-y-3">
-                <p className="text-sm font-medium text-red-900">
-                  ¿Estás seguro? Esta acción no se puede deshacer y eliminará todos los
-                  slots e inscripciones.
-                </p>
-                <div className="flex gap-2">
-                  <button
-                    type="button"
-                    onClick={handleDelete}
-                    disabled={deleteEvent.isPending}
-                    className="btn btn-danger"
-                  >
-                    {deleteEvent.isPending ? 'Eliminando...' : 'Sí, Eliminar'}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setShowDeleteConfirm(false)}
-                    className="btn btn-outline"
-                  >
-                    Cancelar
-                  </button>
-                </div>
-              </div>
-            )}
-          </Card>
-        )}
 
         {/* Botones */}
         <div className="flex gap-4">
@@ -502,8 +529,47 @@ export default function EditEventPage() {
           <Link to={`/events/${id}`} className="btn btn-outline">
             Cancelar
           </Link>
+          {canDelete && (
+            <button
+              type="button"
+              onClick={() => setShowDeleteConfirm(true)}
+              className="btn btn-danger ml-auto"
+            >
+              <Trash2 className="h-4 w-4 mr-2" />
+              Eliminar Evento
+            </button>
+          )}
         </div>
       </form>
+
+      {/* Modal de confirmación de eliminación */}
+      {showDeleteConfirm && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 max-w-md">
+            <h3 className="text-lg font-bold text-gray-900 mb-2">
+              ¿Eliminar evento?
+            </h3>
+            <p className="text-gray-600 mb-4">
+              Esta acción no se puede deshacer. Se eliminarán todas las escuadras y slots.
+            </p>
+            <div className="flex gap-3">
+              <button
+                onClick={handleDelete}
+                disabled={deleteEvent.isPending}
+                className="btn btn-danger flex-1"
+              >
+                {deleteEvent.isPending ? 'Eliminando...' : 'Sí, eliminar'}
+              </button>
+              <button
+                onClick={() => setShowDeleteConfirm(false)}
+                className="btn btn-outline flex-1"
+              >
+                Cancelar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

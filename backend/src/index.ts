@@ -8,6 +8,7 @@ import { clanRoutes } from './routes/clan.routes';
 import { userRoutes } from './routes/user.routes';
 import eventRoutes from './routes/event.routes';
 import { slotRoutes, squadRouter } from './routes/slot.routes';
+import communicationTreeRoutes from './routes/communicationTree.routes';
 
 dotenv.config();
 
@@ -40,6 +41,7 @@ app.use('/api/users', userRoutes);
 app.use('/api/events', eventRoutes);
 app.use('/api/slots', slotRoutes);
 app.use('/api/squads', squadRouter);
+app.use('/api/events', communicationTreeRoutes);
 
 app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
   console.error('Error:', err);

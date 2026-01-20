@@ -38,6 +38,13 @@ enum SlotStatus {
   OCCUPIED
 }
 
+enum NodeType {
+  COMMAND   // Mando principal (ej: ALPHA MANDO)
+  SQUAD     // Escuadra (ej: BRAVO, CHARLIE)
+  ELEMENT   // Elemento/sub-equipo (ej: HIERRO 1)
+  SUPPORT   // Apoyo (ej: AEREO, MEDICO)
+}
+
 // ===== MODELOS =====
 
 model User {
@@ -102,6 +109,7 @@ model Event {
   squads          Squad[]
   absences        Absence[]
   auditLogs       AuditLog[]
+  communicationNodes CommunicationNode[]
   
   createdAt       DateTime    @default(now())
   updatedAt       DateTime    @updatedAt
@@ -197,6 +205,36 @@ model ClanChangeRequest {
   @@index([userId])
   @@index([targetClanId])
   @@index([status])
+}
+
+model CommunicationNode {
+  id          String   @id @default(uuid())
+  
+  eventId     String
+  event       Event    @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  
+  // Identificación del nodo
+  name        String   // "ALPHA MANDO", "BRAVO", "HIERRO 1", etc.
+  frequency   String?  // Formato: "xxx.xx" (ej: "123.45", "48.00")
+  type        NodeType // COMMAND, SQUAD, ELEMENT, SUPPORT
+  
+  // Jerarquía
+  parentId    String?
+  parent      CommunicationNode?  @relation("NodeHierarchy", fields: [parentId], references: [id], onDelete: Cascade)
+  children    CommunicationNode[] @relation("NodeHierarchy")
+  
+  // Posición visual (para guardar el layout del árbol)
+  positionX   Float    @default(0)
+  positionY   Float    @default(0)
+  
+  // Orden de visualización
+  order       Int      @default(0)
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  @@index([eventId])
+  @@index([parentId])
 }
 
 model AuditLog {

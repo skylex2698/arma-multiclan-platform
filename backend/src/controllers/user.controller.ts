@@ -317,6 +317,64 @@ export class UserController {
       );
     }
   }
+
+  // Actualizar rol de usuario
+  async updateRole(req: Request, res: Response) {
+    try {
+      const { userId } = req.params;
+      const { role } = req.body;
+
+      if (Array.isArray(userId)) {
+        return res.status(400).json({
+          success: false,
+          message: 'ID de usuario inválido',
+        });
+      }
+
+      const user = await userService.updateRole(userId, role);
+
+      res.json({
+        success: true,
+        data: { user },
+        message: 'Rol actualizado correctamente',
+      });
+    } catch (error) {
+      console.error('Error al actualizar rol:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Error al actualizar rol',
+      });
+    }
+  }
+
+  // Actualizar estado de usuario
+  async updateStatus(req: Request, res: Response) {
+    try {
+      const { userId } = req.params;
+      const { status } = req.body;
+
+      if (Array.isArray(userId)) {
+        return res.status(400).json({
+          success: false,
+          message: 'ID de usuario inválido',
+        });
+      }
+
+      const user = await userService.updateStatus(userId, status);
+
+      res.json({
+        success: true,
+        data: { user },
+        message: 'Estado actualizado correctamente',
+      });
+    } catch (error) {
+      console.error('Error al actualizar estado:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Error al actualizar estado',
+      });
+    }
+  }
 }
 
 export const userController = new UserController();

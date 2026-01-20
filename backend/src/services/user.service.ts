@@ -523,6 +523,44 @@ export class UserService {
 
     logger.info('User password changed', { userId });
   }
+
+  async updateRole(userId: string, role: UserRole) {
+    const user = await prisma.user.update({
+      where: { id: userId },
+      data: { role },
+      include: {
+        clan: {
+          select: {
+            id: true,
+            name: true,
+            tag: true,
+            avatarUrl: true,
+          },
+        },
+      },
+    });
+
+    return user;
+  }
+
+  async updateStatus(userId: string, status: UserStatus) {
+    const user = await prisma.user.update({
+      where: { id: userId },
+      data: { status },
+      include: {
+        clan: {
+          select: {
+            id: true,
+            name: true,
+            tag: true,
+            avatarUrl: true,
+          },
+        },
+      },
+    });
+
+    return user;
+  }
 }
 
 export const userService = new UserService();

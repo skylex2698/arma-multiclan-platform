@@ -7,15 +7,30 @@ import type {
   UpdateNodeDto,
   UpdatePositionsDto,
 } from '../types/communicationTree';
-import type { ApiResponse } from '../types';
 
 export const communicationTreeService = {
   // Obtener árbol completo de un evento
   getEventTree: async (eventId: string): Promise<CommunicationNode[]> => {
-    const response = await api.get<ApiResponse<CommunicationNode[]>>(
-      `/events/${eventId}/communication-tree`
-    );
-    return response.data.data;
+    try {
+      const response = await api.get(`/events/${eventId}/communication-tree`);
+      
+      // El backend puede devolver la data directamente o envuelta en un objeto
+      const data = response.data?.data || response.data;
+      
+      // Asegurarse de devolver siempre un array
+      if (Array.isArray(data)) {
+        return data;
+      }
+      
+      return [];
+    } catch (error: any) {
+      // Si es 404 o no hay datos, devolver array vacío
+      if (error.response?.status === 404) {
+        return [];
+      }
+      console.error('Error fetching communication tree:', error);
+      return [];
+    }
   },
 
   // Crear un nodo
@@ -23,11 +38,11 @@ export const communicationTreeService = {
     eventId: string,
     data: CreateNodeDto
   ): Promise<CommunicationNode> => {
-    const response = await api.post<ApiResponse<CommunicationNode>>(
+    const response = await api.post(
       `/events/${eventId}/communication-tree`,
       data
     );
-    return response.data.data;
+    return response.data?.data || response.data;
   },
 
   // Actualizar un nodo
@@ -36,11 +51,11 @@ export const communicationTreeService = {
     nodeId: string,
     data: UpdateNodeDto
   ): Promise<CommunicationNode> => {
-    const response = await api.put<ApiResponse<CommunicationNode>>(
+    const response = await api.put(
       `/events/${eventId}/communication-tree/${nodeId}`,
       data
     );
-    return response.data.data;
+    return response.data?.data || response.data;
   },
 
   // Eliminar un nodo
@@ -50,10 +65,17 @@ export const communicationTreeService = {
 
   // Auto-generar árbol desde escuadras
   autoGenerateTree: async (eventId: string): Promise<CommunicationNode[]> => {
-    const response = await api.post<ApiResponse<CommunicationNode[]>>(
+    const response = await api.post(
       `/events/${eventId}/communication-tree/auto-generate`
     );
-    return response.data.data;
+    
+    const data = response.data?.data || response.data;
+    
+    if (Array.isArray(data)) {
+      return data;
+    }
+    
+    return [];
   },
 
   // Actualizar posiciones de nodos (drag & drop)

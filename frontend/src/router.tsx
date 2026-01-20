@@ -15,6 +15,7 @@ import CreateClanPage from './pages/clanes/CreateClanPage';
 import EditClanPage from './pages/clanes/EditClanPage';
 import UsersPage from './pages/users/UsersPage';
 import ProfilePage from './pages/profile/ProfilePage';
+import EditCommunicationTreePage from './pages/events/EditCommunicationTreePage';
 
 // Protected Route wrapper
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
@@ -101,6 +102,14 @@ export const router = createBrowserRouter([
     element: (
       <ProtectedRoute>
         <EditEventPage />
+      </ProtectedRoute>
+    ),
+  },
+  {
+    path: '/events/:id/communications/edit',
+    element: (
+      <ProtectedRoute>
+        <EditCommunicationTreePage />
       </ProtectedRoute>
     ),
   },

@@ -1,64 +1,75 @@
 import { useState } from 'react';
-import { Search, Filter, UserCheck } from 'lucide-react';
-import {
-  useUsers,
-  useValidateUser,
-  useChangeUserRole,
-  useChangeUserStatus,
-} from '../../hooks/useUsers';
-import { useClans } from '../../hooks/useClans';
-import { UserCard } from '../../components/users/UserCard';
+import { Users, Search, Filter } from 'lucide-react';
+import { useUsers, useUpdateUserRole, useUpdateUserStatus } from '../../hooks/useUsers';
 import { LoadingSpinner } from '../../components/ui/LoadingSpinner';
+import { Card } from '../../components/ui/Card';
+import { Badge } from '../../components/ui/Badge';
+import { UserAvatar } from '../../components/ui/UserAvatar';
 import type { UserRole, UserStatus } from '../../types';
 
 export default function UsersPage() {
-  const [searchQuery, setSearchQuery] = useState('');
-  const [clanFilter, setClanFilter] = useState('');
-  const [roleFilter, setRoleFilter] = useState('');
-  const [statusFilter, setStatusFilter] = useState('');
+  const [search, setSearch] = useState('');
+  const [roleFilter, setRoleFilter] = useState<string>('ALL');
+  const [statusFilter, setStatusFilter] = useState<string>('ALL');
+  const [clanFilter, setClanFilter] = useState<string>('ALL');
 
-  const { data: usersData, isLoading } = useUsers({
-    clanId: clanFilter || undefined,
-    role: roleFilter || undefined,
-    status: statusFilter || undefined,
+  const { data, isLoading } = useUsers({
+    search: search || undefined,
+    role: roleFilter !== 'ALL' ? (roleFilter as UserRole) : undefined,
+    status: statusFilter !== 'ALL' ? (statusFilter as UserStatus) : undefined,
   });
 
-  const { data: clansData } = useClans();
-  const validateUser = useValidateUser();
-  const changeRole = useChangeUserRole();
-  const changeStatus = useChangeUserStatus();
+  const updateRole = useUpdateUserRole();
+  const updateStatus = useUpdateUserStatus();
 
+  const users = data?.users || [];
+
+  // Obtener lista única de clanes
+  const clans = Array.from(
+    new Set(users.filter((u) => u.clan).map((u) => u.clan!.id))
+  ).map((id) => users.find((u) => u.clan?.id === id)?.clan).filter(Boolean) as NonNullable<typeof users[0]['clan']>[];
+
+  // Filtrar por clan
   const filteredUsers =
-    usersData?.users.filter(
-      (user) =>
-        user.nickname.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        user.email?.toLowerCase().includes(searchQuery.toLowerCase())
-    ) || [];
+    clanFilter !== 'ALL'
+      ? users.filter((u) => u.clanId === clanFilter)
+      : users;
 
-  const pendingUsers = filteredUsers.filter((u) => u.status === 'PENDING');
-  const activeUsers = filteredUsers.filter((u) => u.status !== 'PENDING');
-
-  const handleValidate = async (userId: string) => {
+  const handleRoleChange = async (userId: string, newRole: UserRole) => {
     try {
-      await validateUser.mutateAsync(userId);
-    } catch (error) {
-      console.error('Error validating user:', error);
+      await updateRole.mutateAsync({ userId, role: newRole });
+    } catch (err) {
+      console.error('Error al actualizar rol:', err);
     }
   };
 
-  const handleChangeRole = async (userId: string, role: UserRole) => {
+  const handleStatusChange = async (userId: string, newStatus: UserStatus) => {
     try {
-      await changeRole.mutateAsync({ userId, role });
-    } catch (error) {
-      console.error('Error changing role:', error);
+      await updateStatus.mutateAsync({ userId, status: newStatus });
+    } catch (err) {
+      console.error('Error al actualizar estado:', err);
     }
   };
 
-  const handleChangeStatus = async (userId: string, status: UserStatus) => {
-    try {
-      await changeStatus.mutateAsync({ userId, status });
-    } catch (error) {
-      console.error('Error changing status:', error);
+  const getRoleBadgeVariant = (role: string) => {
+    switch (role) {
+      case 'ADMIN':
+        return 'danger' as const;
+      case 'CLAN_LEADER':
+        return 'warning' as const;
+      default:
+        return 'info' as const;
+    }
+  };
+
+  const getRoleLabel = (role: string) => {
+    switch (role) {
+      case 'ADMIN':
+        return 'Admin';
+      case 'CLAN_LEADER':
+        return 'Líder';
+      default:
+        return 'Miembro';
     }
   };
 
@@ -68,48 +79,48 @@ export default function UsersPage() {
 
   return (
     <div>
-      <div className="mb-6">
-        <h1 className="text-3xl font-bold text-military-900">
-          Gestión de Usuarios
-        </h1>
-        <p className="text-military-600 mt-1">
-          {usersData?.count || 0} usuarios registrados
-          {pendingUsers.length > 0 && (
-            <span className="ml-2 text-yellow-600 font-medium">
-              • {pendingUsers.length} pendientes de validación
-            </span>
-          )}
-        </p>
+      <div className="flex items-center justify-between mb-6">
+        <div>
+          <h1 className="text-3xl font-bold text-military-900 dark:text-gray-100">
+            Gestión de Usuarios
+          </h1>
+          <p className="text-military-600 dark:text-gray-400 mt-1">
+            {filteredUsers.length} usuarios registrados
+          </p>
+        </div>
+        <Users className="h-8 w-8 text-primary-600 dark:text-tactical-500" />
       </div>
 
       {/* Filtros */}
-      <div className="card mb-6">
+      <Card className="mb-6">
         <div className="flex items-center gap-2 mb-4">
-          <Filter className="h-5 w-5 text-military-600" />
-          <h2 className="text-lg font-semibold text-military-900">Filtros</h2>
+          <Filter className="h-5 w-5 text-military-600 dark:text-gray-400" />
+          <h2 className="text-lg font-bold text-military-900 dark:text-gray-100">
+            Filtros
+          </h2>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           {/* Búsqueda */}
           <div>
-            <label className="block text-sm font-medium text-military-700 mb-1">
+            <label className="block text-sm font-medium text-military-700 dark:text-gray-300 mb-1">
               Buscar
             </label>
             <div className="relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-military-400" />
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-military-400 dark:text-gray-500" />
               <input
                 type="text"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Nombre o email..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
                 className="input pl-10"
+                placeholder="Nombre o email..."
               />
             </div>
           </div>
 
-          {/* Clan */}
+          {/* Filtro de Clan */}
           <div>
-            <label className="block text-sm font-medium text-military-700 mb-1">
+            <label className="block text-sm font-medium text-military-700 dark:text-gray-300 mb-1">
               Clan
             </label>
             <select
@@ -117,19 +128,18 @@ export default function UsersPage() {
               onChange={(e) => setClanFilter(e.target.value)}
               className="input"
             >
-              <option value="">Todos los clanes</option>
-              {clansData?.clans.map((clan) => (
+              <option value="ALL">Todos los clanes</option>
+              {clans.map((clan) => (
                 <option key={clan.id} value={clan.id}>
-                  {clan.tag ? `${clan.tag} - ` : ''}
-                  {clan.name}
+                  [{clan.tag}] {clan.name}
                 </option>
               ))}
             </select>
           </div>
 
-          {/* Rol */}
+          {/* Filtro de Rol */}
           <div>
-            <label className="block text-sm font-medium text-military-700 mb-1">
+            <label className="block text-sm font-medium text-military-700 dark:text-gray-300 mb-1">
               Rol
             </label>
             <select
@@ -137,16 +147,16 @@ export default function UsersPage() {
               onChange={(e) => setRoleFilter(e.target.value)}
               className="input"
             >
-              <option value="">Todos los roles</option>
-              <option value="USER">Usuario</option>
-              <option value="CLAN_LEADER">Líder de Clan</option>
+              <option value="ALL">Todos los roles</option>
               <option value="ADMIN">Administrador</option>
+              <option value="CLAN_LEADER">Líder de Clan</option>
+              <option value="USER">Usuario</option>
             </select>
           </div>
 
-          {/* Estado */}
+          {/* Filtro de Estado */}
           <div>
-            <label className="block text-sm font-medium text-military-700 mb-1">
+            <label className="block text-sm font-medium text-military-700 dark:text-gray-300 mb-1">
               Estado
             </label>
             <select
@@ -154,65 +164,115 @@ export default function UsersPage() {
               onChange={(e) => setStatusFilter(e.target.value)}
               className="input"
             >
-              <option value="">Todos los estados</option>
-              <option value="PENDING">Pendientes</option>
-              <option value="ACTIVE">Activos</option>
-              <option value="BLOCKED">Bloqueados</option>
-              <option value="BANNED">Baneados</option>
-              <option value="INACTIVE">Inactivos</option>
+              <option value="ALL">Todos los estados</option>
+              <option value="ACTIVE">Activo</option>
+              <option value="PENDING">Pendiente</option>
+              <option value="BLOCKED">Bloqueado</option>
+              <option value="BANNED">Baneado</option>
             </select>
           </div>
         </div>
-      </div>
+      </Card>
 
-      {/* Usuarios pendientes */}
-      {pendingUsers.length > 0 && (
-        <div className="mb-6">
-          <div className="flex items-center gap-2 mb-4">
-            <UserCheck className="h-5 w-5 text-yellow-600" />
-            <h2 className="text-xl font-bold text-military-900">
-              Usuarios Pendientes de Validación
-            </h2>
-            <span className="badge badge-warning">{pendingUsers.length}</span>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {pendingUsers.map((user) => (
-              <UserCard
-                key={user.id}
-                user={user}
-                onValidate={handleValidate}
-                isLoading={validateUser.isPending}
-              />
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Usuarios activos */}
-      <div>
-        <h2 className="text-xl font-bold text-military-900 mb-4">
+      {/* Lista de usuarios */}
+      <div className="space-y-4">
+        <h2 className="text-2xl font-bold text-military-900 dark:text-gray-100">
           Todos los Usuarios
         </h2>
-        {activeUsers.length === 0 ? (
-          <div className="card text-center py-12">
-            <p className="text-military-600">
-              {searchQuery || clanFilter || roleFilter || statusFilter
-                ? 'No se encontraron usuarios con estos filtros'
-                : 'No hay usuarios registrados'}
+
+        {filteredUsers.length === 0 ? (
+          <Card>
+            <p className="text-center text-military-500 dark:text-gray-500 py-8">
+              No se encontraron usuarios
             </p>
-          </div>
+          </Card>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {activeUsers.map((user) => (
-              <UserCard
-                key={user.id}
-                user={user}
-                onChangeRole={handleChangeRole}
-                onChangeStatus={handleChangeStatus}
-                isLoading={
-                  changeRole.isPending || changeStatus.isPending
-                }
-              />
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {filteredUsers.map((user) => (
+              <Card key={user.id} className="hover:shadow-lg transition-shadow">
+                {/* Header */}
+                <div className="flex items-center gap-4 mb-4">
+                  <UserAvatar user={user} size="xl" showBorder={true} />
+                  <div className="flex-1 min-w-0">
+                    <h3 className="text-lg font-bold text-military-900 dark:text-gray-100 truncate">
+                      {user.nickname}
+                    </h3>
+                    <div className="flex gap-2 mt-1 flex-wrap">
+                      <Badge variant={getRoleBadgeVariant(user.role)}>
+                        {getRoleLabel(user.role)}
+                      </Badge>
+                      <Badge
+                        variant={
+                          user.status === 'ACTIVE'
+                            ? 'success'
+                            : user.status === 'PENDING'
+                            ? 'warning'
+                            : 'default'
+                        }
+                      >
+                        {user.status === 'ACTIVE' ? 'Activo' : user.status}
+                      </Badge>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Email */}
+                <p className="text-sm text-military-600 dark:text-gray-400 mb-4 truncate">
+                  📧 {user.email}
+                </p>
+
+                {/* Clan */}
+                <div className="mb-4">
+                  <p className="text-xs font-semibold text-military-600 dark:text-gray-400 mb-1">
+                    Clan:
+                  </p>
+                  <div className="bg-white dark:bg-gray-700 rounded p-2 border border-military-200 dark:border-gray-600">
+                    <p className="text-sm font-medium text-military-900 dark:text-gray-100">
+                      {user.clan ? `${user.clan.tag} ${user.clan.name}` : 'Sin clan'}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Controles */}
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-medium text-military-600 dark:text-gray-400 mb-1">
+                      Rol
+                    </label>
+                    <select
+                      value={user.role}
+                      onChange={(e) =>
+                        handleRoleChange(user.id, e.target.value as UserRole)
+                      }
+                      disabled={updateRole.isPending}
+                      className="input text-sm w-full"
+                    >
+                      <option value="ADMIN">Admin</option>
+                      <option value="CLAN_LEADER">Líder</option>
+                      <option value="USER">Usuario</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-medium text-military-600 dark:text-gray-400 mb-1">
+                      Estado
+                    </label>
+                    <select
+                      value={user.status}
+                      onChange={(e) =>
+                        handleStatusChange(user.id, e.target.value as UserStatus)
+                      }
+                      disabled={updateStatus.isPending}
+                      className="input text-sm w-full"
+                    >
+                      <option value="ACTIVE">Activo</option>
+                      <option value="PENDING">Pendiente</option>
+                      <option value="BLOCKED">Bloqueado</option>
+                      <option value="BANNED">Baneado</option>
+                    </select>
+                  </div>
+                </div>
+              </Card>
             ))}
           </div>
         )}

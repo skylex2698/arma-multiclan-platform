@@ -43,6 +43,7 @@ export function SlotItem({
     onAdminAssign &&
     availableUsers.length > 0;
 
+  // Verificar si puede desapuntar por admin
   const canAdminUnassign =
     slot.status === 'OCCUPIED' &&
     !isOccupiedByMe &&
@@ -72,10 +73,10 @@ export function SlotItem({
       <div
         className={`
           flex items-center justify-between p-3 rounded-lg border-2 transition-all
-          ${isFree ? 'border-military-200 bg-white hover:border-primary-300' : ''}
-          ${isOccupiedByMe ? 'border-primary-500 bg-primary-50' : ''}
-          ${slot.status === 'OCCUPIED' && !isOccupiedByMe ? 'border-military-300 bg-military-50' : ''}
-          ${canInteract && (isFree || isOccupiedByMe) && !showUserSelector ? 'cursor-pointer' : 'cursor-default'}
+          ${isFree ? 'slot-free' : ''}
+          ${isOccupiedByMe ? 'slot-mine' : ''}
+          ${slot.status === 'OCCUPIED' && !isOccupiedByMe ? 'slot-occupied' : ''}
+          ${canInteract && (isFree || isOccupiedByMe) && !showUserSelector ? 'cursor-pointer hover:shadow-md' : 'cursor-default'}
         `}
         onClick={handleClick}
       >
@@ -83,21 +84,21 @@ export function SlotItem({
           {slot.user ? (
             <UserAvatar user={slot.user} size="md" showBorder={true} />
           ) : (
-            <div className="w-10 h-10 rounded-full bg-military-100 flex items-center justify-center border-2 border-military-200">
-              <UserPlus className="h-5 w-5 text-military-400" />
+            <div className="w-10 h-10 rounded-full bg-military-100 dark:bg-gray-600 flex items-center justify-center border-2 border-military-200 dark:border-gray-500">
+              <UserPlus className="h-5 w-5 text-military-400 dark:text-gray-400" />
             </div>
           )}
 
           <div className="flex-1">
-            <p className="font-medium text-military-900">{slot.role}</p>
+            <p className="font-medium text-military-900 dark:text-gray-100">{slot.role}</p>
             {slot.user && (
-              <p className="text-sm text-military-600">
+              <p className="text-sm text-military-600 dark:text-gray-400">
                 {slot.user.clan?.tag && `${slot.user.clan.tag} `}
                 {slot.user.nickname}
               </p>
             )}
             {isFree && (
-              <p className="text-sm text-military-500">Slot disponible</p>
+              <p className="text-sm text-military-500 dark:text-gray-500">Slot disponible</p>
             )}
           </div>
         </div>
@@ -114,6 +115,7 @@ export function SlotItem({
                     e.stopPropagation();
                     onUnassign(slot.id);
                   }}
+                  title="Desapuntarme"
                 >
                   <UserMinus className="h-4 w-4" />
                 </button>
@@ -129,6 +131,7 @@ export function SlotItem({
                 e.stopPropagation();
                 onAssign(slot.id);
               }}
+              title="Apuntarme"
             >
               <UserPlus className="h-4 w-4" />
             </button>
@@ -166,7 +169,7 @@ export function SlotItem({
             </button>
           )}
 
-          {slot.status === 'OCCUPIED' && !isOccupiedByMe && (
+          {slot.status === 'OCCUPIED' && !isOccupiedByMe && !canAdminUnassign && (
             <Badge variant="info">Ocupado</Badge>
           )}
         </div>
@@ -174,36 +177,36 @@ export function SlotItem({
 
       {/* Selector de usuario */}
       {showUserSelector && (
-        <div className="absolute right-0 top-full mt-1 z-20 bg-white border border-military-300 rounded-lg shadow-lg w-64 max-h-64 overflow-y-auto">
-          <div className="p-2 border-b border-military-200 bg-military-50">
-            <p className="text-xs font-medium text-military-700">
+        <div className="absolute right-0 top-full mt-1 z-20 bg-white dark:bg-gray-800 border border-military-300 dark:border-gray-700 rounded-lg shadow-lg w-64 max-h-64 overflow-y-auto">
+          <div className="p-2 border-b border-military-200 dark:border-gray-700 bg-military-50 dark:bg-gray-700">
+            <p className="text-xs font-medium text-military-700 dark:text-gray-300">
               Asignar usuario a este slot:
             </p>
           </div>
           <div className="p-1">
             {availableUsers.length === 0 ? (
-              <p className="text-sm text-military-500 p-2">
+              <p className="text-sm text-military-500 dark:text-gray-400 p-2">
                 No hay usuarios disponibles
               </p>
             ) : (
               availableUsers.map((availableUser) => {
                 const slotInfo = getUserSlotInfo?.(availableUser.id) || { hasSlot: false };
-                
+
                 return (
                   <button
                     key={availableUser.id}
                     onClick={() => handleAdminAssign(availableUser.id)}
-                    className="w-full text-left px-3 py-2 hover:bg-military-50 rounded text-sm flex items-center gap-2"
+                    className="w-full text-left px-3 py-2 hover:bg-military-50 dark:hover:bg-gray-700 rounded text-sm flex items-center gap-2"
                     disabled={isLoading}
                   >
                     <UserAvatar user={availableUser} size="sm" showBorder={true} />
                     <div className="flex-1">
-                      <p className="font-medium">
+                      <p className="font-medium text-military-900 dark:text-gray-100">
                         {availableUser.clan?.tag && `${availableUser.clan.tag} `}
                         {availableUser.nickname}
                       </p>
                       {slotInfo.hasSlot && (
-                        <p className="text-xs text-amber-600">
+                        <p className="text-xs text-amber-600 dark:text-amber-400">
                           Ya en: {slotInfo.squadName} - {slotInfo.slotRole}
                         </p>
                       )}
@@ -213,10 +216,10 @@ export function SlotItem({
               })
             )}
           </div>
-          <div className="p-2 border-t border-military-200">
+          <div className="p-2 border-t border-military-200 dark:border-gray-700">
             <button
               onClick={() => setShowUserSelector(false)}
-              className="w-full px-2 py-1 text-xs text-military-600 hover:text-military-900 hover:bg-military-50 rounded"
+              className="w-full px-2 py-1 text-xs text-military-600 dark:text-gray-400 hover:text-military-900 dark:hover:text-gray-100 hover:bg-military-50 dark:hover:bg-gray-700 rounded"
             >
               Cancelar
             </button>

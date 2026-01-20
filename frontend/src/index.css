@@ -1,91 +1,322 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Rajdhani:wght@500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
 
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 @layer base {
-  * {
-    @apply border-military-200;
-  }
-  
   body {
-    @apply bg-military-50 text-military-900 antialiased;
-  }
-
-  h1, h2, h3, h4, h5, h6 {
-    @apply font-military;
+    transition: background-color 0.2s, color 0.2s;
   }
 }
 
 @layer components {
+  /* Botones */
   .btn {
-    @apply px-4 py-2 rounded-lg font-medium transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2;
-  }
-
-  .btn-sm {
-    @apply px-3 py-1 text-sm;
+    @apply px-4 py-2 rounded-lg font-medium transition-all duration-200;
+    @apply focus:outline-none focus:ring-2 focus:ring-offset-2;
   }
 
   .btn-primary {
-    @apply bg-primary-600 text-white hover:bg-primary-700 focus:ring-primary-500;
+    @apply bg-primary-600 hover:bg-primary-700 text-white;
+    @apply focus:ring-primary-500;
   }
 
   .btn-secondary {
-    @apply bg-military-600 text-white hover:bg-military-700 focus:ring-military-500;
+    @apply bg-military-200 hover:bg-military-300 text-military-900;
+    @apply focus:ring-military-500;
   }
 
   .btn-danger {
-    @apply bg-red-600 text-white hover:bg-red-700 focus:ring-red-500;
+    @apply bg-red-600 hover:bg-red-700 text-white;
+    @apply focus:ring-red-500;
   }
 
   .btn-outline {
-    @apply border-2 border-military-300 text-military-700 hover:bg-military-50 focus:ring-military-500;
+    @apply border-2 border-military-300 hover:bg-military-50 text-military-700;
+    @apply focus:ring-military-500;
   }
 
+  .btn-sm {
+    @apply px-3 py-1.5 text-sm;
+  }
+
+  /* Inputs */
   .input {
-    @apply w-full px-4 py-2 border border-military-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent;
+    @apply w-full px-4 py-2 border rounded-lg;
+    @apply border-military-300;
+    @apply focus:ring-2 focus:ring-primary-500 focus:border-primary-500;
+    @apply transition-colors duration-200;
   }
 
+  /* Cards */
   .card {
-    @apply bg-white rounded-lg shadow-md p-6;
-  }
-
-  .badge {
-    @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium;
-  }
-
-  .badge-success {
-    @apply bg-green-100 text-green-800;
-  }
-
-  .badge-warning {
-    @apply bg-yellow-100 text-yellow-800;
-  }
-
-  .badge-danger {
-    @apply bg-red-100 text-red-800;
-  }
-
-  .badge-info {
-    @apply bg-blue-100 text-blue-800;
+    @apply rounded-lg shadow-md p-6;
+    @apply border border-military-200;
+    @apply transition-colors duration-200;
   }
 }
 
-/* Custom scrollbar */
+/* Dark mode overrides - usando CSS puro sin @apply */
+.dark .btn-primary {
+  background-color: rgb(22 163 74); /* tactical-600 */
+}
+
+.dark .btn-primary:hover {
+  background-color: rgb(21 128 61); /* tactical-700 */
+}
+
+.dark .btn-secondary {
+  background-color: rgb(77 88 55); /* military-700 */
+  color: rgb(229 231 235); /* gray-100 */
+}
+
+.dark .btn-secondary:hover {
+  background-color: rgb(88 95 68); /* military-600 */
+}
+
+.dark .btn-outline {
+  border-color: rgb(88 95 68); /* military-600 */
+  color: rgb(229 231 235); /* gray-200 */
+}
+
+.dark .btn-outline:hover {
+  background-color: rgb(58 62 47); /* military-800 */
+}
+
+.dark .input {
+  background-color: rgb(31 41 55); /* gray-800 */
+  border-color: rgb(75 85 99); /* gray-600 */
+  color: rgb(243 244 246); /* gray-100 */
+}
+
+.dark .input:focus {
+  border-color: rgb(22 163 74); /* tactical-600 */
+  --tw-ring-color: rgb(22 163 74);
+}
+
+.dark .card {
+  background-color: rgb(31 41 55); /* gray-800 */
+  border-color: rgb(55 65 81); /* gray-700 */
+}
+
+/* Scrollbar personalizada */
 ::-webkit-scrollbar {
   width: 8px;
   height: 8px;
 }
 
 ::-webkit-scrollbar-track {
-  @apply bg-military-100;
+  background-color: rgb(243 244 246); /* gray-100 */
+}
+
+.dark ::-webkit-scrollbar-track {
+  background-color: rgb(31 41 55); /* gray-800 */
 }
 
 ::-webkit-scrollbar-thumb {
-  @apply bg-military-400 rounded-full;
+  background-color: rgb(138 147 111); /* military-400 */
+  border-radius: 9999px;
+}
+
+.dark ::-webkit-scrollbar-thumb {
+  background-color: rgb(88 95 68); /* military-600 */
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  @apply bg-military-500;
+  background-color: rgb(111 119 86); /* military-500 */
+}
+
+/* Animaciones tácticas */
+@keyframes tactical-pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.6;
+  }
+}
+
+.tactical-pulse {
+  animation: tactical-pulse 2s ease-in-out infinite;
+}
+
+/* Grid táctica de fondo */
+.tactical-grid {
+  background-image: 
+    linear-gradient(to right, rgba(0,0,0,0.03) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(0,0,0,0.03) 1px, transparent 1px);
+  background-size: 20px 20px;
+}
+
+.dark .tactical-grid {
+  background-image: 
+    linear-gradient(to right, rgba(255,255,255,0.03) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(255,255,255,0.03) 1px, transparent 1px);
+}
+
+/* Backgrounds base */
+body {
+  background-color: rgb(246 247 244); /* military-50 */
+}
+
+.dark body {
+  background-color: rgb(17 24 39); /* gray-900 */
+}
+
+/* Cards - más específico */
+.card,
+.bg-white {
+  background-color: white !important;
+}
+
+.dark .card,
+.dark .bg-white {
+  background-color: rgb(31 41 55) !important; /* gray-800 */
+}
+
+/* Mejorar contraste en modo oscuro */
+.dark h1,
+.dark h2,
+.dark h3,
+.dark h4,
+.dark h5,
+.dark h6 {
+  color: rgb(243 244 246); /* gray-100 */
+}
+
+.dark p,
+.dark span,
+.dark label {
+  color: rgb(209 213 219); /* gray-300 */
+}
+
+/* Texto en cards oscuros */
+.dark .card h1,
+.dark .card h2,
+.dark .card h3,
+.dark .card h4,
+.dark .card h5,
+.dark .card h6 {
+  color: rgb(243 244 246); /* gray-100 */
+}
+
+.dark .card p,
+.dark .card span {
+  color: rgb(209 213 219); /* gray-300 */
+}
+
+/* Badges y etiquetas */
+.dark .badge {
+  color: rgb(243 244 246);
+}
+
+/* Bordes más visibles en oscuro */
+.dark .border,
+.dark .border-military-200 {
+  border-color: rgb(55 65 81) !important; /* gray-700 */
+}
+
+/* Inputs en modo oscuro */
+.dark select,
+.dark textarea {
+  background-color: rgb(31 41 55); /* gray-800 */
+  border-color: rgb(75 85 99); /* gray-600 */
+  color: rgb(243 244 246); /* gray-100 */
+}
+
+.dark select option {
+  background-color: rgb(31 41 55);
+  color: rgb(243 244 246);
+}
+
+/* Mejorar visibilidad de los filtros en modo oscuro */
+.dark input[type="checkbox"] {
+  border-color: rgb(75 85 99);
+}
+
+/* Placeholder más visible */
+.dark input::placeholder,
+.dark textarea::placeholder {
+  color: rgb(156 163 175); /* gray-400 */
+}
+
+/* Hover states más visibles */
+.dark a:hover,
+.dark button:hover {
+  opacity: 0.9;
+}
+
+/* Slots ocupados - más destacados */
+.slot-occupied {
+  background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%);
+  border-color: #16a34a !important;
+  box-shadow: 0 0 0 1px rgba(22, 163, 74, 0.1);
+}
+
+.dark .slot-occupied {
+  background: linear-gradient(135deg, #14532d 0%, #166534 100%);
+  border-color: #22c55e !important;
+  box-shadow: 0 0 0 1px rgba(34, 197, 94, 0.2);
+}
+
+/* Slots libres - más discretos */
+.slot-free {
+  background-color: #fafaf9;
+  border-color: #e5e7eb;
+}
+
+.dark .slot-free {
+  background-color: #1f2937;
+  border-color: #374151;
+}
+
+/* Slot del usuario - más destacado */
+.slot-mine {
+  background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%);
+  border-color: #3b82f6 !important;
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
+}
+
+.dark .slot-mine {
+  background: linear-gradient(135deg, #1e3a8a 0%, #1e40af 100%);
+  border-color: #60a5fa !important;
+  box-shadow: 0 0 0 2px rgba(96, 165, 250, 0.3);
+}
+
+/* Slots ocupados - más destacados */
+.slot-occupied {
+  background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%);
+  border-color: #16a34a !important;
+  box-shadow: 0 0 0 1px rgba(22, 163, 74, 0.1);
+}
+
+.dark .slot-occupied {
+  background: linear-gradient(135deg, #14532d 0%, #166534 100%);
+  border-color: #22c55e !important;
+  box-shadow: 0 0 0 1px rgba(34, 197, 94, 0.2);
+}
+
+/* Slots libres - más discretos */
+.slot-free {
+  background-color: #fafaf9;
+  border-color: #e5e7eb;
+}
+
+.dark .slot-free {
+  background-color: #1f2937;
+  border-color: #374151;
+}
+
+/* Slot del usuario - más destacado */
+.slot-mine {
+  background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%);
+  border-color: #3b82f6 !important;
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
+}
+
+.dark .slot-mine {
+  background: linear-gradient(135deg, #1e3a8a 0%, #1e40af 100%);
+  border-color: #60a5fa !important;
+  box-shadow: 0 0 0 2px rgba(96, 165, 250, 0.3);
 }

@@ -1,5 +1,5 @@
 import { api } from './api';
-import type { ApiResponse, User, ClanChangeRequest } from '../types';
+import type { ApiResponse, User, ClanChangeRequest, UserRole, UserStatus } from '../types';
 
 export const userService = {
   // Obtener todos los usuarios
@@ -109,5 +109,23 @@ export const userService = {
     newPassword: string;
   }): Promise<void> => {
     await api.put('/users/change-password', data);
+  },
+
+  // Actualizar rol de usuario
+  updateRole: async (userId: string, role: UserRole): Promise<{ user: User }> => {
+    const response = await api.put<ApiResponse<{ user: User }>>(
+      `/users/${userId}/role`,
+      { role }
+    );
+    return response.data.data;
+  },
+
+  // Actualizar estado de usuario
+  updateStatus: async (userId: string, status: UserStatus): Promise<{ user: User }> => {
+    const response = await api.put<ApiResponse<{ user: User }>>(
+      `/users/${userId}/status`,
+      { status }
+    );
+    return response.data.data;
   },
 };

@@ -1,87 +1,71 @@
-import { Crown, Shield } from 'lucide-react';
 import { Badge } from '../ui/Badge';
 import { UserAvatar } from '../ui/UserAvatar';
-import type { User as UserType } from '../../types';
+import type { User } from '../../types';
 
 interface MembersListProps {
-  members: UserType[];
+  members: User[];
 }
 
 export function MembersList({ members }: MembersListProps) {
-  const getRoleBadge = (role: string) => {
+  const getRoleBadgeVariant = (role: string) => {
     switch (role) {
       case 'ADMIN':
-        return <Badge variant="danger">Admin</Badge>;
+        return 'danger' as const;
       case 'CLAN_LEADER':
-        return <Badge variant="warning">Líder</Badge>;
+        return 'warning' as const;
       default:
-        return <Badge variant="default">Miembro</Badge>;
+        return 'info' as const;
     }
   };
 
-  const getStatusBadge = (status: string) => {
-    switch (status) {
-      case 'ACTIVE':
-        return <Badge variant="success">Activo</Badge>;
-      case 'PENDING':
-        return <Badge variant="warning">Pendiente</Badge>;
-      case 'BLOCKED':
-        return <Badge variant="danger">Bloqueado</Badge>;
-      case 'BANNED':
-        return <Badge variant="danger">Baneado</Badge>;
-      case 'INACTIVE':
-        return <Badge variant="default">Inactivo</Badge>;
+  const getRoleLabel = (role: string) => {
+    switch (role) {
+      case 'ADMIN':
+        return 'Administrador';
+      case 'CLAN_LEADER':
+        return 'Líder de Clan';
       default:
-        return null;
+        return 'Miembro';
     }
   };
 
-  const getRoleIcon = (role: string) => {
-    switch (role) {
-      case 'ADMIN':
-        return <Crown className="h-4 w-4 text-red-600" />;
-      case 'CLAN_LEADER':
-        return <Shield className="h-4 w-4 text-yellow-600" />;
-      default:
-        return null;
-    }
-  };
+  if (members.length === 0) {
+    return (
+      <p className="text-military-500 dark:text-gray-500 text-center py-8">
+        No hay miembros en este clan
+      </p>
+    );
+  }
 
   return (
-    <div className="space-y-2">
-      {members.length === 0 ? (
-        <div className="text-center py-8 text-military-500">
-          No hay miembros en este clan
-        </div>
-      ) : (
-        members.map((member) => (
-          <div
-            key={member.id}
-            className="flex items-center justify-between p-4 bg-military-50 rounded-lg hover:bg-military-100 transition-colors"
-          >
-            <div className="flex items-center gap-3">
-              <div className="relative">
-                <UserAvatar user={member} size="md" />
-                {getRoleIcon(member.role) && (
-                  <div className="absolute -bottom-1 -right-1 bg-white rounded-full p-0.5">
-                    {getRoleIcon(member.role)}
-                  </div>
-                )}
-              </div>
-              <div>
-                <p className="font-medium text-military-900">
-                  {member.nickname}
-                </p>
-                <p className="text-sm text-military-600">{member.email}</p>
-              </div>
-            </div>
-            <div className="flex items-center gap-2">
-              {getRoleBadge(member.role)}
-              {getStatusBadge(member.status)}
+    <div className="space-y-3">
+      {members.map((member) => (
+        <div
+          key={member.id}
+          className="bg-white dark:bg-gray-800 rounded-lg p-4 border border-military-200 dark:border-gray-700 flex items-center justify-between hover:shadow-md transition-shadow"
+        >
+          <div className="flex items-center gap-3">
+            <UserAvatar user={member} size="lg" showBorder={true} />
+            <div>
+              <p className="font-medium text-military-900 dark:text-gray-100">
+                {member.nickname}
+              </p>
+              <p className="text-sm text-military-600 dark:text-gray-400">
+                {member.email}
+              </p>
             </div>
           </div>
-        ))
-      )}
+
+          <div className="flex items-center gap-2">
+            <Badge variant={getRoleBadgeVariant(member.role)}>
+              {getRoleLabel(member.role)}
+            </Badge>
+            <Badge variant={member.status === 'ACTIVE' ? 'success' : 'default'}>
+              {member.status === 'ACTIVE' ? 'Activo' : member.status}
+            </Badge>
+          </div>
+        </div>
+      ))}
     </div>
   );
 }

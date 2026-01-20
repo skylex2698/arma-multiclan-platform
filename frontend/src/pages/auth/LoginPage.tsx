@@ -3,6 +3,7 @@ import { useNavigate, Link } from 'react-router-dom';
 import { useAuthStore } from '../../store/authStore';
 import { authService } from '../../services/authService';
 import { Shield, Mail, Lock, LogIn } from 'lucide-react';
+import { APP_CONFIG } from '../../config/app.config';
 
 export default function LoginPage() {
   const navigate = useNavigate();
@@ -32,24 +33,27 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-military-900 via-military-800 to-military-700 flex items-center justify-center p-4">
+    <div className="min-h-screen bg-gradient-to-br from-primary-800 via-primary-700 to-primary-900 dark:from-gray-900 dark:via-gray-800 dark:to-black flex items-center justify-center p-4">
       <div className="w-full max-w-md">
         {/* Logo y título */}
         <div className="text-center mb-8">
           <div className="flex justify-center mb-4">
-            <Shield className="h-16 w-16 text-primary-400" />
+            <div className="relative">
+              <Shield className="h-20 w-20 text-accent-400" />
+              <div className="absolute inset-0 bg-accent-400 opacity-20 blur-2xl"></div>
+            </div>
           </div>
           <h1 className="text-3xl font-bold text-white mb-2">
-            Arma Platform
+            {APP_CONFIG.shortName}
           </h1>
-          <p className="text-military-300">
-            Plataforma de gestión de eventos multiclan
+          <p className="text-military-200 dark:text-gray-400">
+            {APP_CONFIG.name}
           </p>
         </div>
 
         {/* Formulario */}
-        <div className="bg-white rounded-lg shadow-xl p-8">
-          <h2 className="text-2xl font-bold text-military-900 mb-6">
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-2xl p-8 border border-military-200 dark:border-gray-700">
+          <h2 className="text-2xl font-bold text-military-900 dark:text-gray-100 mb-6">
             Iniciar Sesión
           </h2>
 

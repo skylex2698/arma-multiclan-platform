@@ -53,8 +53,10 @@ export default function EventsPage() {
     <div>
       <div className="flex justify-between items-center mb-6">
         <div>
-          <h1 className="text-3xl font-bold text-military-900">Eventos</h1>
-          <p className="text-military-600 mt-1">
+          <h1 className="text-3xl font-bold text-military-900 dark:text-gray-100 mb-2">
+            Eventos
+          </h1>
+          <p className="text-military-600 dark:text-gray-400">
             {data?.count || 0} eventos disponibles
           </p>
         </div>

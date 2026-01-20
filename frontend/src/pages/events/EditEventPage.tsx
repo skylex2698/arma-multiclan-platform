@@ -368,7 +368,7 @@ export default function EditEventPage() {
             {squads.map((squad, squadIndex) => (
               <div
                 key={squadIndex}
-                className="p-4 border-2 border-military-200 rounded-lg bg-military-50"
+                className="p-4 border-2 border-military-200 dark:border-gray-700 rounded-lg bg-military-50 dark:bg-gray-700"
               >
                 <div className="flex items-center gap-2 mb-3">
                   <input

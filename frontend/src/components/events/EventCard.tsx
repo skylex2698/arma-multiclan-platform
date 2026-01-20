@@ -1,7 +1,6 @@
 import { Link } from 'react-router-dom';
-import { Calendar, Users, Clock, MapPin } from 'lucide-react';
+import { Calendar, Clock, MapPin, Users } from 'lucide-react';
 import { Badge } from '../ui/Badge';
-import { Card } from '../ui/Card';
 import type { Event } from '../../types';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -11,26 +10,20 @@ interface EventCardProps {
 }
 
 export function EventCard({ event }: EventCardProps) {
-  const occupancyPercentage = event.totalSlots
-    ? Math.round((event.occupiedSlots! / event.totalSlots) * 100)
-    : 0;
-
-  const isUpcoming = new Date(event.scheduledDate) > new Date();
   const isPast = new Date(event.scheduledDate) < new Date();
 
   return (
-    <Link to={`/events/${event.id}`}>
-      <Card className="hover:shadow-lg transition-shadow cursor-pointer">
-        <div className="flex justify-between items-start mb-4">
-          <div className="flex-1">
-            <h3 className="text-xl font-bold text-military-900 mb-2">
-              {event.name}
-            </h3>
-            <p className="text-sm text-military-600 line-clamp-2">
-              {event.description || 'Sin descripción'}
-            </p>
-          </div>
-          <div className="flex gap-2 ml-4">
+    <Link
+      to={`/events/${event.id}`}
+      className="block bg-white dark:bg-gray-800 rounded-lg shadow-md border-2 border-military-200 dark:border-gray-700 hover:shadow-lg transition-all overflow-hidden"
+    >
+      {/* Header con estado */}
+      <div className="bg-primary-50 dark:bg-gray-700 px-4 py-3 border-b border-military-200 dark:border-gray-600">
+        <div className="flex items-center justify-between">
+          <h3 className="text-xl font-bold text-military-900 dark:text-gray-100">
+            {event.name}
+          </h3>
+          <div className="flex gap-2">
             <Badge variant={event.status === 'ACTIVE' ? 'success' : 'default'}>
               {event.status === 'ACTIVE' ? 'Activo' : 'Inactivo'}
             </Badge>
@@ -39,56 +32,82 @@ export function EventCard({ event }: EventCardProps) {
             )}
           </div>
         </div>
+      </div>
 
-        <div className="space-y-2 mb-4">
-          <div className="flex items-center text-sm text-military-600">
-            <Calendar className="h-4 w-4 mr-2" />
-            {format(new Date(event.scheduledDate), "d 'de' MMMM, yyyy", {
-              locale: es,
-            })}
-          </div>
-          <div className="flex items-center text-sm text-military-600">
-            <Clock className="h-4 w-4 mr-2" />
-            {format(new Date(event.scheduledDate), 'HH:mm', { locale: es })}
-          </div>
-          <div className="flex items-center text-sm text-military-600">
-            <MapPin className="h-4 w-4 mr-2" />
-            {event.gameType === 'ARMA_3' ? 'Arma 3' : 'Arma Reforger'}
-          </div>
-        </div>
+      {/* Contenido */}
+      <div className="p-4">
+        {event.description && (
+          <p className="text-military-600 dark:text-gray-300 text-sm mb-4 line-clamp-2">
+            {event.description}
+          </p>
+        )}
 
-        <div className="flex items-center justify-between pt-4 border-t border-military-200">
-          <div className="flex items-center text-sm text-military-600">
-            <Users className="h-4 w-4 mr-2" />
+        {/* Info grid */}
+        <div className="grid grid-cols-2 gap-3 mb-4">
+          <div className="flex items-center gap-2 text-sm text-military-600 dark:text-gray-400">
+            <Calendar className="h-4 w-4" />
             <span>
-              {event.occupiedSlots}/{event.totalSlots} slots ocupados
+              {format(new Date(event.scheduledDate), "d 'de' MMM", {
+                locale: es,
+              })}
             </span>
           </div>
-          <div className="text-right">
-            <div className="text-xs text-military-500 mb-1">
-              {occupancyPercentage}% ocupado
-            </div>
-            <div className="w-32 bg-military-200 rounded-full h-2">
-              <div
-                className="bg-primary-600 h-2 rounded-full transition-all"
-                style={{ width: `${occupancyPercentage}%` }}
-              />
-            </div>
+
+          <div className="flex items-center gap-2 text-sm text-military-600 dark:text-gray-400">
+            <Clock className="h-4 w-4" />
+            <span>
+              {format(new Date(event.scheduledDate), 'HH:mm', { locale: es })}
+            </span>
+          </div>
+
+          <div className="flex items-center gap-2 text-sm text-military-600 dark:text-gray-400">
+            <MapPin className="h-4 w-4" />
+            <span>{event.gameType === 'ARMA_3' ? 'Arma 3' : 'Arma Reforger'}</span>
+          </div>
+
+          <div className="flex items-center gap-2 text-sm text-military-600 dark:text-gray-400">
+            <Users className="h-4 w-4" />
+            <span>
+              {event.occupiedSlots}/{event.totalSlots} slots
+            </span>
           </div>
         </div>
 
+        {/* Progress bar */}
+        <div className="flex items-center gap-3">
+          <div className="flex-1 bg-military-200 dark:bg-gray-700 rounded-full h-2">
+            <div
+              className="bg-primary-600 dark:bg-tactical-600 h-2 rounded-full transition-all"
+              style={{
+                width: `${
+                  event.totalSlots
+                    ? (event.occupiedSlots! / event.totalSlots) * 100
+                    : 0
+                }%`,
+              }}
+            />
+          </div>
+          <span className="text-xs text-military-600 dark:text-gray-400 font-medium">
+            {event.totalSlots
+              ? Math.round((event.occupiedSlots! / event.totalSlots) * 100)
+              : 0}
+            %
+          </span>
+        </div>
+
+        {/* Creador */}
         {event.creator && (
-          <div className="mt-4 pt-4 border-t border-military-200">
-            <p className="text-xs text-military-500">
+          <div className="mt-3 pt-3 border-t border-military-200 dark:border-gray-700">
+            <p className="text-xs text-military-500 dark:text-gray-500">
               Creado por{' '}
-              <span className="font-medium text-military-700">
+              <span className="font-medium text-military-700 dark:text-gray-300">
                 {event.creator.clan?.tag && `${event.creator.clan.tag} `}
                 {event.creator.nickname}
               </span>
             </p>
           </div>
         )}
-      </Card>
+      </div>
     </Link>
   );
 }

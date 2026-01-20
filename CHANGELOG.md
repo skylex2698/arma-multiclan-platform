@@ -161,3 +161,70 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 - Tipos TypeScript en hooks
 
 ---
+
+## [2.0.0] - 2025-01-21
+
+### ✨ Cambios Mayores
+
+**Rediseño Completo - CCT (Centro de Coordinación Táctica):**
+- Nueva identidad de marca orientada a simuladores militares
+- Nombre actualizado de "Arma Platform" a "Centro de Coordinación Táctica"
+- Logo militar profesional con escudo
+- Paleta de colores táctica (verde militar, naranja arena)
+
+**Sistema de Modo Claro/Oscuro:**
+- Toggle interactivo en navbar (sol/luna)
+- Modo Claro: Comando Diurno - tonos verde militar claro
+- Modo Oscuro: Operaciones Nocturnas - gris oscuro + verde táctico
+- Persistencia de preferencia en localStorage
+- Transiciones suaves entre modos
+
+**Footer Profesional:**
+- Copyright 2025
+- Créditos a Skylex (desarrollador)
+- Referencia a Arma 3 y Arma Reforger
+- Diseño responsive
+
+### 🎨 Mejoras Visuales
+
+**Sistema de Slots Mejorado:**
+- Slots ocupados con gradientes verdes destacados
+- Slots libres con colores discretos
+- Slots del usuario con borde azul brillante y shadow
+- Mejor diferenciación visual entre estados
+
+**Modo Oscuro Refinado:**
+- Contraste mejorado en todos los textos
+- Cards con fondos apropiados (gray-800)
+- Borders visibles (gray-700)
+- Inputs y selects con colores consistentes
+- Scrollbar personalizada
+
+**Efectos Tácticos:**
+- Grid de fondo sutil estilo mapa táctico
+- Animación tactical-pulse para elementos importantes
+- Scrollbar militar personalizada
+
+### 🔧 Correcciones
+
+- Tags de clan sin dobles corchetes ([[TAG]] → [TAG])
+- Imports TypeScript corregidos
+- Exports named vs default corregidos
+- Warnings de non-null assertions eliminados
+
+### 📚 Nuevos Archivos
+
+- `src/config/app.config.ts` - Configuración centralizada
+- `src/hooks/useTheme.ts` - Hook de tema con Zustand
+- `src/components/ui/ThemeToggle.tsx` - Toggle de tema
+- `src/components/layout/Footer.tsx` - Footer profesional
+
+### 🔄 Archivos Actualizados
+
+Frontend:
+- MainLayout, EventCard, SlotItem, MembersList
+- LoginPage, UsersPage, ClanDetailPage
+- useUsers, userService
+- index.css, tailwind.config.js, index.html
+
+---

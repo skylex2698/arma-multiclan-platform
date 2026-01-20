@@ -1,6 +1,6 @@
 // frontend/src/types/communicationTree.ts
+// VERSIÓN ACTUALIZADA CON PARENTFREQUENCY
 
-// Usar tipos literales en lugar de enum
 export const NodeType = {
   COMMAND: 'COMMAND',
   SQUAD: 'SQUAD',
@@ -17,6 +17,7 @@ export interface CommunicationNode {
   frequency?: string;
   type: NodeType;
   parentId?: string;
+  parentFrequency?: string; // ← AÑADIR ESTE CAMPO
   positionX: number;
   positionY: number;
   order: number;
@@ -31,7 +32,6 @@ export interface CreateNodeDto {
   parentId?: string;
   positionX?: number;
   positionY?: number;
-  order?: number;
 }
 
 export interface UpdateNodeDto {
@@ -39,9 +39,6 @@ export interface UpdateNodeDto {
   frequency?: string;
   type?: NodeType;
   parentId?: string;
-  positionX?: number;
-  positionY?: number;
-  order?: number;
 }
 
 export interface UpdatePositionsDto {

@@ -1,5 +1,5 @@
 // frontend/src/components/events/CommunicationTree/CommunicationTreeEditor.tsx
-// VERSIÓN LIMPIA - SIN DEBUG
+// VERSIÓN SIN WARNINGS
 
 import { useState, useCallback, useEffect } from 'react';
 import ReactFlow, {
@@ -57,6 +57,7 @@ export default function CommunicationTreeEditor({ eventId }: CommunicationTreeEd
       return;
     }
 
+    // Nodos
     const flowNodes: Node[] = backendNodes.map((node) => ({
       id: node.id,
       type: 'custom',
@@ -68,27 +69,55 @@ export default function CommunicationTreeEditor({ eventId }: CommunicationTreeEd
       },
     }));
 
+    // Edges con etiquetas de frecuencia
     const flowEdges: Edge[] = backendNodes
       .filter((node) => node.parentId)
-      .map((node) => ({
-        id: `e-${node.parentId}-${node.id}`,
-        source: node.parentId!,
-        target: node.id,
-        type: 'smoothstep',
-        animated: false,
-        style: { stroke: '#64748b', strokeWidth: 2 },
-      }));
+      .map((node) => {
+        const edge: Edge = {
+          id: `e-${node.parentId}-${node.id}`,
+          source: node.parentId!,
+          target: node.id,
+          type: 'smoothstep',
+          animated: false,
+          style: { stroke: '#64748b', strokeWidth: 2 },
+        };
+
+        // Si hay parentFrequency, añadir label
+        if (node.parentFrequency) {
+          edge.label = node.parentFrequency;
+          edge.labelStyle = {
+            fill: '#fff',
+            fontWeight: 700,
+            fontSize: '12px',
+            fontFamily: 'monospace',
+          };
+          edge.labelBgStyle = {
+            fill: '#eab308',
+            fillOpacity: 1,
+          };
+          edge.labelBgPadding = [8, 6] as [number, number];
+          edge.labelBgBorderRadius = 4;
+        }
+
+        return edge;
+      });
 
     setNodes(flowNodes);
     setEdges(flowEdges);
-    setHasUnsavedChanges(false);
   }, [backendNodes, setNodes, setEdges]);
+
+  // Reset hasUnsavedChanges cuando cambian los backendNodes
+  useEffect(() => {
+    setHasUnsavedChanges(false);
+  }, [backendNodes]);
 
   // Manejar cambios en los nodos (drag)
   const handleNodesChange = useCallback(
     (changes: NodeChange[]) => {
       onNodesChange(changes);
-      const hasPositionChange = changes.some((c) => c.type === 'position' && !(c as any).dragging);
+      const hasPositionChange = changes.some(
+        (c) => c.type === 'position' && !(c as NodeChange & { dragging?: boolean }).dragging
+      );
       if (hasPositionChange) {
         setHasUnsavedChanges(true);
       }
@@ -314,6 +343,18 @@ export default function CommunicationTreeEditor({ eventId }: CommunicationTreeEd
               <p>🔍 <strong>Rueda del ratón</strong> para zoom</p>
             </div>
           </Panel>
+
+          {/* Leyenda */}
+          <Panel position="bottom-right">
+            <div className="bg-gray-900 bg-opacity-90 text-white text-xs px-3 py-2 rounded-lg">
+              <p className="font-bold mb-1">Leyenda:</p>
+              <p>📻 Frecuencia interna</p>
+              <p className="flex items-center gap-1 mt-1">
+                <span className="inline-block w-3 h-3 bg-yellow-500 rounded"></span>
+                Frecuencia de comunicación
+              </p>
+            </div>
+          </Panel>
         </ReactFlow>
       </div>
 
@@ -332,7 +373,10 @@ export default function CommunicationTreeEditor({ eventId }: CommunicationTreeEd
                     {node.name}
                   </p>
                   {node.frequency && (
-                    <p className="text-xs text-gray-500">{node.frequency}</p>
+                    <p className="text-xs text-gray-500">📻 {node.frequency}</p>
+                  )}
+                  {node.parentFrequency && (
+                    <p className="text-xs text-yellow-600">↔ {node.parentFrequency}</p>
                   )}
                 </div>
                 <button

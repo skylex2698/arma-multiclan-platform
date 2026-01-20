@@ -1,4 +1,5 @@
 // frontend/src/components/events/CommunicationTree/CustomNode.tsx
+// VERSIÓN LIMPIA - Sin parentFrequency (se mostrará en la conexión)
 
 import { memo } from 'react';
 import { Handle, Position } from 'reactflow';
@@ -69,7 +70,7 @@ const CustomNode = ({ data }: CustomNodeProps) => {
           {data.label}
         </div>
 
-        {/* Frecuencia */}
+        {/* Frecuencia Interna */}
         {data.frequency && (
           <div className="flex items-center gap-1 bg-black/20 px-2 py-1 rounded text-xs">
             <Radio className="w-3 h-3" />

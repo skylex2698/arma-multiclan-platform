@@ -30,6 +30,7 @@ class CommunicationTreeService {
     });
 
     logger.info('Communication tree fetched', { eventId, nodeCount: nodes.length });
+
     return nodes;
   }
 
@@ -192,7 +193,7 @@ class CommunicationTreeService {
       where: { eventId }
     });
 
-    const createdNodes: Record<string, any> = {}; // Mapa de squadId -> nodeId
+    const createdNodes: Record<string, any> = {}; // Mapa de squadId -> node
 
     // PASO 1: Crear nodos de comando primero
     const commandSquads = event.squads.filter(s => s.isCommand);
@@ -207,14 +208,16 @@ class CommunicationTreeService {
           type: 'COMMAND',
           positionX: i * 300,
           positionY: 0,
-          order: i
+          order: i,
+          // ⚠️ Los nodos COMMAND no tienen padre, así que parentFrequency es null
+          parentFrequency: null
         }
       });
 
       createdNodes[squad.id] = node;
     }
 
-    // PASO 2: Crear nodos normales (escuadras sin padre o con padre ya creado)
+    // PASO 2: Crear nodos normales (escuadras)
     const normalSquads = event.squads.filter(s => !s.isCommand);
     
     // Ordenar por jerarquía (primero los que no tienen padre, luego sus hijos)
@@ -248,7 +251,10 @@ class CommunicationTreeService {
           frequency: squad.frequency || undefined,
           type: nodeType,
           parentId: parentNodeId,
-          positionX: (indexAtLevel - 1) * 250,
+          // ========== IMPORTANTE: Guardar parentFrequency ==========
+          parentFrequency: squad.parentFrequency || null,
+          // =========================================================
+          positionX: (indexAtLevel) * 250,
           positionY: level * 200,
           order: i + commandSquads.length
         }
@@ -308,28 +314,24 @@ class CommunicationTreeService {
   }
 }
 
-// Funciones auxiliares para el auto-generador:
+// Funciones auxiliares (sin cambios)
 function sortByHierarchy(squads: any[]): any[] {
   const sorted: any[] = [];
   const processed = new Set<string>();
   
-  // Función recursiva para añadir una escuadra y sus hijos
   function addSquadWithChildren(squad: any) {
     if (processed.has(squad.id)) return;
     
     sorted.push(squad);
     processed.add(squad.id);
     
-    // Añadir hijos
     const children = squads.filter(s => s.parentSquadId === squad.id);
     children.forEach(child => addSquadWithChildren(child));
   }
   
-  // Primero añadir las escuadras sin padre
   const rootSquads = squads.filter(s => !s.parentSquadId);
   rootSquads.forEach(squad => addSquadWithChildren(squad));
   
-  // Añadir cualquier escuadra que quedó sin procesar
   squads.forEach(squad => {
     if (!processed.has(squad.id)) {
       addSquadWithChildren(squad);
@@ -340,7 +342,7 @@ function sortByHierarchy(squads: any[]): any[] {
 }
 
 function getHierarchyLevel(squad: any, allSquads: any[]): number {
-  let level = 1; // Comandos están en nivel 0, escuadras normales empiezan en 1
+  let level = 1;
   let current = squad;
   
   while (current.parentSquadId) {

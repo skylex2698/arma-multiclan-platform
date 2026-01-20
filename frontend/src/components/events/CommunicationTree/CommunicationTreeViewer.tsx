@@ -1,4 +1,5 @@
 // frontend/src/components/events/CommunicationTree/CommunicationTreeViewer.tsx
+// VERSIÓN LIMPIA SIN WARNINGS
 
 import { useMemo } from 'react';
 import ReactFlow, {
@@ -42,20 +43,41 @@ const CommunicationTreeViewer = ({ eventId }: CommunicationTreeViewerProps) => {
     }));
   }, [nodes]);
 
-  // Crear las conexiones (edges) basadas en parentId
+  // Crear las conexiones (edges) con etiquetas de frecuencia
   const flowEdges: Edge[] = useMemo(() => {
     if (!nodes) return [];
 
     return nodes
       .filter((node) => node.parentId)
-      .map((node) => ({
-        id: `e-${node.parentId}-${node.id}`,
-        source: node.parentId!,
-        target: node.id,
-        type: 'smoothstep',
-        animated: false,
-        style: { stroke: '#64748b', strokeWidth: 2 },
-      }));
+      .map((node) => {
+        const edge: Edge = {
+          id: `e-${node.parentId}-${node.id}`,
+          source: node.parentId!,
+          target: node.id,
+          type: 'smoothstep',
+          animated: false,
+          style: { stroke: '#64748b', strokeWidth: 2 },
+        };
+
+        // Si hay parentFrequency, añadir label
+        if (node.parentFrequency) {
+          edge.label = node.parentFrequency;
+          edge.labelStyle = {
+            fill: '#fff',
+            fontWeight: 700,
+            fontSize: '12px',
+            fontFamily: 'monospace',
+          };
+          edge.labelBgStyle = {
+            fill: '#eab308',
+            fillOpacity: 1,
+          };
+          edge.labelBgPadding = [8, 6] as [number, number];
+          edge.labelBgBorderRadius = 4;
+        }
+
+        return edge;
+      });
   }, [nodes]);
 
   // Función para exportar a PNG
@@ -144,6 +166,18 @@ const CommunicationTreeViewer = ({ eventId }: CommunicationTreeViewerProps) => {
             <Download className="w-4 h-4" />
             Exportar PNG
           </button>
+        </Panel>
+
+        {/* Leyenda */}
+        <Panel position="bottom-right">
+          <div className="bg-gray-900 bg-opacity-90 text-white text-xs px-3 py-2 rounded-lg">
+            <p className="font-bold mb-1">Leyenda:</p>
+            <p>📻 Frecuencia interna</p>
+            <p className="flex items-center gap-1 mt-1">
+              <span className="inline-block w-3 h-3 bg-yellow-500 rounded"></span>
+              Frecuencia de comunicación
+            </p>
+          </div>
         </Panel>
       </ReactFlow>
     </div>

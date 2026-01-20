@@ -229,6 +229,9 @@ model CommunicationNode {
   parentId    String?
   parent      CommunicationNode?  @relation("NodeHierarchy", fields: [parentId], references: [id], onDelete: Cascade)
   children    CommunicationNode[] @relation("NodeHierarchy")
+
+  // Frecuencia padre
+  parentFrequency String?
   
   // Posición visual (para guardar el layout del árbol)
   positionX   Float    @default(0)

@@ -7,6 +7,8 @@ import { useCreateEvent } from '../../hooks/useEvents';
 import { Card } from '../../components/ui/Card';
 import { SquadCommunicationFields } from '../../components/events/SquadCommunicationFields';
 import type { GameType } from '../../types';
+import { BriefingEditorWithTemplates } from '../../components/events/BriefingEditor/BriefingEditorWithTemplates';
+import '../../components/events/BriefingEditor/BriefingEditor.css';
 
 interface SlotForm {
   id: string;
@@ -314,15 +316,17 @@ export default function CreateEventPage() {
 
             <div>
               <label className="block text-sm font-medium text-military-700 mb-2">
-                Briefing (HTML)
+                Briefing del Evento
               </label>
-              <textarea
-                value={briefing}
-                onChange={(e) => setBriefing(e.target.value)}
-                className="input w-full font-mono text-sm"
-                rows={6}
-                placeholder="<h2>Objetivo</h2><p>...</p>"
+              <BriefingEditorWithTemplates
+                content={briefing}
+                onChange={setBriefing}
+                placeholder="Escribe el briefing del evento aquí..."
               />
+              <div className="mt-2 text-xs text-gray-500 space-y-1">
+                <p>💡 <strong>Tip:</strong> Usa las plantillas predefinidas para empezar más rápido</p>
+                <p>📝 El briefing admite formato rico: títulos, listas, tablas, imágenes y más</p>
+              </div>
             </div>
           </div>
         </Card>

@@ -1,3 +1,5 @@
+// frontend/src/pages/events/EventDetailPage.tsx
+
 import { useParams, Link } from 'react-router-dom';
 import {
   Calendar,
@@ -6,6 +8,9 @@ import {
   User,
   ArrowLeft,
   AlertCircle,
+  Edit,
+  Copy,
+  Radio,
 } from 'lucide-react';
 import { useEvent } from '../../hooks/useEvents';
 import { useAssignSlot, useUnassignSlot } from '../../hooks/useSlots';
@@ -13,13 +18,16 @@ import { LoadingSpinner } from '../../components/ui/LoadingSpinner';
 import { Badge } from '../../components/ui/Badge';
 import { Card } from '../../components/ui/Card';
 import { SquadSection } from '../../components/events/SquadSection';
+import CommunicationTreeViewer from '../../components/events/CommunicationTree/CommunicationTreeViewer';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { useState } from 'react';
 import { useAuthStore } from '../../store/authStore';
 import { useAdminAssignSlot, useAdminUnassignSlot } from '../../hooks/useSlots';
 import { useUsers } from '../../hooks/useUsers';
-import { Edit, Copy } from 'lucide-react';
+import type { Squad, Slot } from '../../types';
+
+type TabType = 'briefing' | 'slots' | 'communications';
 
 export default function EventDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -28,10 +36,11 @@ export default function EventDetailPage() {
   const assignSlot = useAssignSlot(id!);
   const unassignSlot = useUnassignSlot(id!);
   const [actionError, setActionError] = useState('');
+  const [activeTab, setActiveTab] = useState<TabType>('briefing');
   const adminAssignSlot = useAdminAssignSlot();
   const adminUnassignSlot = useAdminUnassignSlot();
 
-  // Obtener usuarios disponibles para asignación (AGREGAR)
+  // Obtener usuarios disponibles para asignación
   const { data: usersData } = useUsers(
     user?.role === 'ADMIN' || user?.role === 'CLAN_LEADER'
       ? {
@@ -43,8 +52,6 @@ export default function EventDetailPage() {
       : undefined
   );
 
-  // CAMBIO: NO filtrar usuarios que ya están en el evento
-  // Filtrar usuarios que NO están ya en el evento (AGREGAR)
   const availableUsers = usersData?.users || [];
 
   const handleAdminAssign = async (slotId: string, userId: string) => {
@@ -63,10 +70,9 @@ export default function EventDetailPage() {
     }
   };
 
-  // Opcional: Marcar visualmente cuáles ya están asignados
   const getUserSlotInfo = (userId: string) => {
     for (const squad of data?.event?.squads || []) {
-      const slot = squad.slots.find((s) => s.userId === userId);
+      const slot = squad.slots.find((s: Slot) => s.userId === userId);
       if (slot) {
         return {
           hasSlot: true,
@@ -173,7 +179,6 @@ export default function EventDetailPage() {
                 </Link>
               </>
             )}
-
           </div>
         </div>
 
@@ -255,44 +260,121 @@ export default function EventDetailPage() {
         </div>
       )}
 
-      {/* Briefing */}
-      {event.briefing && (
-        <Card className="mb-6">
-          <h2 className="text-xl font-bold text-military-900 mb-4">Briefing</h2>
-          <div
-            className="prose max-w-none"
-            dangerouslySetInnerHTML={{ __html: event.briefing }}
-          />
+      {/* Pestañas */}
+      <div className="mb-6">
+        <div className="border-b border-military-200">
+          <nav className="-mb-px flex space-x-8">
+            <button
+              onClick={() => setActiveTab('briefing')}
+              className={`
+                py-4 px-1 border-b-2 font-medium text-sm transition-colors
+                ${
+                  activeTab === 'briefing'
+                    ? 'border-primary-500 text-primary-600'
+                    : 'border-transparent text-military-500 hover:text-military-700 hover:border-military-300'
+                }
+              `}
+            >
+              Briefing
+            </button>
+            <button
+              onClick={() => setActiveTab('slots')}
+              className={`
+                py-4 px-1 border-b-2 font-medium text-sm transition-colors
+                ${
+                  activeTab === 'slots'
+                    ? 'border-primary-500 text-primary-600'
+                    : 'border-transparent text-military-500 hover:text-military-700 hover:border-military-300'
+                }
+              `}
+            >
+              Escuadras y Slots
+            </button>
+            <button
+              onClick={() => setActiveTab('communications')}
+              className={`
+                py-4 px-1 border-b-2 font-medium text-sm transition-colors inline-flex items-center gap-2
+                ${
+                  activeTab === 'communications'
+                    ? 'border-primary-500 text-primary-600'
+                    : 'border-transparent text-military-500 hover:text-military-700 hover:border-military-300'
+                }
+              `}
+            >
+              <Radio className="h-4 w-4" />
+              Comunicaciones
+            </button>
+          </nav>
+        </div>
+      </div>
+
+      {/* Contenido de las pestañas */}
+      {activeTab === 'briefing' && (
+        <Card>
+          {event.briefing ? (
+            <>
+              <h2 className="text-xl font-bold text-military-900 mb-4">Briefing</h2>
+              <div
+                className="prose max-w-none"
+                dangerouslySetInnerHTML={{ __html: event.briefing }}
+              />
+            </>
+          ) : (
+            <p className="text-military-500 text-center py-8">
+              No hay briefing disponible para este evento
+            </p>
+          )}
         </Card>
       )}
 
-      {/* Escuadras y Slots */}
-      <div className="space-y-4">
-        <h2 className="text-2xl font-bold text-military-900">
-          Escuadras y Slots
-        </h2>
-        {event.squads
-          .sort((a, b) => a.order - b.order)
-          .map((squad) => (
-            <SquadSection
-              key={squad.id}
-              squad={squad}
-              onAssignSlot={handleAssignSlot}
-              onUnassignSlot={handleUnassignSlot}
-              onAdminAssign={handleAdminAssign}
-              onAdminUnassign={handleAdminUnassign}
-              isLoading={
-                assignSlot.isPending ||
-                unassignSlot.isPending ||
-                adminAssignSlot.isPending ||
-                adminUnassignSlot.isPending
-              }
-              eventStatus={event.status}
-              availableUsers={availableUsers}
-              getUserSlotInfo={getUserSlotInfo}
-            />
-          ))}
-      </div>
+      {activeTab === 'slots' && (
+        <div className="space-y-4">
+          <h2 className="text-2xl font-bold text-military-900">
+            Escuadras y Slots
+          </h2>
+          {event.squads
+            .sort((a: Squad, b: Squad) => a.order - b.order)
+            .map((squad: Squad) => (
+              <SquadSection
+                key={squad.id}
+                squad={squad}
+                onAssignSlot={handleAssignSlot}
+                onUnassignSlot={handleUnassignSlot}
+                onAdminAssign={handleAdminAssign}
+                onAdminUnassign={handleAdminUnassign}
+                isLoading={
+                  assignSlot.isPending ||
+                  unassignSlot.isPending ||
+                  adminAssignSlot.isPending ||
+                  adminUnassignSlot.isPending
+                }
+                eventStatus={event.status}
+                availableUsers={availableUsers}
+                getUserSlotInfo={getUserSlotInfo}
+              />
+            ))}
+        </div>
+      )}
+
+      {activeTab === 'communications' && (
+        <div>
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-2xl font-bold text-military-900">
+              Árbol de Comunicaciones
+            </h2>
+            {canEditEvent && (
+              <Link
+                to={`/events/${event.id}/communications/edit`}
+                className="btn btn-primary btn-sm flex items-center"
+              >
+                <Edit className="h-4 w-4 mr-1" />
+                Editar Árbol
+              </Link>
+            )}
+          </div>
+          <CommunicationTreeViewer eventId={event.id} />
+        </div>
+      )}
     </div>
   );
 }

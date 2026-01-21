@@ -314,8 +314,8 @@ export default function EventDetailPage() {
           {event.briefing ? (
             <>
               <h2 className="text-xl font-bold text-military-900 mb-4">Briefing</h2>
-              <div
-                className="prose max-w-none"
+              <div 
+                className="briefing-content p-6 bg-white rounded-lg border border-gray-200"
                 dangerouslySetInnerHTML={{ __html: event.briefing }}
               />
             </>

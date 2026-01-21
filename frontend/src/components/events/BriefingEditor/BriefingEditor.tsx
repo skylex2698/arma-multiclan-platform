@@ -1,6 +1,7 @@
 // frontend/src/components/events/BriefingEditor/BriefingEditor.tsx
-// VERSIÓN CORREGIDA - Imports sin default
+// VERSIÓN CORREGIDA - Sin duplicados + mejor configuración
 
+import { useEffect } from 'react';
 import { useEditor, EditorContent } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import { Image } from '@tiptap/extension-image';
@@ -11,8 +12,6 @@ import { TableCell } from '@tiptap/extension-table-cell';
 import { TableHeader } from '@tiptap/extension-table-header';
 import { TextAlign } from '@tiptap/extension-text-align';
 import { Underline } from '@tiptap/extension-underline';
-import { TextStyle } from '@tiptap/extension-text-style';
-import { Color } from '@tiptap/extension-color';
 import { 
   Bold, 
   Italic, 
@@ -47,10 +46,11 @@ export function BriefingEditor({ content, onChange, placeholder = 'Escribe el br
         heading: {
           levels: [1, 2, 3],
         },
+        // Deshabilitar las extensiones que vamos a añadir manualmente
+        link: false,
+        underline: false,
       }),
       Underline,
-      TextStyle,
-      Color,
       Link.configure({
         openOnClick: false,
         HTMLAttributes: {
@@ -83,6 +83,13 @@ export function BriefingEditor({ content, onChange, placeholder = 'Escribe el br
     },
   });
 
+  // Actualizar contenido cuando cambia externamente (por ejemplo, al seleccionar plantilla)
+  useEffect(() => {
+    if (editor && content !== editor.getHTML()) {
+      editor.commands.setContent(content);
+    }
+  }, [content, editor]);
+
   if (!editor) {
     return null;
   }
@@ -109,7 +116,7 @@ export function BriefingEditor({ content, onChange, placeholder = 'Escribe el br
   };
 
   return (
-    <div className="border border-gray-300 rounded-lg overflow-hidden">
+    <div className="border border-gray-300 rounded-lg overflow-hidden bg-white">
       {/* Toolbar */}
       <div className="bg-gray-100 border-b border-gray-300 p-2 flex flex-wrap gap-1">
         {/* Deshacer/Rehacer */}
@@ -117,7 +124,7 @@ export function BriefingEditor({ content, onChange, placeholder = 'Escribe el br
           type="button"
           onClick={() => editor.chain().focus().undo().run()}
           disabled={!editor.can().undo()}
-          className="p-2 hover:bg-gray-200 rounded disabled:opacity-50"
+          className="p-2 hover:bg-gray-200 rounded disabled:opacity-50 disabled:cursor-not-allowed"
           title="Deshacer"
         >
           <Undo className="w-4 h-4" />
@@ -126,7 +133,7 @@ export function BriefingEditor({ content, onChange, placeholder = 'Escribe el br
           type="button"
           onClick={() => editor.chain().focus().redo().run()}
           disabled={!editor.can().redo()}
-          className="p-2 hover:bg-gray-200 rounded disabled:opacity-50"
+          className="p-2 hover:bg-gray-200 rounded disabled:opacity-50 disabled:cursor-not-allowed"
           title="Rehacer"
         >
           <Redo className="w-4 h-4" />
@@ -286,7 +293,7 @@ export function BriefingEditor({ content, onChange, placeholder = 'Escribe el br
       </div>
 
       {/* Editor */}
-      <div className="bg-white">
+      <div className="bg-white min-h-[300px]">
         <EditorContent editor={editor} />
       </div>
     </div>

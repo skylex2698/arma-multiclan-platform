@@ -1,5 +1,5 @@
 // frontend/src/components/events/BriefingEditor/TemplateSelector.tsx
-// Selector de plantillas de briefing con preview
+// VERSIÓN CORREGIDA - Botones con type="button" para evitar submit
 
 import { useState } from 'react';
 import { 
@@ -69,7 +69,15 @@ export function TemplateSelector({ isOpen, onClose, onSelect }: TemplateSelector
   };
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+    <div 
+      className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4"
+      onClick={(e) => {
+        // Cerrar si se hace click en el fondo
+        if (e.target === e.currentTarget) {
+          onClose();
+        }
+      }}
+    >
       <div className="bg-white rounded-lg shadow-xl max-w-6xl w-full max-h-[90vh] overflow-hidden flex flex-col">
         {/* Header */}
         <div className="flex items-center justify-between p-6 border-b border-gray-200">
@@ -82,6 +90,7 @@ export function TemplateSelector({ isOpen, onClose, onSelect }: TemplateSelector
             </p>
           </div>
           <button
+            type="button"
             onClick={onClose}
             className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
           >
@@ -97,6 +106,7 @@ export function TemplateSelector({ isOpen, onClose, onSelect }: TemplateSelector
               {briefingTemplates.map((template) => (
                 <button
                   key={template.id}
+                  type="button"
                   onClick={() => {
                     setSelectedTemplate(template);
                     setShowPreview(false);
@@ -150,6 +160,7 @@ export function TemplateSelector({ isOpen, onClose, onSelect }: TemplateSelector
                     Vista Previa
                   </h3>
                   <button
+                    type="button"
                     onClick={() => setShowPreview(!showPreview)}
                     className="text-sm text-blue-600 hover:text-blue-700 font-medium"
                   >
@@ -190,12 +201,14 @@ export function TemplateSelector({ isOpen, onClose, onSelect }: TemplateSelector
           </p>
           <div className="flex gap-3">
             <button
+              type="button"
               onClick={onClose}
               className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-100 transition-colors"
             >
               Cancelar
             </button>
             <button
+              type="button"
               onClick={handleSelectTemplate}
               disabled={!selectedTemplate}
               className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"

@@ -1,6 +1,6 @@
 import { Navigate } from 'react-router-dom';
 import { useAuthStore } from '../../store/authStore';
-import { MainLayout } from '../../components/layout/MainLayout';
+import { MainLayout } from '../layout/MainLayout';
 
 interface AdminOrClanLeaderRouteProps {
   children: React.ReactNode;

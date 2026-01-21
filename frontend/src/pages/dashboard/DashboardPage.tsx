@@ -26,13 +26,19 @@ export default function DashboardPage() {
     status: 'ACTIVE',
   });
 
-  // Obtener datos de admin
+  // Obtener datos de admin y líder de clan
+  // Admin ve todos los usuarios pendientes, Líder de Clan solo los de su clan
   const { data: usersData } = useUsers(
-    user?.role === 'ADMIN' ? { status: 'PENDING' } : undefined
+    user?.role === 'ADMIN' || user?.role === 'CLAN_LEADER'
+      ? { status: 'PENDING' }
+      : undefined
   );
 
+  // Admin ve todas las solicitudes, Líder de Clan solo las de su clan
   const { data: requestsData } = useClanChangeRequests(
-    user?.role === 'ADMIN' ? { status: 'PENDING' } : undefined
+    user?.role === 'ADMIN' || user?.role === 'CLAN_LEADER'
+      ? { status: 'PENDING' }
+      : undefined
   );
 
   if (loadingEvents) {
@@ -122,41 +128,48 @@ export default function DashboardPage() {
         />
       </div>
 
-      {/* Panel de Admin */}
-      {user.role === 'ADMIN' && (pendingUsers > 0 || pendingRequests > 0) && (
-        <div className="mb-8">
-          <Card className="bg-yellow-50 border-yellow-200">
-            <div className="flex items-start gap-4">
-              <AlertCircle className="h-6 w-6 text-yellow-600 flex-shrink-0 mt-1" />
-              <div className="flex-1">
-                <h3 className="font-bold text-military-900 mb-2">
-                  Tareas Pendientes
-                </h3>
-                <div className="space-y-2">
-                  {pendingUsers > 0 && (
-                    <Link
-                      to="/users"
-                      className="block text-sm text-military-700 hover:text-primary-600"
-                    >
-                      • {pendingUsers} usuario{pendingUsers !== 1 ? 's' : ''}{' '}
-                      pendiente{pendingUsers !== 1 ? 's' : ''} de validación →
-                    </Link>
-                  )}
-                  {pendingRequests > 0 && (
-                    <Link
-                      to="/users/requests"
-                      className="block text-sm text-military-700 hover:text-primary-600"
-                    >
-                      • {pendingRequests} solicitud{pendingRequests !== 1 ? 'es' : ''}{' '}
-                      de cambio de clan →
-                    </Link>
-                  )}
+      {/* Panel de Admin y Líder de Clan */}
+      {(user.role === 'ADMIN' || user.role === 'CLAN_LEADER') &&
+        (pendingUsers > 0 || pendingRequests > 0) && (
+          <div className="mb-8">
+            <Card className="bg-yellow-50 dark:bg-yellow-900/20 border-yellow-200 dark:border-yellow-800">
+              <div className="flex items-start gap-4">
+                <AlertCircle className="h-6 w-6 text-yellow-600 dark:text-yellow-500 flex-shrink-0 mt-1" />
+                <div className="flex-1">
+                  <h3 className="font-bold text-military-900 dark:text-gray-100 mb-2">
+                    Tareas Pendientes
+                    {user.role === 'CLAN_LEADER' && (
+                      <span className="text-sm font-normal text-military-600 dark:text-gray-400 ml-2">
+                        (de tu clan)
+                      </span>
+                    )}
+                  </h3>
+                  <div className="space-y-2">
+                    {pendingUsers > 0 && (
+                      <Link
+                        to="/users"
+                        className="block text-sm text-military-700 dark:text-gray-300 hover:text-primary-600 dark:hover:text-tactical-400"
+                      >
+                        • {pendingUsers} {user.role === 'CLAN_LEADER' ? 'miembro' : 'usuario'}
+                        {pendingUsers !== 1 ? 's' : ''} pendiente
+                        {pendingUsers !== 1 ? 's' : ''} de validación →
+                      </Link>
+                    )}
+                    {pendingRequests > 0 && (
+                      <Link
+                        to="/users/requests"
+                        className="block text-sm text-military-700 dark:text-gray-300 hover:text-primary-600 dark:hover:text-tactical-400"
+                      >
+                        • {pendingRequests} solicitud{pendingRequests !== 1 ? 'es' : ''} de
+                        cambio de clan →
+                      </Link>
+                    )}
+                  </div>
                 </div>
               </div>
-            </div>
-          </Card>
-        </div>
-      )}
+            </Card>
+          </div>
+        )}
 
       {/* Accesos rápidos */}
       <div className="mb-8">
@@ -167,19 +180,19 @@ export default function DashboardPage() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
         <div>
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-2xl font-bold text-military-900">
+            <h2 className="text-2xl font-bold text-military-900 dark:text-gray-100">
               Próximos Eventos
             </h2>
             <Link
               to="/events"
-              className="text-sm text-primary-600 hover:text-primary-700 font-medium"
+              className="text-sm text-primary-600 dark:text-tactical-400 hover:text-primary-700 dark:hover:text-tactical-300 font-medium"
             >
               Ver todos →
             </Link>
           </div>
           {upcomingEvents.length === 0 ? (
             <Card>
-              <p className="text-center py-8 text-military-600">
+              <p className="text-center py-8 text-military-600 dark:text-gray-400">
                 No hay eventos próximos
               </p>
               {(user.role === 'ADMIN' || user.role === 'CLAN_LEADER') && (
@@ -202,7 +215,7 @@ export default function DashboardPage() {
         {/* Mis eventos */}
         <div>
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-2xl font-bold text-military-900">
+            <h2 className="text-2xl font-bold text-military-900 dark:text-gray-100">
               Mis Inscripciones
             </h2>
             {myEvents.length > 0 && (
@@ -211,7 +224,7 @@ export default function DashboardPage() {
           </div>
           {myEvents.length === 0 ? (
             <Card>
-              <p className="text-center py-8 text-military-600">
+              <p className="text-center py-8 text-military-600 dark:text-gray-400">
                 No estás inscrito en ningún evento
               </p>
               <div className="text-center">

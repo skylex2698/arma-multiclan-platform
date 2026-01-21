@@ -1,8 +1,6 @@
 import { Request, Response } from 'express';
 import { clanService } from '../services/clan.service';
 import { prisma } from '../config/database';
-import path from 'path';
-import fs from 'fs';
 
 const handleError = (res: Response, error: unknown) => {
   if (error instanceof Error) {
@@ -133,56 +131,45 @@ class ClanController {
 
   async uploadAvatar(req: Request, res: Response) {
     try {
-      // Obtener ID y asegurar que es string
-      const idParam = req.params.id;
-      const id = Array.isArray(idParam) ? idParam[0] : idParam;
+      const { id } = req.params;
+      const userId = req.user!.id;
+      const userRole = req.user!.role;
+
+      // Verificar permisos
+      if (userRole !== 'ADMIN') {
+        const user = await prisma.user.findUnique({
+          where: { id: userId },
+          select: { clanId: true, role: true },
+        });
+
+        if (user?.role !== 'CLAN_LEADER' || user?.clanId !== (id as string)) {
+          return res.status(403).json({
+            success: false,
+            message: 'No tienes permisos para modificar este clan',
+          });
+        }
+      }
 
       if (!req.file) {
-        return res.status(400).json({ error: 'No se proporcionó ninguna imagen' });
+        return res.status(400).json({
+          success: false,
+          message: 'No se proporcionó ningún archivo',
+        });
       }
 
-      // Nueva URL centralizada
+      // Construir URL del archivo
       const avatarUrl = `/uploads/clans/${req.file.filename}`;
 
-      // Obtener el clan actual para eliminar avatar anterior
-      const currentClan = await prisma.clan.findUnique({
-        where: { id },
-        select: { avatarUrl: true }
-      });
-
-      // Eliminar avatar anterior si existe
-      if (currentClan?.avatarUrl) {
-        const oldFilename = path.basename(currentClan.avatarUrl);
-        const oldPath = path.join(__dirname, '../../uploads/clans', oldFilename);
-        if (fs.existsSync(oldPath)) {
-          fs.unlinkSync(oldPath);
-        }
-      }
-
       // Actualizar clan con nueva URL
-      const updatedClan = await prisma.clan.update({
-        where: { id },
-        data: { avatarUrl }
-      });
+      const clan = await clanService.updateClan(id as string, { avatarUrl });
 
-      // Audit log
-      await prisma.auditLog.create({
-        data: {
-          action: 'CLAN_AVATAR_UPDATED',
-          entity: 'Clan',
-          entityId: id,
-          userId: (req as any).user?.id,
-          details: JSON.stringify({
-            avatarUrl,
-            filename: req.file.filename
-          })
-        }
+      return res.status(200).json({
+        success: true,
+        message: 'Avatar actualizado exitosamente',
+        data: { clan, avatarUrl },
       });
-
-      res.json(updatedClan);
-    } catch (error: any) {
-      console.error('Error uploading clan avatar:', error);
-      res.status(500).json({ error: error.message || 'Error al subir el avatar' });
+    } catch (error) {
+      handleError(res, error);
     }
   }
 }

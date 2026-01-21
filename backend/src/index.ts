@@ -9,7 +9,6 @@ import { userRoutes } from './routes/user.routes';
 import eventRoutes from './routes/event.routes';
 import { slotRoutes, squadRouter } from './routes/slot.routes';
 import communicationTreeRoutes from './routes/communicationTree.routes';
-import imageRoutes from './routes/image.routes';
 
 dotenv.config();
 
@@ -25,8 +24,7 @@ app.use(cors({
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Todos los uploads desde una única carpeta
-app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
+app.use('/uploads', express.static(path.join(process.cwd(), 'public', 'uploads')));
 
 app.get('/health', (req, res) => {
   res.json({ 
@@ -44,9 +42,6 @@ app.use('/api/events', eventRoutes);
 app.use('/api/slots', slotRoutes);
 app.use('/api/squads', squadRouter);
 app.use('/api/events', communicationTreeRoutes);
-
-// Rutas de imágenes
-app.use('/api', imageRoutes);
 
 app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
   console.error('Error:', err);

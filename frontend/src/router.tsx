@@ -1,6 +1,7 @@
 import { createBrowserRouter, Navigate } from 'react-router-dom';
 import { useAuthStore } from './store/authStore';
 import { MainLayout } from './components/layout/MainLayout';
+import { AdminOrClanLeaderRoute } from './components/routes/AdminOrClanLeaderRoute';
 import LoginPage from './pages/auth/LoginPage';
 import RegisterPage from './pages/auth/RegisterPage';
 import DashboardPage from './pages/dashboard/DashboardPage';
@@ -156,9 +157,9 @@ export const router = createBrowserRouter([
   {
     path: '/users',
     element: (
-      <AdminRoute>
+      <AdminOrClanLeaderRoute>
         <UsersPage />
-      </AdminRoute>
+      </AdminOrClanLeaderRoute>
     ),
   },
   {

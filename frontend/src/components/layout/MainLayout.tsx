@@ -42,7 +42,8 @@ export function MainLayout({ children }: MainLayoutProps) {
     { path: '/dashboard', label: 'Dashboard', icon: Home },
     { path: '/events', label: 'Operaciones', icon: Calendar },
     { path: '/clanes', label: 'Clanes', icon: Shield },
-    ...(user?.role === 'ADMIN'
+    // Mostrar Personal tanto para ADMIN como para CLAN_LEADER
+    ...(user?.role === 'ADMIN' || user?.role === 'CLAN_LEADER'
       ? [{ path: '/users', label: 'Personal', icon: Users }]
       : []),
   ];

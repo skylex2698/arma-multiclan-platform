@@ -12,11 +12,21 @@ export class UserController {
     try {
       const { clanId, role, status } = req.query;
 
-      const users = await userService.getAllUsers({
-        clanId: clanId as string,
+      // Si es líder de clan, filtrar solo por su clan
+      let filters: any = {
         role: role as UserRole,
         status: status as UserStatus
-      });
+      };
+
+      if (req.user?.role === UserRole.CLAN_LEADER) {
+        // Forzar filtro por clan del líder
+        filters.clanId = req.user.clanId;
+      } else if (clanId) {
+        // Admin puede filtrar por cualquier clan
+        filters.clanId = clanId as string;
+      }
+
+      const users = await userService.getAllUsers(filters);
 
       return successResponse(res, { users, count: users.length }, 'Usuarios obtenidos correctamente');
     } catch (error: any) {

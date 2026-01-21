@@ -6,12 +6,18 @@ import { Card } from '../../components/ui/Card';
 import { Badge } from '../../components/ui/Badge';
 import { UserAvatar } from '../../components/ui/UserAvatar';
 import type { UserRole, UserStatus } from '../../types';
+import { useAuthStore } from '../../store/authStore';
 
 export default function UsersPage() {
   const [search, setSearch] = useState('');
   const [roleFilter, setRoleFilter] = useState<string>('ALL');
   const [statusFilter, setStatusFilter] = useState<string>('ALL');
   const [clanFilter, setClanFilter] = useState<string>('ALL');
+
+  // Obtener el usuario actual para verificar permisos
+  const { user: currentUser } = useAuthStore();
+  const isAdmin = currentUser?.role === 'ADMIN';
+  const isClanLeader = currentUser?.role === 'CLAN_LEADER';
 
   const { data, isLoading } = useUsers({
     search: search || undefined,
@@ -82,11 +88,16 @@ export default function UsersPage() {
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-3xl font-bold text-military-900 dark:text-gray-100">
-            Gestión de Usuarios
+            {isClanLeader ? 'Gestión de Personal' : 'Gestión de Usuarios'}
           </h1>
           <p className="text-military-600 dark:text-gray-400 mt-1">
-            {filteredUsers.length} usuarios registrados
+            {filteredUsers.length} {isClanLeader ? 'miembros del clan' : 'usuarios registrados'}
           </p>
+          {isClanLeader && (
+            <p className="text-sm text-military-500 dark:text-gray-500 mt-2">
+              ℹ️ Como líder de clan, solo puedes ver y gestionar a los miembros de tu clan
+            </p>
+          )}
         </div>
         <Users className="h-8 w-8 text-primary-600 dark:text-tactical-500" />
       </div>
@@ -118,24 +129,26 @@ export default function UsersPage() {
             </div>
           </div>
 
-          {/* Filtro de Clan */}
-          <div>
-            <label className="block text-sm font-medium text-military-700 dark:text-gray-300 mb-1">
-              Clan
-            </label>
-            <select
-              value={clanFilter}
-              onChange={(e) => setClanFilter(e.target.value)}
-              className="input"
-            >
-              <option value="ALL">Todos los clanes</option>
-              {clans.map((clan) => (
-                <option key={clan.id} value={clan.id}>
-                  [{clan.tag}] {clan.name}
-                </option>
-              ))}
-            </select>
-          </div>
+          {/* Filtro de Clan - Solo visible para Admin */}
+          {isAdmin && (
+            <div>
+              <label className="block text-sm font-medium text-military-700 dark:text-gray-300 mb-1">
+                Clan
+              </label>
+              <select
+                value={clanFilter}
+                onChange={(e) => setClanFilter(e.target.value)}
+                className="input"
+              >
+                <option value="ALL">Todos los clanes</option>
+                {clans.map((clan) => (
+                  <option key={clan.id} value={clan.id}>
+                    [{clan.tag}] {clan.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
 
           {/* Filtro de Rol */}
           <div>
@@ -177,7 +190,7 @@ export default function UsersPage() {
       {/* Lista de usuarios */}
       <div className="space-y-4">
         <h2 className="text-2xl font-bold text-military-900 dark:text-gray-100">
-          Todos los Usuarios
+          {isClanLeader ? 'Miembros del Clan' : 'Todos los Usuarios'}
         </h2>
 
         {filteredUsers.length === 0 ? (
@@ -235,24 +248,32 @@ export default function UsersPage() {
 
                 {/* Controles */}
                 <div className="grid grid-cols-2 gap-3">
+                  {/* Control de Rol - Solo Admin puede ver y editar */}
                   <div>
                     <label className="block text-xs font-medium text-military-600 dark:text-gray-400 mb-1">
                       Rol
                     </label>
-                    <select
-                      value={user.role}
-                      onChange={(e) =>
-                        handleRoleChange(user.id, e.target.value as UserRole)
-                      }
-                      disabled={updateRole.isPending}
-                      className="input text-sm w-full"
-                    >
-                      <option value="ADMIN">Admin</option>
-                      <option value="CLAN_LEADER">Líder</option>
-                      <option value="USER">Usuario</option>
-                    </select>
+                    {isAdmin ? (
+                      <select
+                        value={user.role}
+                        onChange={(e) =>
+                          handleRoleChange(user.id, e.target.value as UserRole)
+                        }
+                        disabled={updateRole.isPending}
+                        className="input text-sm w-full"
+                      >
+                        <option value="ADMIN">Admin</option>
+                        <option value="CLAN_LEADER">Líder</option>
+                        <option value="USER">Usuario</option>
+                      </select>
+                    ) : (
+                      <div className="input text-sm w-full bg-gray-100 dark:bg-gray-800 cursor-not-allowed">
+                        {getRoleLabel(user.role)}
+                      </div>
+                    )}
                   </div>
 
+                  {/* Control de Estado - Admin y Líder de Clan pueden editar */}
                   <div>
                     <label className="block text-xs font-medium text-military-600 dark:text-gray-400 mb-1">
                       Estado
@@ -272,6 +293,13 @@ export default function UsersPage() {
                     </select>
                   </div>
                 </div>
+
+                {/* Nota informativa para líderes de clan */}
+                {isClanLeader && (
+                  <div className="mt-3 text-xs text-military-500 dark:text-gray-500 italic">
+                    * Solo puedes cambiar el estado, no el rol
+                  </div>
+                )}
               </Card>
             ))}
           </div>

@@ -4,7 +4,8 @@ import { useEvent, useCreateEventFromTemplate } from '../../hooks/useEvents';
 import { ArrowLeft, Save, Copy } from 'lucide-react';
 import { Card } from '../../components/ui/Card';
 import { LoadingSpinner } from '../../components/ui/LoadingSpinner';
-import type { GameType } from '../../types';
+import { BriefingEditorWithTemplates } from '../../components/events/BriefingEditor/BriefingEditorWithTemplates';
+import '../../components/events/BriefingEditor/BriefingEditor.css';
 
 export default function CreateEventFromTemplatePage() {
   const { templateId } = useParams<{ templateId: string }>();
@@ -184,18 +185,16 @@ export default function CreateEventFromTemplatePage() {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-military-700 mb-1">
-                Briefing (HTML)
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Briefing del Evento
               </label>
-              <textarea
-                value={briefing}
-                onChange={(e) => setBriefing(e.target.value)}
-                className="input font-mono text-sm"
-                rows={6}
-                placeholder="<h1>Briefing</h1><p>Objetivo: Capturar la base enemiga...</p>"
+              <BriefingEditorWithTemplates
+                content={briefing}
+                onChange={setBriefing}
+                placeholder="Edita el briefing del evento..."
               />
-              <p className="text-xs text-military-500 mt-1">
-                Puedes usar HTML para dar formato al briefing
+              <p className="text-xs text-gray-500 mt-2">
+                💡 El briefing se ha copiado de la plantilla. Puedes editarlo libremente.
               </p>
             </div>
           </div>

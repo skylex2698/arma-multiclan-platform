@@ -23,12 +23,12 @@
   },
   "dependencies": {
     "@prisma/client": "5.22.0",
-    "@types/multer": "^2.0.0",
     "cors": "^2.8.5",
     "dotenv": "^17.2.3",
     "express": "^5.2.1",
     "multer": "^2.0.2",
-    "prisma": "5.22.0"
+    "prisma": "5.22.0",
+    "sharp": "^0.34.5"
   },
   "devDependencies": {
     "@types/bcryptjs": "^2.4.6",
@@ -36,6 +36,7 @@
     "@types/express": "^5.0.6",
     "@types/express-validator": "^2.20.33",
     "@types/jsonwebtoken": "^9.0.10",
+    "@types/multer": "^2.0.0",
     "@types/node": "^25.0.9",
     "bcryptjs": "^3.0.3",
     "express-validator": "^7.3.1",

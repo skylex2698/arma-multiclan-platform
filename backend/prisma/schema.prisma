@@ -71,6 +71,8 @@ model User {
   
   createdAt         DateTime    @default(now())
   updatedAt         DateTime    @updatedAt
+
+  uploadedImages Image[]
   
   @@index([clanId])
   @@index([status])
@@ -113,6 +115,8 @@ model Event {
   
   createdAt       DateTime    @default(now())
   updatedAt       DateTime    @updatedAt
+
+  images      Image[]
   
   @@index([status])
   @@index([scheduledDate])
@@ -267,4 +271,26 @@ model AuditLog {
   @@index([entity, entityId])
   @@index([userId])
   @@index([createdAt])
+}
+
+model Image {
+  id               String   @id @default(uuid())
+  
+  eventId          String
+  event            Event    @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  
+  filename         String
+  originalName     String
+  url              String
+  size             Int
+  mimetype         String
+  
+  uploadedBy       String?
+  uploadedByUser   User?    @relation(fields: [uploadedBy], references: [id], onDelete: SetNull)
+  
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+  
+  @@index([eventId])
+  @@index([uploadedBy])
 }

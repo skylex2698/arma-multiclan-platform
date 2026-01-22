@@ -4,6 +4,7 @@ import { useUpdateProfile, useChangePassword } from '../../hooks/useUsers';
 import { Card } from '../../components/ui/Card';
 import { Badge } from '../../components/ui/Badge';
 import { UserAvatar } from '../../components/ui/UserAvatar';
+import { ClanChangeRequestForm } from '../../components/profile/ClanChangeRequestForm';
 import {
   User,
   Mail,
@@ -393,6 +394,9 @@ export default function ProfilePage() {
           </p>
         )}
       </Card>
+
+      {/* Solicitar cambio de clan */}
+      <ClanChangeRequestForm currentClanId={user.clanId} />
     </div>
   );
 }

@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Users, Search, Filter } from 'lucide-react';
-import { useUsers, useUpdateUserRole, useUpdateUserStatus } from '../../hooks/useUsers';
+import { useUsers, useUpdateUserRole, useUpdateUserStatus, useChangeUserClan } from '../../hooks/useUsers';
+import { useClans } from '../../hooks/useClans';
 import { LoadingSpinner } from '../../components/ui/LoadingSpinner';
 import { Card } from '../../components/ui/Card';
 import { Badge } from '../../components/ui/Badge';
@@ -27,6 +28,10 @@ export default function UsersPage() {
 
   const updateRole = useUpdateUserRole();
   const updateStatus = useUpdateUserStatus();
+  const changeClan = useChangeUserClan();
+
+  const { data: clansData } = useClans();
+  const allClans = clansData?.clans || [];
 
   const users = data?.users || [];
 
@@ -54,6 +59,14 @@ export default function UsersPage() {
       await updateStatus.mutateAsync({ userId, status: newStatus });
     } catch (err) {
       console.error('Error al actualizar estado:', err);
+    }
+  };
+
+  const handleClanChange = async (userId: string, newClanId: string) => {
+    try {
+      await changeClan.mutateAsync({ userId, clanId: newClanId === 'null' ? null : newClanId });
+    } catch (err) {
+      console.error('Error al actualizar clan:', err);
     }
   };
 
@@ -234,20 +247,8 @@ export default function UsersPage() {
                   📧 {user.email}
                 </p>
 
-                {/* Clan */}
-                <div className="mb-4">
-                  <p className="text-xs font-semibold text-military-600 dark:text-gray-400 mb-1">
-                    Clan:
-                  </p>
-                  <div className="bg-white dark:bg-gray-700 rounded p-2 border border-military-200 dark:border-gray-600">
-                    <p className="text-sm font-medium text-military-900 dark:text-gray-100">
-                      {user.clan ? `${user.clan.tag} ${user.clan.name}` : 'Sin clan'}
-                    </p>
-                  </div>
-                </div>
-
                 {/* Controles */}
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-3 gap-3 mb-3">
                   {/* Control de Rol - Solo Admin puede ver y editar */}
                   <div>
                     <label className="block text-xs font-medium text-military-600 dark:text-gray-400 mb-1">
@@ -291,6 +292,32 @@ export default function UsersPage() {
                       <option value="BLOCKED">Bloqueado</option>
                       <option value="BANNED">Baneado</option>
                     </select>
+                  </div>
+
+                  {/* Control de Clan - Solo Admin puede editar */}
+                  <div>
+                    <label className="block text-xs font-medium text-military-600 dark:text-gray-400 mb-1">
+                      Clan
+                    </label>
+                    {isAdmin ? (
+                      <select
+                        value={user.clanId || 'null'}
+                        onChange={(e) => handleClanChange(user.id, e.target.value)}
+                        disabled={changeClan.isPending}
+                        className="input text-sm w-full"
+                      >
+                        <option value="null">Sin clan</option>
+                        {allClans.map((clan) => (
+                          <option key={clan.id} value={clan.id}>
+                            [{clan.tag}] {clan.name}
+                          </option>
+                        ))}
+                      </select>
+                    ) : (
+                      <div className="input text-sm w-full bg-gray-100 dark:bg-gray-800 cursor-not-allowed">
+                        {user.clan ? `[${user.clan.tag}] ${user.clan.name}` : 'Sin clan'}
+                      </div>
+                    )}
                   </div>
                 </div>
 

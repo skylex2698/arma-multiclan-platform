@@ -128,4 +128,13 @@ export const userService = {
     );
     return response.data.data;
   },
+
+  // Solicitar cambio de clan
+  requestClanChange: async (targetClanId: string, reason?: string): Promise<{ request: ClanChangeRequest }> => {
+    const response = await api.post<ApiResponse<{ request: ClanChangeRequest }>>(
+      '/users/clan-change-request',
+      { targetClanId, reason }
+    );
+    return response.data.data;
+  },
 };

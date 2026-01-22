@@ -225,33 +225,51 @@ export class UserService {
       data: {
         clanId: newClanId,
         role: newRole
+      },
+      include: {
+        clan: {
+          select: {
+            id: true,
+            name: true,
+            tag: true,
+            avatarUrl: true
+          }
+        }
       }
     });
 
-    // Registrar en historial de clanes
-    await prisma.clanHistory.create({
-      data: {
-        userId,
-        previousClan: user.clan?.name || null,
-        newClan: newClanId ? (await prisma.clan.findUnique({ where: { id: newClanId } }))?.name || null : null,
-        reason: 'Cambio realizado por administrador'
-      }
-    });
+    // Registrar en historial de clanes (opcional, no bloquear si falla)
+    try {
+      await prisma.clanHistory.create({
+        data: {
+          userId,
+          previousClan: user.clan?.name || null,
+          newClan: newClanId ? (await prisma.clan.findUnique({ where: { id: newClanId } }))?.name || null : null,
+          reason: 'Cambio realizado por administrador'
+        }
+      });
+    } catch (error) {
+      logger.warn('Failed to create clan history record', { error });
+    }
 
-    // Registrar en audit log
-    await prisma.auditLog.create({
-      data: {
-        action: 'USER_CLAN_CHANGED',
-        entity: 'User',
-        entityId: userId,
-        userId: adminId,
-        details: JSON.stringify({
-          previousClanId: user.clanId,
-          newClanId,
-          roleChanged: user.role !== newRole
-        })
-      }
-    });
+    // Registrar en audit log (opcional, no bloquear si falla)
+    try {
+      await prisma.auditLog.create({
+        data: {
+          action: 'USER_CLAN_CHANGED',
+          entity: 'User',
+          entityId: userId,
+          userId: adminId,
+          details: JSON.stringify({
+            previousClanId: user.clanId,
+            newClanId,
+            roleChanged: user.role !== newRole
+          })
+        }
+      });
+    } catch (error) {
+      logger.warn('Failed to create audit log record', { error });
+    }
 
     logger.info('User clan changed', { userId, previousClanId: user.clanId, newClanId, adminId });
 

@@ -116,17 +116,17 @@ export class UserController {
     }
   }
 
-  // PUT /api/users/:id/clan
+  // PUT /api/users/:userId/clan
   async changeUserClan(req: Request, res: Response) {
     try {
-      const id = req.params.id as string;
+      const userId = req.params.userId as string;
       const { clanId } = req.body;
 
       if (!req.user) {
         return errorResponse(res, 'No autenticado', 401);
       }
 
-      const user = await userService.changeUserClan(id, clanId || null, req.user.id);
+      const user = await userService.changeUserClan(userId, clanId || null, req.user.id);
 
       return successResponse(res, { user }, 'Clan actualizado correctamente');
     } catch (error: any) {

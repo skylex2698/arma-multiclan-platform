@@ -17,6 +17,7 @@ import ClanDetailPage from './pages/clanes/ClanDetailPage';
 import CreateClanPage from './pages/clanes/CreateClanPage';
 import EditClanPage from './pages/clanes/EditClanPage';
 import UsersPage from './pages/users/UsersPage';
+import ClanChangeRequestsPage from './pages/users/ClanChangeRequestsPage';
 import ProfilePage from './pages/profile/ProfilePage';
 import EditCommunicationTreePage from './pages/events/EditCommunicationTreePage';
 
@@ -173,6 +174,14 @@ export const router = createBrowserRouter([
     element: (
       <AdminOrClanLeaderRoute>
         <UsersPage />
+      </AdminOrClanLeaderRoute>
+    ),
+  },
+  {
+    path: '/users/requests',
+    element: (
+      <AdminOrClanLeaderRoute>
+        <ClanChangeRequestsPage />
       </AdminOrClanLeaderRoute>
     ),
   },

@@ -67,6 +67,15 @@ export class AuthController {
 
       const result = await authService.loginLocal(email, password);
 
+      // Establecer JWT en cookie httpOnly (además de devolverlo en el body por compatibilidad)
+      setJWTCookie(res, {
+        userId: result.user.id,
+        role: result.user.role,
+        clanId: result.user.clanId || undefined,
+      });
+
+      logger.audit('USER_LOGIN', result.user.id, { method: 'local', ip: req.ip });
+
       return successResponse(res, result, 'Login exitoso');
     } catch (error: any) {
       logger.error('Error in loginLocal', error);
@@ -251,10 +260,17 @@ export class AuthController {
     }
   }
 
-  // POST /api/auth/logout - Logout (clear JWT cookie)
+  // POST /api/auth/logout - Logout (clear JWT cookie and blacklist token)
   async logout(req: Request, res: Response) {
     try {
-      clearJWTCookie(res);
+      // Obtener el token actual para añadirlo a la blacklist
+      const token = req.cookies?.token;
+
+      // Limpiar cookie y revocar token
+      clearJWTCookie(res, token);
+
+      logger.audit('USER_LOGOUT', req.user?.id, { ip: req.ip });
+
       return successResponse(res, null, 'Logout exitoso');
     } catch (error: any) {
       logger.error('Error in logout', error);

@@ -1,17 +1,64 @@
-const jwt = require('jsonwebtoken');
+import jwt, { SignOptions, VerifyOptions } from 'jsonwebtoken';
 import { Response } from 'express';
 import { JWTPayload } from '../types';
 
-const JWT_SECRET = process.env.JWT_SECRET || 'fallback-secret-change-in-production';
-const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '7d';
+// ============================================
+// SEGURIDAD: Validación estricta de JWT_SECRET
+// ============================================
+
+const JWT_SECRET: jwt.Secret = process.env.JWT_SECRET as string;
+
+if (!JWT_SECRET) {
+  console.error('FATAL: JWT_SECRET environment variable is required');
+  process.exit(1);
+}
+
+if (JWT_SECRET.length < 32) {
+  console.error('FATAL: JWT_SECRET must be at least 32 characters long');
+  process.exit(1);
+}
+
+// Reducido de 7d a 24h por seguridad
+const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '24h';
+
+// ============================================
+// Token Blacklist para revocación de tokens
+// ============================================
+
+const tokenBlacklist = new Set<string>();
+
+export const blacklistToken = (token: string): void => {
+  tokenBlacklist.add(token);
+  // Auto-limpiar después del tiempo de expiración máximo (24h)
+  setTimeout(() => tokenBlacklist.delete(token), 24 * 60 * 60 * 1000);
+};
+
+export const isTokenBlacklisted = (token: string): boolean => {
+  return tokenBlacklist.has(token);
+};
+
+// ============================================
+// Funciones de generación y verificación
+// ============================================
 
 export const generateToken = (payload: JWTPayload): string => {
-  return jwt.sign(payload, JWT_SECRET, { expiresIn: JWT_EXPIRES_IN });
+  return jwt.sign(payload, JWT_SECRET, {
+    expiresIn: JWT_EXPIRES_IN as jwt.SignOptions['expiresIn'],
+    algorithm: 'HS256' // Algoritmo explícito para prevenir confusion attacks
+  } as SignOptions);
 };
 
 export const verifyToken = (token: string): JWTPayload | null => {
   try {
-    return jwt.verify(token, JWT_SECRET) as JWTPayload;
+    // Verificar si está en la blacklist
+    if (isTokenBlacklisted(token)) {
+      return null;
+    }
+
+    const options: VerifyOptions = {
+      algorithms: ['HS256'] // Solo aceptar HS256
+    };
+    return jwt.verify(token, JWT_SECRET, options) as JWTPayload;
   } catch (error) {
     return null;
   }
@@ -25,26 +72,26 @@ export const decodeToken = (token: string): JWTPayload | null => {
   }
 };
 
-/**
- * Opciones de cookie para JWT
- */
+// ============================================
+// Opciones de cookie para JWT
+// ============================================
+
 const getCookieOptions = () => {
-  const isSecure = process.env.COOKIE_SECURE === 'true';
-  const sameSite = (process.env.COOKIE_SAMESITE || 'lax') as 'strict' | 'lax' | 'none';
+  const isProduction = process.env.NODE_ENV === 'production';
+  const isSecure = process.env.COOKIE_SECURE === 'true' || isProduction;
+  const sameSite = (process.env.COOKIE_SAMESITE || (isProduction ? 'strict' : 'lax')) as 'strict' | 'lax' | 'none';
 
   return {
     httpOnly: true,
     secure: isSecure,
     sameSite,
     path: '/',
-    maxAge: 7 * 24 * 60 * 60 * 1000, // 7 días en milisegundos
+    maxAge: 24 * 60 * 60 * 1000, // 24 horas (sincronizado con JWT_EXPIRES_IN)
   };
 };
 
 /**
  * Establece el JWT en una cookie httpOnly
- * @param res - Response de Express
- * @param payload - Payload del JWT
  */
 export const setJWTCookie = (res: Response, payload: JWTPayload): void => {
   const token = generateToken(payload);
@@ -52,13 +99,17 @@ export const setJWTCookie = (res: Response, payload: JWTPayload): void => {
 };
 
 /**
- * Limpia la cookie del JWT (logout)
- * @param res - Response de Express
+ * Limpia la cookie del JWT (logout) y añade el token a la blacklist
  */
-export const clearJWTCookie = (res: Response): void => {
+export const clearJWTCookie = (res: Response, token?: string): void => {
+  // Añadir token a la blacklist si se proporciona
+  if (token) {
+    blacklistToken(token);
+  }
+
   res.clearCookie('token', {
     httpOnly: true,
-    secure: process.env.COOKIE_SECURE === 'true',
+    secure: process.env.COOKIE_SECURE === 'true' || process.env.NODE_ENV === 'production',
     sameSite: (process.env.COOKIE_SAMESITE || 'lax') as 'strict' | 'lax' | 'none',
     path: '/',
   });

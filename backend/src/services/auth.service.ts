@@ -1,6 +1,7 @@
 import { prisma } from '../config/database';
 import { hashPassword, comparePassword } from '../utils/password';
 import { generateToken } from '../utils/jwt';
+import { encrypt } from '../utils/encryption';
 import { logger } from '../utils/logger';
 import { UserStatus, UserRole } from '@prisma/client';
 
@@ -288,7 +289,7 @@ export class AuthService {
         }
       });
 
-      // Upsert OAuthAccount
+      // Upsert OAuthAccount con tokens cifrados
       await prisma.oAuthAccount.upsert({
         where: {
           provider_providerAccountId: {
@@ -300,15 +301,17 @@ export class AuthService {
           userId: user.id,
           provider: 'discord',
           providerAccountId: data.discordId,
-          accessToken: data.accessToken,
-          refreshToken: data.refreshToken,
+          // SEGURIDAD: Cifrar tokens antes de almacenar
+          accessToken: encrypt(data.accessToken),
+          refreshToken: data.refreshToken ? encrypt(data.refreshToken) : null,
           tokenType: 'Bearer',
           scope: data.scope,
           expiresAt,
         },
         update: {
-          accessToken: data.accessToken,
-          refreshToken: data.refreshToken,
+          // SEGURIDAD: Cifrar tokens antes de almacenar
+          accessToken: encrypt(data.accessToken),
+          refreshToken: data.refreshToken ? encrypt(data.refreshToken) : null,
           tokenType: 'Bearer',
           scope: data.scope,
           expiresAt,
@@ -358,14 +361,15 @@ export class AuthService {
       }
     });
 
-    // Crear OAuthAccount
+    // Crear OAuthAccount con tokens cifrados
     await prisma.oAuthAccount.create({
       data: {
         userId: newUser.id,
         provider: 'discord',
         providerAccountId: data.discordId,
-        accessToken: data.accessToken,
-        refreshToken: data.refreshToken,
+        // SEGURIDAD: Cifrar tokens antes de almacenar
+        accessToken: encrypt(data.accessToken),
+        refreshToken: data.refreshToken ? encrypt(data.refreshToken) : null,
         tokenType: 'Bearer',
         scope: data.scope,
         expiresAt,
@@ -445,7 +449,7 @@ export class AuthService {
       }
     });
 
-    // Upsert OAuthAccount
+    // Upsert OAuthAccount con tokens cifrados
     await prisma.oAuthAccount.upsert({
       where: {
         provider_providerAccountId: {
@@ -457,16 +461,18 @@ export class AuthService {
         userId: data.userId,
         provider: 'discord',
         providerAccountId: data.discordId,
-        accessToken: data.accessToken,
-        refreshToken: data.refreshToken,
+        // SEGURIDAD: Cifrar tokens antes de almacenar
+        accessToken: encrypt(data.accessToken),
+        refreshToken: data.refreshToken ? encrypt(data.refreshToken) : null,
         tokenType: 'Bearer',
         scope: data.scope,
         expiresAt,
       },
       update: {
         userId: data.userId, // Actualizar userId en caso de que existiera con otro user
-        accessToken: data.accessToken,
-        refreshToken: data.refreshToken,
+        // SEGURIDAD: Cifrar tokens antes de almacenar
+        accessToken: encrypt(data.accessToken),
+        refreshToken: data.refreshToken ? encrypt(data.refreshToken) : null,
         tokenType: 'Bearer',
         scope: data.scope,
         expiresAt,

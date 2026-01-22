@@ -1,6 +1,8 @@
 import { Request, Response } from 'express';
+import path from 'path';
 import { clanService } from '../services/clan.service';
 import { prisma } from '../config/database';
+import { validateFileType, deleteFile } from '../config/multer.config';
 
 const handleError = (res: Response, error: unknown) => {
   if (error instanceof Error) {
@@ -154,6 +156,19 @@ class ClanController {
         return res.status(400).json({
           success: false,
           message: 'No se proporcionó ningún archivo',
+        });
+      }
+
+      // SEGURIDAD: Validar magic bytes del archivo
+      const filePath = path.join(process.cwd(), 'public', 'uploads', 'clans', req.file.filename);
+      const isValidFile = await validateFileType(filePath);
+
+      if (!isValidFile) {
+        // Eliminar archivo inválido
+        deleteFile(filePath);
+        return res.status(400).json({
+          success: false,
+          message: 'El archivo no es una imagen válida',
         });
       }
 

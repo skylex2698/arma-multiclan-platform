@@ -2,6 +2,7 @@
 
 import { prisma } from '../index';
 import { logger } from '../utils/logger';
+import { sanitizeHTML } from '../utils/sanitizer';
 import { EventStatus, GameType, UserRole, SlotStatus } from '@prisma/client';
 
 export class EventService {
@@ -179,7 +180,8 @@ export class EventService {
       data: {
         name: data.name,
         description: data.description,
-        briefing: data.briefing,
+        // SEGURIDAD: Sanitizar HTML del briefing para prevenir XSS
+        briefing: data.briefing ? sanitizeHTML(data.briefing) : undefined,
         gameType: data.gameType,
         scheduledDate: data.scheduledDate,
         creatorId: data.creatorId,
@@ -274,7 +276,8 @@ export class EventService {
       data: {
         name: data.name,
         description: data.description,
-        briefing: data.briefing,
+        // SEGURIDAD: Sanitizar HTML del briefing para prevenir XSS
+        briefing: data.briefing ? sanitizeHTML(data.briefing) : undefined,
         gameType: templateEvent.gameType,
         scheduledDate: data.scheduledDate,
         creatorId: data.creatorId,
@@ -492,7 +495,8 @@ export class EventService {
       data: {
         name: data.name,
         description: data.description,
-        briefing: data.briefing,
+        // SEGURIDAD: Sanitizar HTML del briefing para prevenir XSS
+        briefing: data.briefing ? sanitizeHTML(data.briefing) : undefined,
         gameType: data.gameType,
         scheduledDate: data.scheduledDate,
       },

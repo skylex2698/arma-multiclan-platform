@@ -48,7 +48,16 @@ squadRouter.post(
   slotController.createSlot.bind(slotController)
 );
 
-router.post('/:id/admin-assign', slotController.adminAssignSlot.bind(slotController));
-router.post('/:id/admin-unassign', slotController.adminUnassignSlot.bind(slotController));
+// SEGURIDAD: Rutas admin requieren autorización explícita
+router.post(
+  '/:id/admin-assign',
+  authorize(UserRole.ADMIN, UserRole.CLAN_LEADER),
+  slotController.adminAssignSlot.bind(slotController)
+);
+router.post(
+  '/:id/admin-unassign',
+  authorize(UserRole.ADMIN, UserRole.CLAN_LEADER),
+  slotController.adminUnassignSlot.bind(slotController)
+);
 
 export { router as slotRoutes, squadRouter };

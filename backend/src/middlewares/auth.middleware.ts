@@ -20,18 +20,28 @@ export const authenticate = async (
   next: NextFunction
 ) => {
   try {
-    // Obtener token del header
-    const authHeader = req.headers.authorization;
-    
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    let token: string | undefined;
+
+    // Prioridad 1: Leer token de cookie (httpOnly)
+    if (req.cookies && req.cookies.token) {
+      token = req.cookies.token;
+    }
+
+    // Prioridad 2: Leer token del header Authorization (backwards compatibility)
+    if (!token) {
+      const authHeader = req.headers.authorization;
+      if (authHeader && authHeader.startsWith('Bearer ')) {
+        token = authHeader.substring(7); // Remover 'Bearer '
+      }
+    }
+
+    if (!token) {
       return errorResponse(res, 'Token no proporcionado', 401);
     }
 
-    const token = authHeader.substring(7); // Remover 'Bearer '
-    
     // Verificar token
     const payload = verifyToken(token);
-    
+
     if (!payload) {
       return errorResponse(res, 'Token inválido o expirado', 401);
     }

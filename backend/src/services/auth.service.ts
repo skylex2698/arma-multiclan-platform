@@ -236,6 +236,260 @@ export class AuthService {
       }
     };
   }
+
+  /**
+   * Upsert user from Discord OAuth2
+   * Crea un nuevo usuario o actualiza uno existente basándose en Discord ID
+   * También crea/actualiza el OAuthAccount para almacenar tokens
+   */
+  async upsertUserFromDiscord(data: {
+    discordId: string;
+    discordUsername: string;
+    email?: string;
+    accessToken: string;
+    refreshToken?: string;
+    expiresIn: number;
+    scope: string;
+  }) {
+    const expiresAt = Math.floor(Date.now() / 1000) + data.expiresIn;
+
+    // Buscar usuario existente por Discord ID
+    let user = await prisma.user.findUnique({
+      where: { discordId: data.discordId },
+      include: {
+        clan: {
+          select: {
+            id: true,
+            name: true,
+            tag: true,
+            avatarUrl: true,
+          }
+        }
+      }
+    });
+
+    if (user) {
+      // Usuario existe: actualizar info Discord
+      user = await prisma.user.update({
+        where: { id: user.id },
+        data: {
+          discordUsername: data.discordUsername,
+          email: data.email || user.email,
+        },
+        include: {
+          clan: {
+            select: {
+              id: true,
+              name: true,
+              tag: true,
+              avatarUrl: true,
+            }
+          }
+        }
+      });
+
+      // Upsert OAuthAccount
+      await prisma.oAuthAccount.upsert({
+        where: {
+          provider_providerAccountId: {
+            provider: 'discord',
+            providerAccountId: data.discordId,
+          }
+        },
+        create: {
+          userId: user.id,
+          provider: 'discord',
+          providerAccountId: data.discordId,
+          accessToken: data.accessToken,
+          refreshToken: data.refreshToken,
+          tokenType: 'Bearer',
+          scope: data.scope,
+          expiresAt,
+        },
+        update: {
+          accessToken: data.accessToken,
+          refreshToken: data.refreshToken,
+          tokenType: 'Bearer',
+          scope: data.scope,
+          expiresAt,
+        }
+      });
+
+      logger.info('User logged in via Discord OAuth2', { userId: user.id });
+
+      return {
+        user: {
+          id: user.id,
+          email: user.email,
+          nickname: user.nickname,
+          role: user.role,
+          status: user.status,
+          clanId: user.clanId,
+          avatarUrl: user.avatarUrl,
+          clan: user.clan,
+          discordId: user.discordId,
+          discordUsername: user.discordUsername,
+        },
+        isNewUser: false,
+      };
+    }
+
+    // Usuario no existe: crear nuevo en estado PENDING
+    // Se requiere que el usuario complete su registro (nickname + clan)
+    // Por ahora, creamos un usuario temporal con nickname = discordUsername
+    const newUser = await prisma.user.create({
+      data: {
+        discordId: data.discordId,
+        discordUsername: data.discordUsername,
+        email: data.email,
+        nickname: data.discordUsername, // Temporal
+        status: UserStatus.PENDING,
+        role: UserRole.USER,
+      },
+      include: {
+        clan: {
+          select: {
+            id: true,
+            name: true,
+            tag: true,
+            avatarUrl: true,
+          }
+        }
+      }
+    });
+
+    // Crear OAuthAccount
+    await prisma.oAuthAccount.create({
+      data: {
+        userId: newUser.id,
+        provider: 'discord',
+        providerAccountId: data.discordId,
+        accessToken: data.accessToken,
+        refreshToken: data.refreshToken,
+        tokenType: 'Bearer',
+        scope: data.scope,
+        expiresAt,
+      }
+    });
+
+    logger.info('New user created via Discord OAuth2', { userId: newUser.id });
+
+    return {
+      user: {
+        id: newUser.id,
+        email: newUser.email,
+        nickname: newUser.nickname,
+        role: newUser.role,
+        status: newUser.status,
+        clanId: newUser.clanId,
+        avatarUrl: newUser.avatarUrl,
+        clan: newUser.clan,
+        discordId: newUser.discordId,
+        discordUsername: newUser.discordUsername,
+      },
+      isNewUser: true,
+    };
+  }
+
+  /**
+   * Link Discord account to existing user (account linking)
+   * Requiere que el usuario esté autenticado
+   */
+  async linkDiscordAccount(data: {
+    userId: string;
+    discordId: string;
+    discordUsername: string;
+    email?: string;
+    accessToken: string;
+    refreshToken?: string;
+    expiresIn: number;
+    scope: string;
+  }) {
+    const expiresAt = Math.floor(Date.now() / 1000) + data.expiresIn;
+
+    // Verificar que el usuario existe
+    const user = await prisma.user.findUnique({
+      where: { id: data.userId }
+    });
+
+    if (!user) {
+      throw new Error('Usuario no encontrado');
+    }
+
+    // Verificar que el Discord ID no esté ya vinculado a otro usuario
+    const existingDiscordUser = await prisma.user.findUnique({
+      where: { discordId: data.discordId }
+    });
+
+    if (existingDiscordUser && existingDiscordUser.id !== data.userId) {
+      throw new Error('Esta cuenta de Discord ya está vinculada a otro usuario');
+    }
+
+    // Actualizar usuario con info de Discord
+    const updatedUser = await prisma.user.update({
+      where: { id: data.userId },
+      data: {
+        discordId: data.discordId,
+        discordUsername: data.discordUsername,
+        email: data.email || user.email,
+      },
+      include: {
+        clan: {
+          select: {
+            id: true,
+            name: true,
+            tag: true,
+            avatarUrl: true,
+          }
+        }
+      }
+    });
+
+    // Upsert OAuthAccount
+    await prisma.oAuthAccount.upsert({
+      where: {
+        provider_providerAccountId: {
+          provider: 'discord',
+          providerAccountId: data.discordId,
+        }
+      },
+      create: {
+        userId: data.userId,
+        provider: 'discord',
+        providerAccountId: data.discordId,
+        accessToken: data.accessToken,
+        refreshToken: data.refreshToken,
+        tokenType: 'Bearer',
+        scope: data.scope,
+        expiresAt,
+      },
+      update: {
+        userId: data.userId, // Actualizar userId en caso de que existiera con otro user
+        accessToken: data.accessToken,
+        refreshToken: data.refreshToken,
+        tokenType: 'Bearer',
+        scope: data.scope,
+        expiresAt,
+      }
+    });
+
+    logger.info('Discord account linked to user', { userId: data.userId, discordId: data.discordId });
+
+    return {
+      user: {
+        id: updatedUser.id,
+        email: updatedUser.email,
+        nickname: updatedUser.nickname,
+        role: updatedUser.role,
+        status: updatedUser.status,
+        clanId: updatedUser.clanId,
+        avatarUrl: updatedUser.avatarUrl,
+        clan: updatedUser.clan,
+        discordId: updatedUser.discordId,
+        discordUsername: updatedUser.discordUsername,
+      }
+    };
+  }
 }
 
 export const authService = new AuthService();

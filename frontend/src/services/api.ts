@@ -7,11 +7,13 @@ export const api = axios.create({
   headers: {
     'Content-Type': 'application/json',
   },
+  withCredentials: true, // Enviar cookies httpOnly en peticiones
 });
 
-// Interceptor para agregar token a todas las peticiones
+// Interceptor para agregar token a todas las peticiones (backwards compatibility)
 api.interceptors.request.use(
   (config) => {
+    // Mantener compatibilidad con Bearer token para clientes antiguos
     const token = localStorage.getItem('token');
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;

@@ -54,24 +54,25 @@ model User {
   nickname          String
   discordId         String?     @unique
   discordUsername   String?
-  
+
   status            UserStatus  @default(PENDING)
   avatarUrl         String?
   role              UserRole    @default(USER)
-  
+
   clanId            String?
   clan              Clan?       @relation(fields: [clanId], references: [id], onDelete: SetNull)
-  
+
   slots             Slot[]
   createdEvents     Event[]     @relation("EventCreator")
   auditLogs         AuditLog[]
   clanHistory       ClanHistory[]
   absences          Absence[]
   clanChangeRequests ClanChangeRequest[]
-  
+  oauthAccounts     OAuthAccount[]
+
   createdAt         DateTime    @default(now())
   updatedAt         DateTime    @updatedAt
-  
+
   @@index([clanId])
   @@index([status])
   @@index([discordId])
@@ -249,22 +250,43 @@ model CommunicationNode {
 
 model AuditLog {
   id          String   @id @default(uuid())
-  
+
   action      String   // Ej: "USER_VALIDATED", "SLOT_ASSIGNED", "EVENT_CREATED"
   entity      String   // Ej: "User", "Event", "Slot"
   entityId    String
-  
+
   userId      String?
   user        User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
-  
+
   eventId     String?
   event       Event?   @relation(fields: [eventId], references: [id], onDelete: SetNull)
-  
+
   details     String?  // JSON con detalles adicionales
-  
+
   createdAt   DateTime @default(now())
-  
+
   @@index([entity, entityId])
   @@index([userId])
   @@index([createdAt])
+}
+
+model OAuthAccount {
+  id                String   @id @default(uuid())
+  userId            String
+  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  provider          String   // "discord"
+  providerAccountId String   // Discord user ID
+
+  accessToken       String?  @db.Text
+  refreshToken      String?  @db.Text
+  tokenType         String?  // "Bearer"
+  scope             String?  // "identify email guilds"
+  expiresAt         Int?     // Unix timestamp (epoch seconds)
+
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  @@unique([provider, providerAccountId])
+  @@index([userId])
 }

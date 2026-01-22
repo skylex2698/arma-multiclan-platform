@@ -54,3 +54,6 @@ backend/public/uploads/*
 
 # Textos para ia
 textoIA.txt
+
+# Claude
+.claude

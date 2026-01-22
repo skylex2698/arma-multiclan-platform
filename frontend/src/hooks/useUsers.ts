@@ -12,7 +12,6 @@ export function useUsers(filters?: {
   return useQuery({
     queryKey: ['users', filters],
     queryFn: () => userService.getAll(filters),
-    enabled: !!filters,
   });
 }
 

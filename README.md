@@ -50,19 +50,33 @@ Plataforma web para gestión de eventos multijugador de Arma 3 y Arma Reforger e
 - **Líder de Clan**: Gestiona su clan y asigna miembros a eventos
 - **Usuario**: Participa en eventos
 
+### 🔗 Integración con Discord
+- **OAuth2 Login**: Inicia sesión con tu cuenta de Discord
+- **Vinculación de cuentas**: Conecta Discord a tu cuenta existente
+- **Actualización automática de tokens**: Refresh transparente sin pérdida de sesión
+- **Acceso a Discord API**:
+  - Obtener información de usuario
+  - Listar conexiones vinculadas
+  - Ver servidores del usuario
+- **Seguridad**: Tokens en cookies httpOnly, validación anti-CSRF, CORS configurado
+
+📖 **[Ver documentación completa](docs/discord-integration.md)**
+
 ---
 
 ## 🚀 Tecnologías
 
 ### Backend
 - **Node.js** + **TypeScript**
-- **Express** - Framework web
+- **Express 5** - Framework web
 - **Prisma** - ORM para PostgreSQL
 - **PostgreSQL** - Base de datos
 - **JWT** - Autenticación
 - **Bcrypt** - Encriptación de contraseñas
 - **Multer** - Subida de archivos
 - **Winston** - Logging
+- **cookie-parser** - Manejo de cookies httpOnly
+- **Discord OAuth2** - Autenticación con Discord
 
 ### Frontend
 - **React** + **TypeScript**
@@ -103,6 +117,16 @@ JWT_SECRET="tu-secreto-super-seguro-cambialo-en-produccion"
 JWT_EXPIRES_IN="7d"
 PORT=3000
 NODE_ENV="development"
+FRONTEND_URL="http://localhost:5173"
+
+# Discord OAuth2 (opcional - para login con Discord)
+DISCORD_CLIENT_ID=""
+DISCORD_CLIENT_SECRET=""
+DISCORD_REDIRECT_URI="http://localhost:3000/api/auth/discord/callback"
+
+# Cookies (opcional - ajustar en producción)
+COOKIE_SECURE="false"
+COOKIE_SAMESITE="lax"
 ```
 
 Ejecutar migraciones:
@@ -173,28 +197,43 @@ arma-multiclan-platform/
 │   ├── src/
 │   │   ├── config/            # Configuración (DB, Multer)
 │   │   ├── controllers/       # Lógica de endpoints
+│   │   │   ├── auth.controller.ts    # OAuth2 Discord
+│   │   │   └── discord.controller.ts # Discord API
 │   │   ├── middlewares/       # Auth, validaciones
 │   │   ├── routes/            # Rutas de API
+│   │   │   ├── auth.routes.ts
+│   │   │   └── discord.routes.ts
 │   │   ├── services/          # Lógica de negocio
+│   │   │   ├── auth.service.ts       # Vinculación Discord
+│   │   │   └── discord.service.ts    # Cliente OAuth2
 │   │   ├── types/             # TypeScript types
 │   │   ├── utils/             # Utilidades
+│   │   │   ├── crypto.ts      # Anti-CSRF state
+│   │   │   └── jwt.ts         # Cookies httpOnly
 │   │   └── index.ts           # Entry point
 │   └── public/uploads/        # Archivos subidos
 │
 ├── frontend/
 │   ├── src/
 │   │   ├── components/        # Componentes React
+│   │   │   ├── auth/          # DiscordLoginButton
 │   │   │   ├── clanes/
 │   │   │   ├── events/
 │   │   │   ├── layout/
 │   │   │   └── ui/
 │   │   ├── hooks/             # Custom hooks
 │   │   ├── pages/             # Páginas
+│   │   │   └── auth/          # DiscordCallbackPage
 │   │   ├── services/          # API calls
+│   │   │   ├── api.ts         # Axios con credentials
+│   │   │   └── discordApi.ts  # React Query hooks
 │   │   ├── store/             # Estado global
 │   │   ├── types/             # TypeScript types
 │   │   └── App.tsx
 │   └── public/
+│
+├── docs/
+│   └── discord-integration.md # Documentación completa
 │
 └── README.md
 ```
@@ -205,21 +244,30 @@ arma-multiclan-platform/
 
 - ✅ Contraseñas encriptadas con bcrypt
 - ✅ Tokens JWT con expiración
+- ✅ Tokens Discord en cookies httpOnly (no accesibles desde JavaScript)
+- ✅ Validación anti-CSRF con state para OAuth2
+- ✅ Actualización automática de tokens Discord
 - ✅ Validación de entrada en frontend y backend
 - ✅ Sanitización de datos
 - ✅ Subida de archivos restringida (tipos y tamaños)
-- ✅ CORS configurado
+- ✅ CORS configurado con credentials
 - ✅ Logs de auditoría para acciones importantes
 
 ---
 
 ## 🛣️ Roadmap
 
+### Funcionalidades Implementadas Recientemente
+- ✅ **Integración Discord OAuth2** - Login y vinculación de cuentas
+- ✅ **Tokens seguros** - Cookies httpOnly con refresh automático
+- ✅ **Discord API** - Acceso a información de usuario, conexiones y servidores
+
 ### Próximas Funcionalidades
 - [ ] **Perfil de usuario** - Ver y editar perfil personal
 - [ ] **Estadísticas** - Dashboard con métricas de eventos
 - [ ] **Notificaciones** - Alertas de eventos y cambios
-- [ ] **Integración Discord** - OAuth y bot de notificaciones
+- [ ] **Bot de Discord** - Gestión de roles y notificaciones automáticas
+- [ ] **Linked Roles** - Sincronización de roles entre plataforma y Discord
 - [ ] **Calendario visual** - Vista de eventos en calendario
 - [ ] **Modo oscuro** - Tema oscuro para la interfaz
 - [ ] **Exportar reportes** - Excel/PDF de eventos y asistencia

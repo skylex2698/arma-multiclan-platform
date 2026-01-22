@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "description": "Backend API para plataforma de gestión de eventos multiclan de Arma",
   "main": "src/index.ts",
-  "author": "Tu Nombre",
+  "author": "Skylex",
   "license": "MIT",
   "keywords": [
     "arma3",
@@ -23,7 +23,9 @@
   },
   "dependencies": {
     "@prisma/client": "5.22.0",
+    "@types/cookie-parser": "^1.4.10",
     "@types/multer": "^2.0.0",
+    "cookie-parser": "^1.4.7",
     "cors": "^2.8.5",
     "dotenv": "^17.2.3",
     "express": "^5.2.1",

@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import type { User } from '../types';
+import { api } from '../services/api';
 
 interface AuthState {
   user: User | null;
@@ -19,7 +20,11 @@ export const useAuthStore = create<AuthState>()(
       isAuthenticated: false,
 
       setAuth: (user, token) => {
-        localStorage.setItem('token', token);
+        // Solo guardar token en localStorage si existe (backwards compatibility)
+        // Para login con Discord, token será "" (vacío) porque se usa cookie httpOnly
+        if (token) {
+          localStorage.setItem('token', token);
+        }
         set({
           user,
           token,
@@ -27,13 +32,21 @@ export const useAuthStore = create<AuthState>()(
         });
       },
 
-      logout: () => {
-        localStorage.removeItem('token');
-        set({
-          user: null,
-          token: null,
-          isAuthenticated: false,
-        });
+      logout: async () => {
+        try {
+          // Llamar al endpoint de logout para limpiar cookie del servidor
+          await api.post('/auth/logout');
+        } catch (error) {
+          console.error('Error al hacer logout:', error);
+        } finally {
+          // Limpiar localStorage y estado local
+          localStorage.removeItem('token');
+          set({
+            user: null,
+            token: null,
+            isAuthenticated: false,
+          });
+        }
       },
 
       updateUser: (user) => {

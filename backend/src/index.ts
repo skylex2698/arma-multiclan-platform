@@ -2,8 +2,10 @@ import express from 'express';
 import cors from 'cors';
 import path from 'path';
 import dotenv from 'dotenv';
+import cookieParser from 'cookie-parser';
 import { PrismaClient } from '@prisma/client';
 import { authRoutes } from './routes/auth.routes';
+import { discordRoutes } from './routes/discord.routes';
 import { clanRoutes } from './routes/clan.routes';
 import { userRoutes } from './routes/user.routes';
 import eventRoutes from './routes/event.routes';
@@ -21,6 +23,7 @@ app.use(cors({
   origin: process.env.FRONTEND_URL || 'http://localhost:5173',
   credentials: true
 }));
+app.use(cookieParser());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
@@ -36,6 +39,7 @@ app.get('/health', (req, res) => {
 
 // Rutas
 app.use('/api/auth', authRoutes);
+app.use('/api/discord', discordRoutes);
 app.use('/api/clans', clanRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/events', eventRoutes);

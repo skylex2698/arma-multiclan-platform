@@ -4,6 +4,8 @@ import { MainLayout } from './components/layout/MainLayout';
 import { AdminOrClanLeaderRoute } from './components/routes/AdminOrClanLeaderRoute';
 import LoginPage from './pages/auth/LoginPage';
 import RegisterPage from './pages/auth/RegisterPage';
+import DiscordCallbackPage from './pages/auth/DiscordCallbackPage';
+import PendingApprovalPage from './pages/auth/PendingApprovalPage';
 import DashboardPage from './pages/dashboard/DashboardPage';
 import EventsPage from './pages/events/EventsPage';
 import EventDetailPage from './pages/events/EventDetailPage';
@@ -57,6 +59,18 @@ export const router = createBrowserRouter([
   {
     path: '/register',
     element: <RegisterPage />,
+  },
+  {
+    path: '/auth/discord/success',
+    element: <DiscordCallbackPage />,
+  },
+  {
+    path: '/auth/discord/callback',
+    element: <DiscordCallbackPage />,
+  },
+  {
+    path: '/auth/pending',
+    element: <PendingApprovalPage />,
   },
   {
     path: '/dashboard',

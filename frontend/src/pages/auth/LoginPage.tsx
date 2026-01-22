@@ -4,6 +4,7 @@ import { useAuthStore } from '../../store/authStore';
 import { authService } from '../../services/authService';
 import { Shield, Mail, Lock, LogIn } from 'lucide-react';
 import { APP_CONFIG } from '../../config/app.config';
+import { DiscordLoginButton } from '../../components/auth/DiscordLoginButton';
 
 export default function LoginPage() {
   const navigate = useNavigate();
@@ -107,6 +108,16 @@ export default function LoginPage() {
               {loading ? 'Iniciando sesión...' : 'Iniciar Sesión'}
             </button>
           </form>
+
+          {/* Separador */}
+          <div className="mt-6 mb-6 flex items-center">
+            <div className="flex-1 border-t border-military-200 dark:border-gray-600"></div>
+            <span className="px-4 text-sm text-military-500 dark:text-gray-400">o</span>
+            <div className="flex-1 border-t border-military-200 dark:border-gray-600"></div>
+          </div>
+
+          {/* Discord Login */}
+          <DiscordLoginButton />
 
           <div className="mt-6 text-center text-sm text-military-600">
             ¿No tienes cuenta?{' '}

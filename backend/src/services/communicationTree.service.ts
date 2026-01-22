@@ -1,4 +1,4 @@
-import { prisma } from '../config/database';
+import { prisma } from '../index';
 import { logger } from '../utils/logger';
 
 interface CreateNodeDto {

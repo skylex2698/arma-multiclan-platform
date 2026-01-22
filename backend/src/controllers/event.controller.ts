@@ -3,7 +3,7 @@ import { eventService } from '../services/event.service';
 import { successResponse, errorResponse } from '../utils/responses';
 import { logger } from '../utils/logger';
 import { EventStatus, GameType } from '@prisma/client';
-import { prisma } from '../config/database';
+import { prisma } from '../index';
 
 export class EventController {
   // GET /api/events

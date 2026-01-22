@@ -4,7 +4,7 @@ import { successResponse, errorResponse } from '../utils/responses';
 import { logger } from '../utils/logger';
 import { UserRole, UserStatus } from '@prisma/client';
 import { isValidEmail, sanitizeNickname, isStrongPassword } from '../utils/validators';
-import { prisma } from '../config/database';
+import { prisma } from '../index';
 
 export class UserController {
   // GET /api/users

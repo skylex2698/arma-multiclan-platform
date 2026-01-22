@@ -1,4 +1,4 @@
-import { prisma } from '../config/database';
+import { prisma } from '../index';
 import { hashPassword, comparePassword } from '../utils/password';
 import { generateToken } from '../utils/jwt';
 import { encrypt } from '../utils/encryption';

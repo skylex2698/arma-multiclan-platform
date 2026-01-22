@@ -164,6 +164,7 @@ export class EventService {
     scheduledDate: Date;
     creatorId: string;
     squads: Array<{
+      id?: string; // ID temporal del frontend para mapeo de jerarquía
       name: string;
       order: number;
       frequency?: string;
@@ -176,6 +177,16 @@ export class EventService {
       }>;
     }>;
   }) {
+    // Guardar referencias de jerarquía para procesarlas después
+    // El frontend envía IDs temporales (ej: "1672531200000") que no existen en la BD
+    const squadHierarchy = data.squads.map(squad => ({
+      tempId: squad.id,
+      parentTempId: squad.parentSquadId,
+      parentFrequency: squad.parentFrequency
+    }));
+
+    // Paso 1: Crear evento con squads SIN parentSquadId
+    // Esto evita errores de foreign key cuando los padres aún no existen
     const event = await prisma.event.create({
       data: {
         name: data.name,
@@ -193,8 +204,9 @@ export class EventService {
             // ========== CAMPOS DE COMUNICACIÓN ==========
             frequency: squad.frequency || null,
             isCommand: squad.isCommand || false,
-            parentSquadId: squad.parentSquadId || null,
-            parentFrequency: squad.parentFrequency || null,
+            // NO asignamos parentSquadId aquí - lo hacemos después
+            parentSquadId: null,
+            parentFrequency: null,
             // ============================================
             slots: {
               create: squad.slots.map(slot => ({
@@ -206,6 +218,58 @@ export class EventService {
           }))
         }
       },
+      include: {
+        creator: {
+          select: {
+            nickname: true
+          }
+        },
+        squads: {
+          include: {
+            slots: true
+          },
+          orderBy: { order: 'asc' }
+        }
+      }
+    });
+
+    // Paso 2: Crear mapeo de IDs temporales a IDs reales
+    // Los squads se crean en el mismo orden que se envían
+    const tempIdToRealId = new Map<string, string>();
+    event.squads.forEach((squad, index) => {
+      const tempId = squadHierarchy[index]?.tempId;
+      if (tempId) {
+        tempIdToRealId.set(tempId, squad.id);
+      }
+    });
+
+    // Paso 3: Actualizar squads que tienen jerarquía
+    const updatePromises: Promise<unknown>[] = [];
+    event.squads.forEach((squad, index) => {
+      const hierarchy = squadHierarchy[index];
+      if (hierarchy?.parentTempId) {
+        const realParentId = tempIdToRealId.get(hierarchy.parentTempId);
+        if (realParentId) {
+          updatePromises.push(
+            prisma.squad.update({
+              where: { id: squad.id },
+              data: {
+                parentSquadId: realParentId,
+                parentFrequency: hierarchy.parentFrequency || null
+              }
+            })
+          );
+        }
+      }
+    });
+
+    if (updatePromises.length > 0) {
+      await Promise.all(updatePromises);
+    }
+
+    // Recargar el evento con los datos actualizados de jerarquía
+    const finalEvent = await prisma.event.findUnique({
+      where: { id: event.id },
       include: {
         creator: {
           select: {
@@ -240,7 +304,7 @@ export class EventService {
 
     logger.info('Event created', { eventId: event.id, creatorId: data.creatorId });
 
-    return event;
+    return finalEvent!;
   }
 
   // Crear evento desde plantilla
@@ -388,12 +452,20 @@ export class EventService {
 
     // Si se envían escuadras, actualizar estructura completa
     if (data.squads) {
-      // 1. Eliminar escuadras y slots que ya no existen
-      const newSquadIds = data.squads
-        .filter((s) => s.id)
+      // Helper para verificar si un ID es un UUID válido (real de la BD)
+      const isRealUUID = (id: string | undefined): boolean => {
+        if (!id) return false;
+        const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+        return uuidRegex.test(id);
+      };
+
+      // 1. Eliminar escuadras que ya no existen
+      // Solo consideramos IDs reales (UUIDs) para identificar squads existentes
+      const realSquadIds = data.squads
+        .filter((s) => s.id && isRealUUID(s.id))
         .map((s) => s.id as string);
       const squadsToDelete = event.squads.filter(
-        (s) => !newSquadIds.includes(s.id)
+        (s) => !realSquadIds.includes(s.id)
       );
 
       for (const squad of squadsToDelete) {
@@ -402,27 +474,47 @@ export class EventService {
         });
       }
 
-      // 2. Actualizar o crear escuadras
-      for (const squadData of data.squads) {
-        if (squadData.id) {
+      // 2. Guardar info de jerarquía para procesarla después
+      const squadHierarchyInfo: Array<{
+        inputId?: string; // ID del frontend (puede ser temp o real)
+        parentInputId?: string; // parentSquadId del frontend
+        parentFrequency?: string;
+        index: number;
+      }> = data.squads.map((squad, index) => ({
+        inputId: squad.id,
+        parentInputId: squad.parentSquadId,
+        parentFrequency: squad.parentFrequency,
+        index
+      }));
+
+      // Mapeo de IDs de input a IDs reales
+      const inputIdToRealId = new Map<string, string>();
+
+      // 3. Actualizar o crear escuadras SIN parentSquadId primero
+      for (let i = 0; i < data.squads.length; i++) {
+        const squadData = data.squads[i];
+        const inputId = squadData.id;
+        const isExisting = inputId && isRealUUID(inputId);
+
+        if (isExisting) {
           // Actualizar escuadra existente
-          const existingSquad = event.squads.find((s) => s.id === squadData.id);
-          
+          const existingSquad = event.squads.find((s) => s.id === inputId);
+
           if (existingSquad) {
-            // Actualizar nombre, orden y CAMPOS DE COMUNICACIÓN
+            // Actualizar sin parentSquadId por ahora
             await prisma.squad.update({
-              where: { id: squadData.id },
+              where: { id: inputId },
               data: {
                 name: squadData.name,
                 order: squadData.order,
-                // ========== CAMPOS DE COMUNICACIÓN ==========
                 frequency: squadData.frequency || null,
                 isCommand: squadData.isCommand || false,
-                parentSquadId: squadData.parentSquadId || null,
-                parentFrequency: squadData.parentFrequency || null,
-                // ============================================
+                // NO actualizar parentSquadId aquí
               },
             });
+
+            // Registrar mapeo (ID real -> ID real)
+            inputIdToRealId.set(inputId, inputId);
 
             // Manejar slots
             const newSlotIds = squadData.slots
@@ -442,7 +534,6 @@ export class EventService {
             // Actualizar o crear slots
             for (const slotData of squadData.slots) {
               if (slotData.id) {
-                // Actualizar slot existente
                 await prisma.slot.update({
                   where: { id: slotData.id },
                   data: {
@@ -451,31 +542,28 @@ export class EventService {
                   },
                 });
               } else {
-                // Crear nuevo slot
                 await prisma.slot.create({
                   data: {
                     role: slotData.role,
                     order: slotData.order,
                     status: 'FREE',
-                    squadId: squadData.id,
+                    squadId: inputId,
                   },
                 });
               }
             }
           }
         } else {
-          // Crear nueva escuadra con sus slots
-          await prisma.squad.create({
+          // Crear nueva escuadra SIN parentSquadId
+          const newSquad = await prisma.squad.create({
             data: {
               name: squadData.name,
               order: squadData.order,
               eventId: id,
-              // ========== CAMPOS DE COMUNICACIÓN ==========
               frequency: squadData.frequency || null,
               isCommand: squadData.isCommand || false,
-              parentSquadId: squadData.parentSquadId || null,
-              parentFrequency: squadData.parentFrequency || null,
-              // ============================================
+              parentSquadId: null, // Se asignará después
+              parentFrequency: null,
               slots: {
                 create: squadData.slots.map((slot) => ({
                   role: slot.role,
@@ -485,6 +573,41 @@ export class EventService {
               },
             },
           });
+
+          // Registrar mapeo (ID temp -> ID real)
+          if (inputId) {
+            inputIdToRealId.set(inputId, newSquad.id);
+          }
+        }
+      }
+
+      // 4. Actualizar parentSquadId para todos los squads que tienen jerarquía
+      for (const hierarchy of squadHierarchyInfo) {
+        if (hierarchy.parentInputId) {
+          // Resolver el ID real del squad actual
+          const currentSquadRealId = hierarchy.inputId
+            ? inputIdToRealId.get(hierarchy.inputId)
+            : null;
+
+          // Resolver el ID real del padre
+          let parentRealId: string | null = null;
+          if (isRealUUID(hierarchy.parentInputId)) {
+            // El padre es un squad existente
+            parentRealId = hierarchy.parentInputId;
+          } else {
+            // El padre es un squad nuevo, buscar en el mapeo
+            parentRealId = inputIdToRealId.get(hierarchy.parentInputId) || null;
+          }
+
+          if (currentSquadRealId && parentRealId) {
+            await prisma.squad.update({
+              where: { id: currentSquadRealId },
+              data: {
+                parentSquadId: parentRealId,
+                parentFrequency: hierarchy.parentFrequency || null,
+              },
+            });
+          }
         }
       }
     }

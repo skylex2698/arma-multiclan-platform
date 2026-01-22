@@ -1,5 +1,5 @@
 import { Request, Response, NextFunction } from 'express';
-import { prisma } from '../config/database';
+import { prisma } from '../index';
 import { UserRole } from '@prisma/client';
 
 // Verificar si el usuario puede editar el árbol de comunicaciones del evento

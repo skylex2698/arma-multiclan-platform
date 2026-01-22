@@ -4,7 +4,7 @@ import { discordService } from '../services/discord.service';
 import { successResponse, errorResponse } from '../utils/responses';
 import { isValidEmail, isStrongPassword, sanitizeNickname } from '../utils/validators';
 import { logger } from '../utils/logger';
-import { prisma } from '../config/database';
+import { prisma } from '../index';
 import { generateState, validateState } from '../utils/crypto';
 import { setJWTCookie, clearJWTCookie } from '../utils/jwt';
 

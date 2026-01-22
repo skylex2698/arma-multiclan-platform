@@ -2,7 +2,7 @@ import { Request, Response } from 'express';
 import { slotService } from '../services/slot.service';
 import { successResponse, errorResponse } from '../utils/responses';
 import { logger } from '../utils/logger';
-import { prisma } from '../config/database';
+import { prisma } from '../index';
 
 export class SlotController {
   // POST /api/slots/:id/assign

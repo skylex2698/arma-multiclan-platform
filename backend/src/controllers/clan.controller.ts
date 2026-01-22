@@ -1,7 +1,7 @@
 import { Request, Response } from 'express';
 import path from 'path';
 import { clanService } from '../services/clan.service';
-import { prisma } from '../config/database';
+import { prisma } from '../index';
 import { validateFileType, deleteFile } from '../config/multer.config';
 
 const handleError = (res: Response, error: unknown) => {

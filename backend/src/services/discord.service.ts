@@ -1,5 +1,5 @@
 import { logger } from '../utils/logger';
-import { prisma } from '../config/database';
+import { prisma } from '../index';
 
 // ========== TYPES ==========
 

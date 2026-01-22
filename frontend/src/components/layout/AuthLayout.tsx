@@ -1,5 +1,5 @@
 import { Outlet } from 'react-router-dom';
-import { Shield } from 'lucide-react';
+import { Logo } from '../ui/Logo';
 
 export default function AuthLayout() {
   return (
@@ -7,9 +7,7 @@ export default function AuthLayout() {
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
           <div className="flex justify-center mb-4">
-            <div className="bg-primary-600 p-4 rounded-full">
-              <Shield className="w-12 h-12 text-white" />
-            </div>
+            <Logo size="lg" />
           </div>
           <h1 className="text-4xl font-bold text-white mb-2">
             Arma Events Platform

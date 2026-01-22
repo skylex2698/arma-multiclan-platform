@@ -1,5 +1,5 @@
-import { Shield } from 'lucide-react';
 import { APP_CONFIG } from '../../config/app.config';
+import { Logo } from '../ui/Logo';
 
 export function Footer() {
   return (
@@ -8,7 +8,7 @@ export function Footer() {
         <div className="flex flex-col md:flex-row items-center justify-between gap-4">
           {/* Logo y nombre */}
           <div className="flex items-center gap-2">
-            <Shield className="h-5 w-5 text-primary-600 dark:text-tactical-500" />
+            <Logo size="sm" />
             <span className="font-bold text-military-900 dark:text-gray-100">
               {APP_CONFIG.shortName}
             </span>

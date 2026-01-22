@@ -14,6 +14,7 @@ import {
 import { useAuthStore } from '../../store/authStore';
 import { UserAvatar } from '../ui/UserAvatar';
 import { ThemeToggle } from '../ui/ThemeToggle';
+import { Logo } from '../ui/Logo';
 import { Footer } from './Footer';
 import { APP_CONFIG } from '../../config/app.config';
 
@@ -56,10 +57,7 @@ export function MainLayout({ children }: MainLayoutProps) {
           <div className="flex items-center justify-between h-16">
             {/* Logo */}
             <Link to="/dashboard" className="flex items-center gap-3">
-              <div className="relative">
-                <Shield className="h-8 w-8 text-primary-600 dark:text-tactical-500" />
-                <div className="absolute inset-0 bg-primary-600 dark:bg-tactical-500 opacity-20 blur-lg"></div>
-              </div>
+              <Logo size="md" />
               <div className="hidden sm:block">
                 <span className="text-xl font-bold text-military-900 dark:text-gray-100">
                   {APP_CONFIG.shortName}

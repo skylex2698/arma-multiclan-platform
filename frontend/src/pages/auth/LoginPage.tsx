@@ -2,9 +2,10 @@ import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuthStore } from '../../store/authStore';
 import { authService } from '../../services/authService';
-import { Shield, Mail, Lock, LogIn } from 'lucide-react';
+import { Mail, Lock, LogIn } from 'lucide-react';
 import { APP_CONFIG } from '../../config/app.config';
 import { DiscordLoginButton } from '../../components/auth/DiscordLoginButton';
+import { Logo } from '../../components/ui/Logo';
 
 export default function LoginPage() {
   const navigate = useNavigate();
@@ -39,10 +40,7 @@ export default function LoginPage() {
         {/* Logo y título */}
         <div className="text-center mb-8">
           <div className="flex justify-center mb-4">
-            <div className="relative">
-              <Shield className="h-20 w-20 text-accent-400" />
-              <div className="absolute inset-0 bg-accent-400 opacity-20 blur-2xl"></div>
-            </div>
+            <Logo size="xl" />
           </div>
           <h1 className="text-3xl font-bold text-white mb-2">
             {APP_CONFIG.shortName}

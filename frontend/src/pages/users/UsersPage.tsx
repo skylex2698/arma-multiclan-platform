@@ -247,8 +247,34 @@ export default function UsersPage() {
                   📧 {user.email}
                 </p>
 
-                {/* Controles */}
-                <div className="grid grid-cols-3 gap-3 mb-3">
+                {/* Control de Clan - Fila completa */}
+                <div className="mb-3">
+                  <label className="block text-xs font-medium text-military-600 dark:text-gray-400 mb-1">
+                    Clan
+                  </label>
+                  {isAdmin ? (
+                    <select
+                      value={user.clanId || 'null'}
+                      onChange={(e) => handleClanChange(user.id, e.target.value)}
+                      disabled={changeClan.isPending}
+                      className="input text-sm w-full"
+                    >
+                      <option value="null">Sin clan</option>
+                      {allClans.map((clan) => (
+                        <option key={clan.id} value={clan.id}>
+                          {clan.tag} {clan.name}
+                        </option>
+                      ))}
+                    </select>
+                  ) : (
+                    <div className="input text-sm w-full bg-gray-100 dark:bg-gray-800 cursor-not-allowed">
+                      {user.clan ? `[${user.clan.tag}] ${user.clan.name}` : 'Sin clan'}
+                    </div>
+                  )}
+                </div>
+
+                {/* Controles de Rol y Estado */}
+                <div className="grid grid-cols-2 gap-3 mb-3">
                   {/* Control de Rol - Solo Admin puede ver y editar */}
                   <div>
                     <label className="block text-xs font-medium text-military-600 dark:text-gray-400 mb-1">
@@ -292,32 +318,6 @@ export default function UsersPage() {
                       <option value="BLOCKED">Bloqueado</option>
                       <option value="BANNED">Baneado</option>
                     </select>
-                  </div>
-
-                  {/* Control de Clan - Solo Admin puede editar */}
-                  <div>
-                    <label className="block text-xs font-medium text-military-600 dark:text-gray-400 mb-1">
-                      Clan
-                    </label>
-                    {isAdmin ? (
-                      <select
-                        value={user.clanId || 'null'}
-                        onChange={(e) => handleClanChange(user.id, e.target.value)}
-                        disabled={changeClan.isPending}
-                        className="input text-sm w-full"
-                      >
-                        <option value="null">Sin clan</option>
-                        {allClans.map((clan) => (
-                          <option key={clan.id} value={clan.id}>
-                            [{clan.tag}] {clan.name}
-                          </option>
-                        ))}
-                      </select>
-                    ) : (
-                      <div className="input text-sm w-full bg-gray-100 dark:bg-gray-800 cursor-not-allowed">
-                        {user.clan ? `[${user.clan.tag}] ${user.clan.name}` : 'Sin clan'}
-                      </div>
-                    )}
                   </div>
                 </div>
 

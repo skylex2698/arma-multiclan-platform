@@ -8,7 +8,7 @@ export function Footer() {
         <div className="flex flex-col md:flex-row items-center justify-between gap-4">
           {/* Logo y nombre */}
           <div className="flex items-center gap-2">
-            <Logo size="sm" />
+            <Logo size="lg" withGlow />
             <span className="font-bold text-military-900 dark:text-gray-100">
               {APP_CONFIG.shortName}
             </span>

@@ -40,11 +40,8 @@ export default function LoginPage() {
         {/* Logo y título */}
         <div className="text-center mb-8">
           <div className="flex justify-center mb-4">
-            <Logo size="xl" />
+            <Logo size="3xl" withGlow />
           </div>
-          <h1 className="text-3xl font-bold text-white mb-2">
-            {APP_CONFIG.shortName}
-          </h1>
           <p className="text-military-200 dark:text-gray-400">
             {APP_CONFIG.name}
           </p>

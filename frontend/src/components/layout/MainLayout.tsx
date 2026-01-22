@@ -57,7 +57,7 @@ export function MainLayout({ children }: MainLayoutProps) {
           <div className="flex items-center justify-between h-16">
             {/* Logo */}
             <Link to="/dashboard" className="flex items-center gap-3">
-              <Logo size="md" />
+              <Logo size="lg" withGlow />
               <div className="hidden sm:block">
                 <span className="text-xl font-bold text-military-900 dark:text-gray-100">
                   {APP_CONFIG.shortName}

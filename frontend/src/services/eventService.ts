@@ -93,4 +93,50 @@ export const eventService = {
   delete: async (id: string): Promise<void> => {
     await api.delete(`/events/${id}`);
   },
+
+  // Subir archivo de briefing (PDF)
+  uploadBriefingFile: async (
+    eventId: string,
+    file: File
+  ): Promise<{ event: Event; briefingFileUrl: string }> => {
+    const formData = new FormData();
+    formData.append('briefingFile', file);
+
+    const response = await api.post<
+      ApiResponse<{ event: Event; briefingFileUrl: string }>
+    >(`/events/${eventId}/briefing-file`, formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
+    return response.data.data;
+  },
+
+  // Subir archivo de modset (HTML)
+  uploadModsetFile: async (
+    eventId: string,
+    file: File
+  ): Promise<{ event: Event; modsetFileUrl: string }> => {
+    const formData = new FormData();
+    formData.append('modsetFile', file);
+
+    const response = await api.post<
+      ApiResponse<{ event: Event; modsetFileUrl: string }>
+    >(`/events/${eventId}/modset-file`, formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
+    return response.data.data;
+  },
+
+  // Eliminar archivo de briefing
+  deleteBriefingFile: async (eventId: string): Promise<void> => {
+    await api.delete(`/events/${eventId}/briefing-file`);
+  },
+
+  // Eliminar archivo de modset
+  deleteModsetFile: async (eventId: string): Promise<void> => {
+    await api.delete(`/events/${eventId}/modset-file`);
+  },
 };

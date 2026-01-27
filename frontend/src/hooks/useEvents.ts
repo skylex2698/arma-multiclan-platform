@@ -89,3 +89,55 @@ export function useCreateEventFromTemplate() {
     },
   });
 }
+
+// Subir archivo de briefing
+export function useUploadBriefingFile(eventId: string) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (file: File) => eventService.uploadBriefingFile(eventId, file),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['event', eventId] });
+      queryClient.invalidateQueries({ queryKey: ['events'] });
+    },
+  });
+}
+
+// Subir archivo de modset
+export function useUploadModsetFile(eventId: string) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (file: File) => eventService.uploadModsetFile(eventId, file),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['event', eventId] });
+      queryClient.invalidateQueries({ queryKey: ['events'] });
+    },
+  });
+}
+
+// Eliminar archivo de briefing
+export function useDeleteBriefingFile(eventId: string) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: () => eventService.deleteBriefingFile(eventId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['event', eventId] });
+      queryClient.invalidateQueries({ queryKey: ['events'] });
+    },
+  });
+}
+
+// Eliminar archivo de modset
+export function useDeleteModsetFile(eventId: string) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: () => eventService.deleteModsetFile(eventId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['event', eventId] });
+      queryClient.invalidateQueries({ queryKey: ['events'] });
+    },
+  });
+}

@@ -1,9 +1,11 @@
 import { Request, Response } from 'express';
+import path from 'path';
 import { eventService } from '../services/event.service';
 import { successResponse, errorResponse } from '../utils/responses';
 import { logger } from '../utils/logger';
 import { EventStatus, GameType } from '@prisma/client';
 import { prisma } from '../index';
+import { validatePdfFile, validateHtmlFile, deleteFile } from '../config/multer.config';
 
 export class EventController {
   // GET /api/events
@@ -240,6 +242,254 @@ export class EventController {
         error.message || 'Error al eliminar evento',
         500
       );
+    }
+  }
+
+  // POST /api/events/:id/briefing-file
+  async uploadBriefingFile(req: Request, res: Response) {
+    try {
+      const id = req.params.id as string;
+      const userId = req.user!.id;
+      const userRole = req.user!.role;
+
+      // Verificar que el evento existe y permisos
+      const event = await prisma.event.findUnique({
+        where: { id },
+        include: {
+          creator: {
+            select: { id: true, clanId: true },
+          },
+        },
+      });
+
+      if (!event) {
+        return errorResponse(res, 'Evento no encontrado', 404);
+      }
+
+      if (event.status === 'FINISHED') {
+        return errorResponse(res, 'No se puede modificar un evento finalizado', 403);
+      }
+
+      // Verificar permisos
+      const isCreator = event.creatorId === userId;
+      const isAdmin = userRole === 'ADMIN';
+      const isClanLeader = userRole === 'CLAN_LEADER' && req.user!.clanId === event.creator?.clanId;
+
+      if (!isCreator && !isAdmin && !isClanLeader) {
+        return errorResponse(res, 'No tienes permisos para modificar este evento', 403);
+      }
+
+      if (!req.file) {
+        return errorResponse(res, 'No se proporcionó ningún archivo', 400);
+      }
+
+      // Validar que sea PDF real
+      const filePath = path.join(process.cwd(), 'public', 'uploads', 'events', req.file.filename);
+      const isValidPdf = await validatePdfFile(filePath);
+
+      if (!isValidPdf) {
+        deleteFile(filePath);
+        return errorResponse(res, 'El archivo no es un PDF válido', 400);
+      }
+
+      // Eliminar archivo anterior si existe
+      if (event.briefingFileUrl) {
+        const oldFilePath = path.join(process.cwd(), 'public', event.briefingFileUrl);
+        deleteFile(oldFilePath);
+      }
+
+      // Actualizar evento con la URL del archivo
+      const briefingFileUrl = `/uploads/events/${req.file.filename}`;
+      const updatedEvent = await prisma.event.update({
+        where: { id },
+        data: { briefingFileUrl },
+      });
+
+      logger.info('Briefing file uploaded', { eventId: id, userId });
+
+      return successResponse(res, {
+        event: updatedEvent,
+        briefingFileUrl
+      }, 'Archivo de briefing subido correctamente');
+    } catch (error: any) {
+      logger.error('Error in uploadBriefingFile', error);
+      return errorResponse(res, error.message || 'Error al subir archivo de briefing', 500);
+    }
+  }
+
+  // POST /api/events/:id/modset-file
+  async uploadModsetFile(req: Request, res: Response) {
+    try {
+      const id = req.params.id as string;
+      const userId = req.user!.id;
+      const userRole = req.user!.role;
+
+      // Verificar que el evento existe y permisos
+      const event = await prisma.event.findUnique({
+        where: { id },
+        include: {
+          creator: {
+            select: { id: true, clanId: true },
+          },
+        },
+      });
+
+      if (!event) {
+        return errorResponse(res, 'Evento no encontrado', 404);
+      }
+
+      if (event.status === 'FINISHED') {
+        return errorResponse(res, 'No se puede modificar un evento finalizado', 403);
+      }
+
+      // Verificar permisos
+      const isCreator = event.creatorId === userId;
+      const isAdmin = userRole === 'ADMIN';
+      const isClanLeader = userRole === 'CLAN_LEADER' && req.user!.clanId === event.creator?.clanId;
+
+      if (!isCreator && !isAdmin && !isClanLeader) {
+        return errorResponse(res, 'No tienes permisos para modificar este evento', 403);
+      }
+
+      if (!req.file) {
+        return errorResponse(res, 'No se proporcionó ningún archivo', 400);
+      }
+
+      // Validar que sea HTML válido
+      const filePath = path.join(process.cwd(), 'public', 'uploads', 'events', req.file.filename);
+      const isValidHtml = await validateHtmlFile(filePath);
+
+      if (!isValidHtml) {
+        deleteFile(filePath);
+        return errorResponse(res, 'El archivo no es un HTML válido', 400);
+      }
+
+      // Eliminar archivo anterior si existe
+      if (event.modsetFileUrl) {
+        const oldFilePath = path.join(process.cwd(), 'public', event.modsetFileUrl);
+        deleteFile(oldFilePath);
+      }
+
+      // Actualizar evento con la URL del archivo
+      const modsetFileUrl = `/uploads/events/${req.file.filename}`;
+      const updatedEvent = await prisma.event.update({
+        where: { id },
+        data: { modsetFileUrl },
+      });
+
+      logger.info('Modset file uploaded', { eventId: id, userId });
+
+      return successResponse(res, {
+        event: updatedEvent,
+        modsetFileUrl
+      }, 'Archivo de modset subido correctamente');
+    } catch (error: any) {
+      logger.error('Error in uploadModsetFile', error);
+      return errorResponse(res, error.message || 'Error al subir archivo de modset', 500);
+    }
+  }
+
+  // DELETE /api/events/:id/briefing-file
+  async deleteBriefingFile(req: Request, res: Response) {
+    try {
+      const id = req.params.id as string;
+      const userId = req.user!.id;
+      const userRole = req.user!.role;
+
+      const event = await prisma.event.findUnique({
+        where: { id },
+        include: {
+          creator: {
+            select: { id: true, clanId: true },
+          },
+        },
+      });
+
+      if (!event) {
+        return errorResponse(res, 'Evento no encontrado', 404);
+      }
+
+      if (event.status === 'FINISHED') {
+        return errorResponse(res, 'No se puede modificar un evento finalizado', 403);
+      }
+
+      // Verificar permisos
+      const isCreator = event.creatorId === userId;
+      const isAdmin = userRole === 'ADMIN';
+      const isClanLeader = userRole === 'CLAN_LEADER' && req.user!.clanId === event.creator?.clanId;
+
+      if (!isCreator && !isAdmin && !isClanLeader) {
+        return errorResponse(res, 'No tienes permisos para modificar este evento', 403);
+      }
+
+      if (event.briefingFileUrl) {
+        const filePath = path.join(process.cwd(), 'public', event.briefingFileUrl);
+        deleteFile(filePath);
+      }
+
+      await prisma.event.update({
+        where: { id },
+        data: { briefingFileUrl: null },
+      });
+
+      logger.info('Briefing file deleted', { eventId: id, userId });
+
+      return successResponse(res, {}, 'Archivo de briefing eliminado');
+    } catch (error: any) {
+      logger.error('Error in deleteBriefingFile', error);
+      return errorResponse(res, error.message || 'Error al eliminar archivo', 500);
+    }
+  }
+
+  // DELETE /api/events/:id/modset-file
+  async deleteModsetFile(req: Request, res: Response) {
+    try {
+      const id = req.params.id as string;
+      const userId = req.user!.id;
+      const userRole = req.user!.role;
+
+      const event = await prisma.event.findUnique({
+        where: { id },
+        include: {
+          creator: {
+            select: { id: true, clanId: true },
+          },
+        },
+      });
+
+      if (!event) {
+        return errorResponse(res, 'Evento no encontrado', 404);
+      }
+
+      if (event.status === 'FINISHED') {
+        return errorResponse(res, 'No se puede modificar un evento finalizado', 403);
+      }
+
+      // Verificar permisos
+      const isCreator = event.creatorId === userId;
+      const isAdmin = userRole === 'ADMIN';
+      const isClanLeader = userRole === 'CLAN_LEADER' && req.user!.clanId === event.creator?.clanId;
+
+      if (!isCreator && !isAdmin && !isClanLeader) {
+        return errorResponse(res, 'No tienes permisos para modificar este evento', 403);
+      }
+
+      if (event.modsetFileUrl) {
+        const filePath = path.join(process.cwd(), 'public', event.modsetFileUrl);
+        deleteFile(filePath);
+      }
+
+      await prisma.event.update({
+        where: { id },
+        data: { modsetFileUrl: null },
+      });
+
+      logger.info('Modset file deleted', { eventId: id, userId });
+
+      return successResponse(res, {}, 'Archivo de modset eliminado');
+    } catch (error: any) {
+      logger.error('Error in deleteModsetFile', error);
+      return errorResponse(res, error.message || 'Error al eliminar archivo', 500);
     }
   }
 }

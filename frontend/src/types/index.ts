@@ -58,6 +58,8 @@ export interface Event {
   name: string;
   description: string | null;
   briefing: string | null;
+  briefingFileUrl: string | null;
+  modsetFileUrl: string | null;
   gameType: GameType;
   status: EventStatus;
   scheduledDate: string;
@@ -65,6 +67,7 @@ export interface Event {
   creator?: {
     id: string;
     nickname: string;
+    clanId?: string;
     clan?: {
       name: string;
       tag: string;

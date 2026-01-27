@@ -11,8 +11,20 @@ import {
   Edit,
   Copy,
   Radio,
+  FileText,
+  Package,
+  Upload,
+  Trash2,
+  Download,
+  ExternalLink,
 } from 'lucide-react';
-import { useEvent } from '../../hooks/useEvents';
+import {
+  useEvent,
+  useUploadBriefingFile,
+  useUploadModsetFile,
+  useDeleteBriefingFile,
+  useDeleteModsetFile,
+} from '../../hooks/useEvents';
 import { useAssignSlot, useUnassignSlot } from '../../hooks/useSlots';
 import { LoadingSpinner } from '../../components/ui/LoadingSpinner';
 import { Badge } from '../../components/ui/Badge';
@@ -21,7 +33,7 @@ import { SquadSection } from '../../components/events/SquadSection';
 import CommunicationTreeViewer from '../../components/events/CommunicationTree/CommunicationTreeViewer';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { useAuthStore } from '../../store/authStore';
 import { useAdminAssignSlot, useAdminUnassignSlot } from '../../hooks/useSlots';
 import { useUsers } from '../../hooks/useUsers';
@@ -39,6 +51,15 @@ export default function EventDetailPage() {
   const [activeTab, setActiveTab] = useState<TabType>('briefing');
   const adminAssignSlot = useAdminAssignSlot();
   const adminUnassignSlot = useAdminUnassignSlot();
+
+  // Hooks para archivos
+  const uploadBriefingFile = useUploadBriefingFile(id!);
+  const uploadModsetFile = useUploadModsetFile(id!);
+  const deleteBriefingFile = useDeleteBriefingFile(id!);
+  const deleteModsetFile = useDeleteModsetFile(id!);
+  const briefingFileInputRef = useRef<HTMLInputElement>(null);
+  const modsetFileInputRef = useRef<HTMLInputElement>(null);
+  const [fileUploadError, setFileUploadError] = useState('');
 
   // Obtener usuarios disponibles para asignación
   const { data: usersData } = useUsers(
@@ -106,6 +127,67 @@ export default function EventDetailPage() {
         error.response?.data?.message || 'Error al desasignarte del slot'
       );
     }
+  };
+
+  // Handlers para archivos
+  const handleBriefingFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setFileUploadError('');
+    try {
+      await uploadBriefingFile.mutateAsync(file);
+    } catch (err) {
+      const error = err as { response?: { data?: { message?: string } } };
+      setFileUploadError(error.response?.data?.message || 'Error al subir el archivo de briefing');
+    }
+    // Limpiar input
+    if (briefingFileInputRef.current) {
+      briefingFileInputRef.current.value = '';
+    }
+  };
+
+  const handleModsetFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setFileUploadError('');
+    try {
+      await uploadModsetFile.mutateAsync(file);
+    } catch (err) {
+      const error = err as { response?: { data?: { message?: string } } };
+      setFileUploadError(error.response?.data?.message || 'Error al subir el archivo de modset');
+    }
+    // Limpiar input
+    if (modsetFileInputRef.current) {
+      modsetFileInputRef.current.value = '';
+    }
+  };
+
+  const handleDeleteBriefingFile = async () => {
+    if (!confirm('¿Eliminar el archivo de briefing?')) return;
+    setFileUploadError('');
+    try {
+      await deleteBriefingFile.mutateAsync();
+    } catch (err) {
+      const error = err as { response?: { data?: { message?: string } } };
+      setFileUploadError(error.response?.data?.message || 'Error al eliminar el archivo');
+    }
+  };
+
+  const handleDeleteModsetFile = async () => {
+    if (!confirm('¿Eliminar el archivo de modset?')) return;
+    setFileUploadError('');
+    try {
+      await deleteModsetFile.mutateAsync();
+    } catch (err) {
+      const error = err as { response?: { data?: { message?: string } } };
+      setFileUploadError(error.response?.data?.message || 'Error al eliminar el archivo');
+    }
+  };
+
+  const getBackendUrl = () => {
+    return import.meta.env.VITE_API_URL?.replace('/api', '') || 'http://localhost:3000';
   };
 
   if (isLoading) {
@@ -333,21 +415,184 @@ export default function EventDetailPage() {
 
       {/* Contenido de las pestañas */}
       {activeTab === 'briefing' && (
-        <Card>
-          {event.briefing ? (
-            <>
-              <h2 className="text-xl font-bold text-military-900 mb-4">Briefing</h2>
-              <div 
-                className="briefing-content p-6 bg-white rounded-lg border border-gray-200"
-                dangerouslySetInnerHTML={{ __html: event.briefing }}
-              />
-            </>
-          ) : (
-            <p className="text-military-500 text-center py-8">
-              No hay briefing disponible para este evento
-            </p>
+        <div className="space-y-6">
+          {/* Error de subida de archivos */}
+          {fileUploadError && (
+            <div className="card bg-red-50 border border-red-200">
+              <div className="flex items-center">
+                <AlertCircle className="h-5 w-5 text-red-600 mr-2" />
+                <p className="text-red-700">{fileUploadError}</p>
+              </div>
+            </div>
           )}
-        </Card>
+
+          {/* Archivos del evento */}
+          <Card>
+            <h2 className="text-xl font-bold text-military-900 mb-4 flex items-center gap-2">
+              <FileText className="h-5 w-5" />
+              Archivos del Evento
+            </h2>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {/* Briefing PDF */}
+              <div className="p-4 border border-military-200 rounded-lg">
+                <div className="flex items-center gap-2 mb-3">
+                  <FileText className="h-5 w-5 text-red-600" />
+                  <h3 className="font-semibold text-military-900">Briefing (PDF)</h3>
+                </div>
+
+                {event.briefingFileUrl ? (
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2 p-2 bg-green-50 border border-green-200 rounded">
+                      <FileText className="h-4 w-4 text-green-600" />
+                      <span className="text-sm text-green-700 flex-1">Archivo subido</span>
+                    </div>
+                    <div className="flex gap-2">
+                      <a
+                        href={`${getBackendUrl()}${event.briefingFileUrl}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="btn btn-primary btn-sm flex items-center gap-1"
+                      >
+                        <ExternalLink className="h-4 w-4" />
+                        Abrir
+                      </a>
+                      <a
+                        href={`${getBackendUrl()}${event.briefingFileUrl}`}
+                        download
+                        className="btn btn-secondary btn-sm flex items-center gap-1"
+                      >
+                        <Download className="h-4 w-4" />
+                        Descargar
+                      </a>
+                      {canEditEvent && (
+                        <button
+                          onClick={handleDeleteBriefingFile}
+                          disabled={deleteBriefingFile.isPending}
+                          className="btn btn-danger btn-sm flex items-center gap-1"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    <p className="text-sm text-military-500">No hay archivo de briefing</p>
+                    {canEditEvent && (
+                      <>
+                        <input
+                          ref={briefingFileInputRef}
+                          type="file"
+                          accept=".pdf"
+                          onChange={handleBriefingFileChange}
+                          className="hidden"
+                        />
+                        <button
+                          onClick={() => briefingFileInputRef.current?.click()}
+                          disabled={uploadBriefingFile.isPending}
+                          className="btn btn-primary btn-sm flex items-center gap-1"
+                        >
+                          <Upload className="h-4 w-4" />
+                          {uploadBriefingFile.isPending ? 'Subiendo...' : 'Subir PDF'}
+                        </button>
+                      </>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              {/* Modset HTML */}
+              <div className="p-4 border border-military-200 rounded-lg">
+                <div className="flex items-center gap-2 mb-3">
+                  <Package className="h-5 w-5 text-blue-600" />
+                  <h3 className="font-semibold text-military-900">Modset (HTML)</h3>
+                </div>
+
+                {event.modsetFileUrl ? (
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2 p-2 bg-green-50 border border-green-200 rounded">
+                      <Package className="h-4 w-4 text-green-600" />
+                      <span className="text-sm text-green-700 flex-1">Archivo subido</span>
+                    </div>
+                    <div className="flex gap-2">
+                      <a
+                        href={`${getBackendUrl()}${event.modsetFileUrl}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="btn btn-primary btn-sm flex items-center gap-1"
+                      >
+                        <ExternalLink className="h-4 w-4" />
+                        Abrir
+                      </a>
+                      <a
+                        href={`${getBackendUrl()}${event.modsetFileUrl}`}
+                        download
+                        className="btn btn-secondary btn-sm flex items-center gap-1"
+                      >
+                        <Download className="h-4 w-4" />
+                        Descargar
+                      </a>
+                      {canEditEvent && (
+                        <button
+                          onClick={handleDeleteModsetFile}
+                          disabled={deleteModsetFile.isPending}
+                          className="btn btn-danger btn-sm flex items-center gap-1"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    <p className="text-sm text-military-500">No hay archivo de modset</p>
+                    {canEditEvent && (
+                      <>
+                        <input
+                          ref={modsetFileInputRef}
+                          type="file"
+                          accept=".html,.htm"
+                          onChange={handleModsetFileChange}
+                          className="hidden"
+                        />
+                        <button
+                          onClick={() => modsetFileInputRef.current?.click()}
+                          disabled={uploadModsetFile.isPending}
+                          className="btn btn-primary btn-sm flex items-center gap-1"
+                        >
+                          <Upload className="h-4 w-4" />
+                          {uploadModsetFile.isPending ? 'Subiendo...' : 'Subir HTML'}
+                        </button>
+                      </>
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <p className="text-xs text-military-500 mt-3">
+              Tamaño máximo: 10MB por archivo
+            </p>
+          </Card>
+
+          {/* Contenido del briefing */}
+          <Card>
+            {event.briefing ? (
+              <>
+                <h2 className="text-xl font-bold text-military-900 mb-4">Briefing</h2>
+                <div
+                  className="briefing-content p-6 bg-white rounded-lg border border-gray-200"
+                  dangerouslySetInnerHTML={{ __html: event.briefing }}
+                />
+              </>
+            ) : (
+              <p className="text-military-500 text-center py-8">
+                No hay briefing de texto disponible para este evento
+              </p>
+            )}
+          </Card>
+        </div>
       )}
 
       {activeTab === 'slots' && (

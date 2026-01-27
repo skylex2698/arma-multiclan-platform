@@ -115,3 +115,152 @@ export const deleteFile = (filePath: string): void => {
     console.error('Error deleting file:', error);
   }
 };
+
+// ==========================================
+// CONFIGURACIÓN PARA ARCHIVOS DE EVENTOS
+// ==========================================
+
+// Tipos MIME permitidos para eventos
+const EVENT_ALLOWED_MIMES = {
+  briefing: ['application/pdf'],
+  modset: ['text/html', 'application/xhtml+xml'],
+};
+
+// Extensiones permitidas para eventos
+const EVENT_ALLOWED_EXTENSIONS = {
+  briefing: ['.pdf'],
+  modset: ['.html', '.htm'],
+};
+
+// Límite de tamaño: 10MB para archivos de eventos
+const EVENT_FILE_SIZE_LIMIT = 10 * 1024 * 1024;
+
+// Crear carpeta para archivos de eventos
+const eventFilesDir = path.join(process.cwd(), 'public', 'uploads', 'events');
+if (!fs.existsSync(eventFilesDir)) {
+  fs.mkdirSync(eventFilesDir, { recursive: true });
+}
+
+// Storage para briefing PDF
+const briefingStorage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    cb(null, eventFilesDir);
+  },
+  filename: (req, file, cb) => {
+    const uniqueSuffix = Date.now() + '-' + crypto.randomBytes(8).toString('hex');
+    cb(null, `briefing-${uniqueSuffix}.pdf`);
+  },
+});
+
+// Storage para modset HTML
+const modsetStorage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    cb(null, eventFilesDir);
+  },
+  filename: (req, file, cb) => {
+    const uniqueSuffix = Date.now() + '-' + crypto.randomBytes(8).toString('hex');
+    cb(null, `modset-${uniqueSuffix}.html`);
+  },
+});
+
+// Filtro para briefing PDF
+const briefingFileFilter = (
+  req: any,
+  file: Express.Multer.File,
+  cb: multer.FileFilterCallback
+) => {
+  // Validar MIME type
+  if (!EVENT_ALLOWED_MIMES.briefing.includes(file.mimetype)) {
+    return cb(new Error('Solo se permiten archivos PDF para el briefing.'));
+  }
+
+  // Validar extensión
+  const ext = path.extname(file.originalname).toLowerCase();
+  if (!EVENT_ALLOWED_EXTENSIONS.briefing.includes(ext)) {
+    return cb(new Error('El archivo debe tener extensión .pdf'));
+  }
+
+  // Prevenir path traversal
+  const basename = path.basename(file.originalname);
+  if (basename !== file.originalname || file.originalname.includes('..')) {
+    return cb(new Error('Nombre de archivo inválido'));
+  }
+
+  cb(null, true);
+};
+
+// Filtro para modset HTML
+const modsetFileFilter = (
+  req: any,
+  file: Express.Multer.File,
+  cb: multer.FileFilterCallback
+) => {
+  // Validar MIME type
+  if (!EVENT_ALLOWED_MIMES.modset.includes(file.mimetype)) {
+    return cb(new Error('Solo se permiten archivos HTML para el modset.'));
+  }
+
+  // Validar extensión
+  const ext = path.extname(file.originalname).toLowerCase();
+  if (!EVENT_ALLOWED_EXTENSIONS.modset.includes(ext)) {
+    return cb(new Error('El archivo debe tener extensión .html o .htm'));
+  }
+
+  // Prevenir path traversal
+  const basename = path.basename(file.originalname);
+  if (basename !== file.originalname || file.originalname.includes('..')) {
+    return cb(new Error('Nombre de archivo inválido'));
+  }
+
+  cb(null, true);
+};
+
+// Exportar configuraciones para eventos
+export const uploadEventBriefing = multer({
+  storage: briefingStorage,
+  fileFilter: briefingFileFilter,
+  limits: {
+    fileSize: EVENT_FILE_SIZE_LIMIT, // 10MB
+    files: 1,
+  },
+});
+
+export const uploadEventModset = multer({
+  storage: modsetStorage,
+  fileFilter: modsetFileFilter,
+  limits: {
+    fileSize: EVENT_FILE_SIZE_LIMIT, // 10MB
+    files: 1,
+  },
+});
+
+/**
+ * Valida que un archivo PDF sea realmente PDF
+ */
+export const validatePdfFile = async (filePath: string): Promise<boolean> => {
+  try {
+    const fileType = await fileTypeFromFile(filePath);
+    return fileType?.mime === 'application/pdf';
+  } catch {
+    return false;
+  }
+};
+
+/**
+ * Valida que un archivo HTML sea texto (no tiene magic bytes específicos)
+ * Verificamos que el contenido sea texto válido
+ */
+export const validateHtmlFile = async (filePath: string): Promise<boolean> => {
+  try {
+    const content = fs.readFileSync(filePath, 'utf-8');
+    // Verificar que contenga estructura HTML básica
+    const hasHtmlStructure = content.includes('<') && content.includes('>');
+    // Verificar que no contenga scripts maliciosos obvios (básico)
+    const hasNoMaliciousScript = !content.includes('javascript:') &&
+                                  !content.includes('onerror=') &&
+                                  !content.includes('onload=');
+    return hasHtmlStructure && hasNoMaliciousScript;
+  } catch {
+    return false;
+  }
+};

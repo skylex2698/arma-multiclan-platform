@@ -99,7 +99,9 @@ model Event {
   name            String
   description     String?
   briefing        String?     // Contenido HTML del briefing
-  
+  briefingFileUrl String?     // URL del archivo PDF del briefing
+  modsetFileUrl   String?     // URL del archivo HTML del modset (Arma 3)
+
   gameType        GameType
   status          EventStatus @default(ACTIVE)
   

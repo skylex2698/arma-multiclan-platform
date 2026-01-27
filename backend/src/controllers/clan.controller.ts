@@ -3,8 +3,15 @@ import path from 'path';
 import { clanService } from '../services/clan.service';
 import { prisma } from '../index';
 import { validateFileType, deleteFile } from '../config/multer.config';
+import { logger } from '../utils/logger';
 
-const handleError = (res: Response, error: unknown) => {
+const handleError = (res: Response, error: unknown, context?: string) => {
+  // Loguear el error para depuración
+  logger.error(`Error in ClanController${context ? ` (${context})` : ''}`, {
+    error: error instanceof Error ? error.message : error,
+    stack: error instanceof Error ? error.stack : undefined
+  });
+
   if (error instanceof Error) {
     return res.status(400).json({
       success: false,
@@ -184,7 +191,7 @@ class ClanController {
         data: { clan, avatarUrl },
       });
     } catch (error) {
-      handleError(res, error);
+      handleError(res, error, 'uploadAvatar');
     }
   }
 }

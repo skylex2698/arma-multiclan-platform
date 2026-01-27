@@ -100,17 +100,17 @@ export const router = createBrowserRouter([
   {
     path: '/events/create',
     element: (
-      <AdminRoute>
+      <AdminOrClanLeaderRoute>
         <CreateEventPage />
-      </AdminRoute>
+      </AdminOrClanLeaderRoute>
     ),
   },
   {
     path: '/events/from-template/:templateId',
     element: (
-      <AdminRoute>
+      <AdminOrClanLeaderRoute>
         <CreateEventFromTemplatePage />
-      </AdminRoute>
+      </AdminOrClanLeaderRoute>
     ),
   },
   {

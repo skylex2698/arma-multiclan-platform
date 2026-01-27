@@ -119,10 +119,8 @@ export function useUpdateProfile() {
       userService.updateProfile(data),
     onSuccess: (response) => {
       // Actualizar el usuario en el store
-      const token = localStorage.getItem('token');
-      if (token) {
-        setAuth(response.user, token);
-      }
+      // No necesitamos el token porque la autenticación usa cookies httpOnly
+      setAuth(response.user);
       queryClient.invalidateQueries({ queryKey: ['users'] });
     },
   });

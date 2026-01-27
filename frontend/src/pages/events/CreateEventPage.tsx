@@ -184,6 +184,7 @@ export default function CreateEventPage() {
       const dateTime = new Date(`${scheduledDate}T${scheduledTime}`);
 
       const formattedSquads = squads.map((squad) => ({
+        id: squad.id, // ID temporal para mapear jerarquías
         name: squad.name,
         order: squad.order,
         frequency: squad.frequency || undefined,

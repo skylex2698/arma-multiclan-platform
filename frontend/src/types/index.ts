@@ -164,8 +164,13 @@ export interface CreateEventForm {
   gameType: GameType;
   scheduledDate: Date;
   squads: {
+    id?: string; // ID temporal para mapear jerarquías
     name: string;
     order: number;
+    frequency?: string;
+    isCommand?: boolean;
+    parentSquadId?: string;
+    parentFrequency?: string;
     slots: {
       role: string;
       order: number;

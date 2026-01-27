@@ -351,31 +351,33 @@ export default function EventDetailPage() {
       )}
 
       {activeTab === 'slots' && (
-        <div className="space-y-4">
-          <h2 className="text-2xl font-bold text-military-900">
+        <div>
+          <h2 className="text-2xl font-bold text-military-900 mb-4">
             Escuadras y Slots
           </h2>
-          {event.squads
-            .sort((a: Squad, b: Squad) => a.order - b.order)
-            .map((squad: Squad) => (
-              <SquadSection
-                key={squad.id}
-                squad={squad}
-                onAssignSlot={handleAssignSlot}
-                onUnassignSlot={handleUnassignSlot}
-                onAdminAssign={handleAdminAssign}
-                onAdminUnassign={handleAdminUnassign}
-                isLoading={
-                  assignSlot.isPending ||
-                  unassignSlot.isPending ||
-                  adminAssignSlot.isPending ||
-                  adminUnassignSlot.isPending
-                }
-                eventStatus={event.status}
-                availableUsers={availableUsers}
-                getUserSlotInfo={getUserSlotInfo}
-              />
-            ))}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 items-start">
+            {event.squads
+              .sort((a: Squad, b: Squad) => a.order - b.order)
+              .map((squad: Squad) => (
+                <SquadSection
+                  key={squad.id}
+                  squad={squad}
+                  onAssignSlot={handleAssignSlot}
+                  onUnassignSlot={handleUnassignSlot}
+                  onAdminAssign={handleAdminAssign}
+                  onAdminUnassign={handleAdminUnassign}
+                  isLoading={
+                    assignSlot.isPending ||
+                    unassignSlot.isPending ||
+                    adminAssignSlot.isPending ||
+                    adminUnassignSlot.isPending
+                  }
+                  eventStatus={event.status}
+                  availableUsers={availableUsers}
+                  getUserSlotInfo={getUserSlotInfo}
+                />
+              ))}
+          </div>
         </div>
       )}
 

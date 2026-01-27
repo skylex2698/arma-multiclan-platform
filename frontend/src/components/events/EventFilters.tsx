@@ -75,6 +75,7 @@ export function EventFilters({
             <option value="">Todos</option>
             <option value="ACTIVE">Activos</option>
             <option value="INACTIVE">Inactivos</option>
+            <option value="FINISHED">Finalizados</option>
           </select>
         </div>
 

@@ -12,7 +12,7 @@ interface SlotItemProps {
   onAdminAssign?: (slotId: string, userId: string) => void;
   onAdminUnassign?: (slotId: string) => void;
   isLoading: boolean;
-  eventStatus: 'ACTIVE' | 'INACTIVE';
+  eventStatus: 'ACTIVE' | 'INACTIVE' | 'FINISHED';
   availableUsers?: User[];
   getUserSlotInfo?: (userId: string) => {
     hasSlot: boolean;

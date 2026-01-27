@@ -9,12 +9,13 @@ export class EventController {
   // GET /api/events
   async getAllEvents(req: Request, res: Response) {
     try {
-      const { status, gameType, upcoming } = req.query;
+      const { status, gameType, upcoming, includeAll } = req.query;
 
       const events = await eventService.getAllEvents({
         status: status as EventStatus,
         gameType: gameType as GameType,
-        upcoming: upcoming === 'true'
+        upcoming: upcoming === 'true',
+        includeAll: includeAll === 'true'
       });
 
       return successResponse(res, { events, count: events.length }, 'Eventos obtenidos correctamente');
@@ -171,12 +172,18 @@ export class EventController {
         return errorResponse(res, 'Estado inválido', 400);
       }
 
-      const event = await eventService.changeEventStatus(id, status, req.user.id);
+      const event = await eventService.changeEventStatus(
+        id,
+        status,
+        req.user.id,
+        req.user.role,
+        req.user.clanId || undefined
+      );
 
       return successResponse(res, { event }, 'Estado del evento actualizado correctamente');
     } catch (error: any) {
       logger.error('Error in changeEventStatus', error);
-      return errorResponse(res, error.message || 'Error al cambiar estado del evento', 500);
+      return errorResponse(res, error.message || 'Error al cambiar estado del evento', 400);
     }
   }
 

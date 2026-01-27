@@ -14,10 +14,13 @@ export default function EventsPage() {
   const [statusFilter, setStatusFilter] = useState('');
   const [upcomingOnly, setUpcomingOnly] = useState(false);
 
+  // Si se selecciona un filtro de estado, necesitamos incluir todos los eventos
+  // para que el backend no filtre solo ACTIVE por defecto
   const { data, isLoading, error } = useEvents({
     gameType: gameTypeFilter || undefined,
     status: statusFilter || undefined,
     upcoming: upcomingOnly || undefined,
+    includeAll: statusFilter ? true : undefined,
   });
 
   const filteredEvents = useMemo(() => {

@@ -123,14 +123,16 @@ export default function EventDetailPage() {
     );
   }
 
-  const canEditEvent =
-    user?.role === 'ADMIN' ||
-    data?.event?.creatorId === user?.id ||
-    (user?.role === 'CLAN_LEADER' &&
-      user?.clan?.id === data?.event?.creator?.clanId);
-
-  const isPast = data?.event ? new Date(data.event.scheduledDate) < new Date() : false;
   const event = data.event;
+  const isFinished = event.status === 'FINISHED';
+
+  // No se puede editar un evento finalizado
+  const canEditEvent =
+    !isFinished &&
+    (user?.role === 'ADMIN' ||
+    event.creatorId === user?.id ||
+    (user?.role === 'CLAN_LEADER' &&
+      user?.clan?.id === event.creator?.clanId));
 
   return (
     <div>
@@ -154,12 +156,21 @@ export default function EventDetailPage() {
             )}
           </div>
           <div className="flex gap-2 ml-4">
-            <Badge variant={event.status === 'ACTIVE' ? 'success' : 'default'}>
-              {event.status === 'ACTIVE' ? 'Activo' : 'Inactivo'}
+            <Badge
+              variant={
+                event.status === 'ACTIVE'
+                  ? 'success'
+                  : event.status === 'FINISHED'
+                    ? 'warning'
+                    : 'default'
+              }
+            >
+              {event.status === 'ACTIVE'
+                ? 'Activo'
+                : event.status === 'FINISHED'
+                  ? 'Finalizado'
+                  : 'Inactivo'}
             </Badge>
-            {isPast && event.status === 'ACTIVE' && (
-              <Badge variant="warning">Finalizado</Badge>
-            )}
 
             {canEditEvent && (
               <>
@@ -249,6 +260,18 @@ export default function EventDetailPage() {
           </div>
         </div>
       </Card>
+
+      {/* Aviso de evento finalizado */}
+      {isFinished && (
+        <div className="card bg-amber-50 border border-amber-200 mb-6">
+          <div className="flex items-center">
+            <AlertCircle className="h-5 w-5 text-amber-600 mr-2" />
+            <p className="text-amber-700">
+              Este evento ha finalizado. No se pueden realizar modificaciones ni cambios en los slots.
+            </p>
+          </div>
+        </div>
+      )}
 
       {/* Error de acción */}
       {actionError && (

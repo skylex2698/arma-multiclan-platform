@@ -15,7 +15,8 @@ export enum UserStatus {
 
 export enum EventStatus {
   ACTIVE = 'ACTIVE',
-  INACTIVE = 'INACTIVE'
+  INACTIVE = 'INACTIVE',
+  FINISHED = 'FINISHED'
 }
 
 export type GameType = 'ARMA_3' | 'ARMA_REFORGER';

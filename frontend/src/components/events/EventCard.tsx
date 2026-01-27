@@ -10,7 +10,18 @@ interface EventCardProps {
 }
 
 export function EventCard({ event }: EventCardProps) {
-  const isPast = new Date(event.scheduledDate) < new Date();
+  const getStatusBadge = () => {
+    switch (event.status) {
+      case 'ACTIVE':
+        return <Badge variant="success">Activo</Badge>;
+      case 'INACTIVE':
+        return <Badge variant="default">Inactivo</Badge>;
+      case 'FINISHED':
+        return <Badge variant="warning">Finalizado</Badge>;
+      default:
+        return null;
+    }
+  };
 
   return (
     <Link
@@ -24,12 +35,7 @@ export function EventCard({ event }: EventCardProps) {
             {event.name}
           </h3>
           <div className="flex gap-2">
-            <Badge variant={event.status === 'ACTIVE' ? 'success' : 'default'}>
-              {event.status === 'ACTIVE' ? 'Activo' : 'Inactivo'}
-            </Badge>
-            {isPast && event.status === 'ACTIVE' && (
-              <Badge variant="warning">Finalizado</Badge>
-            )}
+            {getStatusBadge()}
           </div>
         </div>
       </div>

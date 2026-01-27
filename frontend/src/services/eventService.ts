@@ -8,11 +8,13 @@ export const eventService = {
     status?: string;
     gameType?: string;
     upcoming?: boolean;
+    includeAll?: boolean;
   }): Promise<{ events: Event[]; count: number }> => {
     const params = new URLSearchParams();
     if (filters?.status) params.append('status', filters.status);
     if (filters?.gameType) params.append('gameType', filters.gameType);
     if (filters?.upcoming) params.append('upcoming', 'true');
+    if (filters?.includeAll) params.append('includeAll', 'true');
 
     const response = await api.get<ApiResponse<{ events: Event[]; count: number }>>(
       `/events?${params.toString()}`

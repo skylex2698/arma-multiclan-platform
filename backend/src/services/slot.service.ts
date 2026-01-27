@@ -28,9 +28,12 @@ export class SlotService {
       throw new Error('Slot no encontrado');
     }
 
-    // Verificar que el evento esté activo
-    if (slot.squad.event.status !== EventStatus.ACTIVE) {
-      throw new Error('No puedes apuntarte a un evento inactivo');
+    // Verificar que el evento esté activo (solo se puede apuntar en eventos ACTIVE)
+    if (slot.squad.event.status === EventStatus.FINISHED) {
+      throw new Error('No puedes apuntarte a un evento finalizado');
+    }
+    if (slot.squad.event.status === EventStatus.INACTIVE) {
+      throw new Error('No puedes apuntarte a un evento inactivo. El evento debe estar activo.');
     }
 
     // Verificar que el slot esté libre
@@ -171,9 +174,12 @@ export class SlotService {
       throw new Error('Este slot no está ocupado');
     }
 
-    // Verificar que el evento esté activo
-    if (slot.squad.event.status !== EventStatus.ACTIVE) {
-      throw new Error('No puedes desapuntarte de un evento inactivo');
+    // Verificar que el evento esté activo (solo se puede desapuntar en eventos ACTIVE)
+    if (slot.squad.event.status === EventStatus.FINISHED) {
+      throw new Error('No puedes desapuntarte de un evento finalizado');
+    }
+    if (slot.squad.event.status === EventStatus.INACTIVE) {
+      throw new Error('No puedes desapuntarte de un evento inactivo. El evento debe estar activo.');
     }
 
     // Si no es admin, verificar permisos

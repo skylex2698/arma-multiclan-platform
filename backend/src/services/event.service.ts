@@ -6,30 +6,101 @@ import { sanitizeHTML } from '../utils/sanitizer';
 import { EventStatus, GameType, UserRole, SlotStatus } from '@prisma/client';
 
 export class EventService {
+  // ============================================
+  // MÉTODOS DE VERIFICACIÓN DE ESTADO
+  // ============================================
+
+  /**
+   * Verifica y marca como FINISHED los eventos ACTIVE que ya pasaron su fecha
+   * Este método debe llamarse periódicamente (cron) o al listar/obtener eventos
+   */
+  async checkAndFinishExpiredEvents(): Promise<number> {
+    const now = new Date();
+
+    // Actualizar eventos ACTIVE cuya fecha ya pasó
+    const result = await prisma.event.updateMany({
+      where: {
+        status: EventStatus.ACTIVE,
+        scheduledDate: { lt: now }
+      },
+      data: {
+        status: EventStatus.FINISHED
+      }
+    });
+
+    if (result.count > 0) {
+      logger.info('Events auto-finished', { count: result.count });
+    }
+
+    return result.count;
+  }
+
+  /**
+   * Verifica si un evento está finalizado (no permite modificaciones)
+   */
+  isEventFinished(event: { status: EventStatus }): boolean {
+    return event.status === EventStatus.FINISHED;
+  }
+
+  /**
+   * Verifica si un evento permite apuntarse/desapuntarse de slots
+   */
+  canModifySlots(event: { status: EventStatus }): boolean {
+    return event.status === EventStatus.ACTIVE;
+  }
+
+  // ============================================
+  // MÉTODOS DE LISTADO
+  // ============================================
+
   // Listar eventos con filtros
   async getAllEvents(filters?: {
     status?: EventStatus;
     gameType?: GameType;
     upcoming?: boolean;
+    includeAll?: boolean; // Si true, muestra todos los estados
   }) {
+    // Primero verificar y finalizar eventos expirados
+    await this.checkAndFinishExpiredEvents();
+
     const now = new Date();
 
+    // Por defecto: solo eventos ACTIVE, ordenados por fecha más próxima
+    const whereClause: Record<string, unknown> = {};
+
+    if (filters?.includeAll) {
+      // Mostrar todos los eventos
+      if (filters?.status) {
+        whereClause.status = filters.status;
+      }
+    } else if (filters?.status) {
+      // Filtro específico de estado
+      whereClause.status = filters.status;
+    } else {
+      // Por defecto: solo ACTIVE
+      whereClause.status = EventStatus.ACTIVE;
+    }
+
+    if (filters?.gameType) {
+      whereClause.gameType = filters.gameType;
+    }
+
+    if (filters?.upcoming) {
+      whereClause.scheduledDate = { gte: now };
+      whereClause.status = EventStatus.ACTIVE;
+    }
+
     const events = await prisma.event.findMany({
-      where: {
-        ...(filters?.status && { status: filters.status }),
-        ...(filters?.gameType && { gameType: filters.gameType }),
-        ...(filters?.upcoming && {
-          scheduledDate: { gte: now },
-          status: EventStatus.ACTIVE
-        })
-      },
+      where: whereClause,
       include: {
         creator: {
           select: {
             id: true,
             nickname: true,
+            clanId: true,
             clan: {
               select: {
+                id: true,
                 name: true,
                 tag: true
               }
@@ -64,7 +135,8 @@ export class EventService {
           }
         }
       },
-      orderBy: { scheduledDate: 'desc' }
+      // Ordenar por fecha más próxima primero
+      orderBy: { scheduledDate: 'asc' }
     });
 
     return events.map(event => ({
@@ -450,6 +522,11 @@ export class EventService {
       throw new Error('Evento no encontrado');
     }
 
+    // VALIDACIÓN: No se puede modificar un evento FINISHED
+    if (event.status === EventStatus.FINISHED) {
+      throw new Error('No se puede modificar un evento finalizado');
+    }
+
     // Si se envían escuadras, actualizar estructura completa
     if (data.squads) {
       // Helper para verificar si un ID es un UUID válido (real de la BD)
@@ -693,14 +770,51 @@ export class EventService {
     };
   }
 
-  // Cambiar estado del evento
-  async changeEventStatus(eventId: string, newStatus: EventStatus, userId: string) {
+  // Cambiar estado del evento con validaciones
+  async changeEventStatus(
+    eventId: string,
+    newStatus: EventStatus,
+    userId: string,
+    userRole: UserRole,
+    userClanId?: string
+  ) {
     const event = await prisma.event.findUnique({
-      where: { id: eventId }
+      where: { id: eventId },
+      include: {
+        creator: {
+          select: {
+            clanId: true
+          }
+        }
+      }
     });
 
     if (!event) {
       throw new Error('Evento no encontrado');
+    }
+
+    const now = new Date();
+
+    // VALIDACIÓN 1: No se puede cambiar el estado de un evento FINISHED
+    if (event.status === EventStatus.FINISHED) {
+      throw new Error('No se puede modificar un evento finalizado');
+    }
+
+    // VALIDACIÓN 2: Solo ADMIN o CLAN_LEADER del mismo clan que creó el evento
+    if (userRole !== UserRole.ADMIN) {
+      if (userRole !== UserRole.CLAN_LEADER || userClanId !== event.creator.clanId) {
+        throw new Error('No tienes permisos para cambiar el estado de este evento');
+      }
+    }
+
+    // VALIDACIÓN 3: No se puede establecer manualmente el estado FINISHED
+    if (newStatus === EventStatus.FINISHED) {
+      throw new Error('El estado FINISHED solo se establece automáticamente cuando el evento expira');
+    }
+
+    // VALIDACIÓN 4: Para pasar a ACTIVE, la fecha debe ser futura
+    if (newStatus === EventStatus.ACTIVE && event.scheduledDate <= now) {
+      throw new Error('No se puede activar un evento cuya fecha ya ha pasado');
     }
 
     const updatedEvent = await prisma.event.update({

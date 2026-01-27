@@ -1,19 +1,33 @@
 import { api } from './api';
 import type { ApiResponse, User, ClanChangeRequest, UserRole, UserStatus } from '../types';
 
+export interface PaginatedUsersResponse {
+  users: User[];
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+}
+
 export const userService = {
-  // Obtener todos los usuarios
+  // Obtener todos los usuarios con paginación
   getAll: async (filters?: {
     clanId?: string;
     role?: string;
     status?: string;
-  }): Promise<{ users: User[]; count: number }> => {
+    search?: string;
+    page?: number;
+    limit?: number;
+  }): Promise<PaginatedUsersResponse> => {
     const params = new URLSearchParams();
     if (filters?.clanId) params.append('clanId', filters.clanId);
     if (filters?.role) params.append('role', filters.role);
     if (filters?.status) params.append('status', filters.status);
+    if (filters?.search) params.append('search', filters.search);
+    if (filters?.page) params.append('page', filters.page.toString());
+    if (filters?.limit) params.append('limit', filters.limit.toString());
 
-    const response = await api.get<ApiResponse<{ users: User[]; count: number }>>(
+    const response = await api.get<ApiResponse<PaginatedUsersResponse>>(
       `/users?${params.toString()}`
     );
     return response.data.data;

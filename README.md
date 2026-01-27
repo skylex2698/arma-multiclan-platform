@@ -2,7 +2,7 @@
 
 Plataforma web para gestión de eventos multijugador de Arma 3 y Arma Reforger entre múltiples clanes.
 
-![Version](https://img.shields.io/badge/version-1.0.0-blue.svg)
+![Version](https://img.shields.io/badge/version-2.1.0-blue.svg)
 ![License](https://img.shields.io/badge/license-MIT-green.svg)
 
 ## 📋 Características
@@ -24,16 +24,26 @@ Plataforma web para gestión de eventos multijugador de Arma 3 y Arma Reforger e
 ### 📅 Gestión de Eventos
 - **Crear eventos** con fecha, hora, tipo de juego y briefing
 - **Plantillas reutilizables** - Crea eventos basados en eventos anteriores
+- **Estados de eventos**:
+  - ACTIVO: Evento abierto para inscripciones
+  - INACTIVO: Evento pausado
+  - FINALIZADO: Auto-finalización cuando pasa la fecha programada
 - **Edición completa**:
   - Información básica (nombre, fecha, descripción)
   - Estructura de escuadras y slots
   - Agregar/eliminar escuadras dinámicamente
   - Modificar roles de slots
+- **Archivos del evento**:
+  - Subir PDF de briefing (máx. 10MB)
+  - Subir HTML de modset Arma 3 (máx. 10MB)
+  - Descargar/eliminar archivos
+  - Validación de tipos de archivo
 - **Sistema de inscripción**:
   - Usuarios se apuntan/desapuntan
   - Admin/Líder asignan usuarios a slots
   - Mover usuarios entre slots
   - Desapuntar usuarios
+- **Visualización en 3 columnas** - Layout responsive para escuadras
 
 ### 👥 Gestión de Usuarios
 - **Registro con validación de clan**
@@ -249,7 +259,9 @@ arma-multiclan-platform/
 - ✅ Actualización automática de tokens Discord
 - ✅ Validación de entrada en frontend y backend
 - ✅ Sanitización de datos
-- ✅ Subida de archivos restringida (tipos y tamaños)
+- ✅ Subida de archivos restringida (tipos y tamaños: 10MB)
+- ✅ Validación de archivos por magic bytes (file-type)
+- ✅ Validación de HTML para prevenir scripts maliciosos
 - ✅ CORS configurado con credentials
 - ✅ Logs de auditoría para acciones importantes
 
@@ -261,16 +273,20 @@ arma-multiclan-platform/
 - ✅ **Integración Discord OAuth2** - Login y vinculación de cuentas
 - ✅ **Tokens seguros** - Cookies httpOnly con refresh automático
 - ✅ **Discord API** - Acceso a información de usuario, conexiones y servidores
+- ✅ **Perfil de usuario** - Ver y editar perfil personal
+- ✅ **Modo claro/oscuro** - Tema con toggle y persistencia
+- ✅ **Estados de eventos** - ACTIVO, INACTIVO, FINALIZADO con auto-finalización
+- ✅ **Archivos de evento** - Subida de PDF/HTML para briefing y modset
+- ✅ **Layout 3 columnas** - Visualización responsive de escuadras
 
 ### Próximas Funcionalidades
-- [ ] **Perfil de usuario** - Ver y editar perfil personal
 - [ ] **Estadísticas** - Dashboard con métricas de eventos
 - [ ] **Notificaciones** - Alertas de eventos y cambios
 - [ ] **Bot de Discord** - Gestión de roles y notificaciones automáticas
 - [ ] **Linked Roles** - Sincronización de roles entre plataforma y Discord
 - [ ] **Calendario visual** - Vista de eventos en calendario
-- [ ] **Modo oscuro** - Tema oscuro para la interfaz
 - [ ] **Exportar reportes** - Excel/PDF de eventos y asistencia
+- [ ] **Historial de participación** - Eventos pasados por usuario
 
 ### Deployment
 - [ ] Backend en Railway/Render

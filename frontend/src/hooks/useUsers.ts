@@ -8,6 +8,8 @@ export function useUsers(filters?: {
   role?: string;
   status?: string;
   search?: string;
+  page?: number;
+  limit?: number;
 }) {
   return useQuery({
     queryKey: ['users', filters],
@@ -104,8 +106,12 @@ export function useAvailableUsers(clanId?: string) {
   return useQuery({
     queryKey: ['users', 'available', clanId],
     queryFn: async () => {
-      const params = clanId ? { clanId, status: 'ACTIVE' } : { status: 'ACTIVE' };
-      return userService.getAll(params);
+      // Para usuarios disponibles, traemos todos sin paginación (limit alto)
+      const params = clanId
+        ? { clanId, status: 'ACTIVE', limit: 500 }
+        : { status: 'ACTIVE', limit: 500 };
+      const result = await userService.getAll(params);
+      return { users: result.users, count: result.total };
     },
   });
 }

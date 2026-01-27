@@ -10,12 +10,15 @@ export class UserController {
   // GET /api/users
   async getAllUsers(req: Request, res: Response) {
     try {
-      const { clanId, role, status } = req.query;
+      const { clanId, role, status, search, page, limit } = req.query;
 
       // Si es líder de clan, filtrar solo por su clan
       let filters: any = {
         role: role as UserRole,
-        status: status as UserStatus
+        status: status as UserStatus,
+        search: search as string,
+        page: page ? parseInt(page as string, 10) : 1,
+        limit: limit ? parseInt(limit as string, 10) : 20,
       };
 
       if (req.user?.role === UserRole.CLAN_LEADER) {
@@ -26,9 +29,15 @@ export class UserController {
         filters.clanId = clanId as string;
       }
 
-      const users = await userService.getAllUsers(filters);
+      const result = await userService.getAllUsers(filters);
 
-      return successResponse(res, { users, count: users.length }, 'Usuarios obtenidos correctamente');
+      return successResponse(res, {
+        users: result.users,
+        total: result.total,
+        page: result.page,
+        limit: result.limit,
+        totalPages: result.totalPages,
+      }, 'Usuarios obtenidos correctamente');
     } catch (error: any) {
       logger.error('Error in getAllUsers', error);
       return errorResponse(res, error.message || 'Error al obtener usuarios', 500);

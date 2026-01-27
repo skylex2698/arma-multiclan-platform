@@ -8,6 +8,9 @@ export function useEvents(filters?: {
   gameType?: string;
   upcoming?: boolean;
   includeAll?: boolean;
+  search?: string;
+  page?: number;
+  limit?: number;
 }) {
   return useQuery({
     queryKey: ['events', filters],

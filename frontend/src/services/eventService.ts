@@ -2,21 +2,35 @@ import { api } from './api';
 import type { ApiResponse, Event, CreateEventForm } from '../types';
 import type { GameType } from '../types';
 
+export interface PaginatedEventsResponse {
+  events: Event[];
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+}
+
 export const eventService = {
-  // Obtener todos los eventos
+  // Obtener todos los eventos con paginación
   getAll: async (filters?: {
     status?: string;
     gameType?: string;
     upcoming?: boolean;
     includeAll?: boolean;
-  }): Promise<{ events: Event[]; count: number }> => {
+    search?: string;
+    page?: number;
+    limit?: number;
+  }): Promise<PaginatedEventsResponse> => {
     const params = new URLSearchParams();
     if (filters?.status) params.append('status', filters.status);
     if (filters?.gameType) params.append('gameType', filters.gameType);
     if (filters?.upcoming) params.append('upcoming', 'true');
     if (filters?.includeAll) params.append('includeAll', 'true');
+    if (filters?.search) params.append('search', filters.search);
+    if (filters?.page) params.append('page', filters.page.toString());
+    if (filters?.limit) params.append('limit', filters.limit.toString());
 
-    const response = await api.get<ApiResponse<{ events: Event[]; count: number }>>(
+    const response = await api.get<ApiResponse<PaginatedEventsResponse>>(
       `/events?${params.toString()}`
     );
     return response.data.data;

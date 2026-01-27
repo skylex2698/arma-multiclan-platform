@@ -104,25 +104,80 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ### 🎯 Próximas Funcionalidades
 
-**En Desarrollo:**
-- Perfil de usuario (ver y editar información personal)
-
 **Planificadas:**
 - Estadísticas y reportes
 - Notificaciones en tiempo real
-- Integración con Discord (OAuth + Bot)
+- Bot de Discord para gestión de roles
 - Calendario visual de eventos
-- Modo oscuro
 - Exportar reportes (Excel/PDF)
 - Sistema de asistencia/confirmación
 - Historial de eventos por usuario
 
 ---
 
+## [2.1.0] - 2025-01-27
+
+### ✨ Agregado
+
+**Sistema de Estados de Eventos:**
+- Nuevo estado FINISHED para eventos completados
+- Auto-finalización de eventos cuando pasa la fecha programada
+- Transición automática: ACTIVE → FINISHED
+- Protección: Eventos finalizados no permiten cambios de slots ni edición
+
+**Subida de Archivos para Eventos:**
+- Subida de archivos PDF de briefing (máximo 10MB)
+- Subida de archivos HTML de modset para Arma 3 (máximo 10MB)
+- Validación de tipos de archivo por extensión y magic bytes
+- Validación de contenido HTML para prevenir scripts maliciosos
+- Botones para descargar, abrir en nueva pestaña y eliminar archivos
+- Permisos: Solo creador, admin o líder de clan pueden gestionar archivos
+
+**Backend - Archivos:**
+- Configuración de Multer para briefing (PDF) y modset (HTML)
+- Endpoints POST/DELETE para /events/:id/briefing-file
+- Endpoints POST/DELETE para /events/:id/modset-file
+- Validación de permisos por rol y estado del evento
+- Almacenamiento en /public/uploads/events/
+
+**Frontend - Archivos:**
+- Hooks useUploadBriefingFile, useUploadModsetFile
+- Hooks useDeleteBriefingFile, useDeleteModsetFile
+- UI completa en pestaña Briefing para gestión de archivos
+- Indicadores de carga durante subida
+- Mensajes de error descriptivos
+
+### 🎨 Mejoras Visuales
+
+**Layout de Escuadras en 3 Columnas:**
+- Visualización de escuadras en grid responsive
+- 1 columna en móvil, 2 en tablet, 3 en desktop
+- Mejor aprovechamiento del espacio en pantallas grandes
+- Alineación superior de cards con items-start
+
+### 🔧 Técnico
+
+**Base de Datos:**
+- Nuevo campo briefingFileUrl en modelo Event
+- Nuevo campo modsetFileUrl en modelo Event
+- Valor FINISHED añadido al enum EventStatus
+- Migraciones: add_finished_status, add_event_files
+
+**Dependencias:**
+- file-type: Validación de tipos de archivo por magic bytes
+
+---
+
 ## Tipos de Cambios
 
 - **Agregado** - Para nuevas características
-- **Cambiado** - Para cambios en fu
+- **Cambiado** - Para cambios en funcionalidades existentes
+- **Obsoleto** - Para funcionalidades que serán eliminadas
+- **Eliminado** - Para funcionalidades eliminadas
+- **Corregido** - Para correcciones de bugs
+- **Seguridad** - Para vulnerabilidades corregidas
+
+---
 
 ## [1.1.0] - 2025-01-20
 

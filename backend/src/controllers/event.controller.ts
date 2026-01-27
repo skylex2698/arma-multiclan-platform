@@ -11,16 +11,25 @@ export class EventController {
   // GET /api/events
   async getAllEvents(req: Request, res: Response) {
     try {
-      const { status, gameType, upcoming, includeAll } = req.query;
+      const { status, gameType, upcoming, includeAll, search, page, limit } = req.query;
 
-      const events = await eventService.getAllEvents({
+      const result = await eventService.getAllEvents({
         status: status as EventStatus,
         gameType: gameType as GameType,
         upcoming: upcoming === 'true',
-        includeAll: includeAll === 'true'
+        includeAll: includeAll === 'true',
+        search: search as string,
+        page: page ? parseInt(page as string, 10) : 1,
+        limit: limit ? parseInt(limit as string, 10) : 12,
       });
 
-      return successResponse(res, { events, count: events.length }, 'Eventos obtenidos correctamente');
+      return successResponse(res, {
+        events: result.events,
+        total: result.total,
+        page: result.page,
+        limit: result.limit,
+        totalPages: result.totalPages,
+      }, 'Eventos obtenidos correctamente');
     } catch (error: any) {
       logger.error('Error in getAllEvents', error);
       return errorResponse(res, error.message || 'Error al obtener eventos', 500);

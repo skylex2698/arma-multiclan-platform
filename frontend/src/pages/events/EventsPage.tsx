@@ -6,6 +6,9 @@ import { useAuthStore } from '../../store/authStore';
 import { EventCard } from '../../components/events/EventCard';
 import { EventFilters } from '../../components/events/EventFilters';
 import { LoadingSpinner } from '../../components/ui/LoadingSpinner';
+import { Pagination } from '../../components/ui/Pagination';
+
+const ITEMS_PER_PAGE = 12;
 
 export default function EventsPage() {
   const user = useAuthStore((state) => state.user);
@@ -13,6 +16,17 @@ export default function EventsPage() {
   const [gameTypeFilter, setGameTypeFilter] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
   const [upcomingOnly, setUpcomingOnly] = useState(false);
+  const [page, setPage] = useState(1);
+
+  // Debounce search
+  const [debouncedSearch, setDebouncedSearch] = useState('');
+  useMemo(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(searchQuery);
+      setPage(1); // Reset to first page on search
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
 
   // Si se selecciona un filtro de estado, necesitamos incluir todos los eventos
   // para que el backend no filtre solo ACTIVE por defecto
@@ -21,28 +35,21 @@ export default function EventsPage() {
     status: statusFilter || undefined,
     upcoming: upcomingOnly || undefined,
     includeAll: statusFilter ? true : undefined,
+    search: debouncedSearch || undefined,
+    page,
+    limit: ITEMS_PER_PAGE,
   });
 
-  const filteredEvents = useMemo(() => {
-    if (!data?.events) return [];
+  const events = data?.events || [];
+  const totalPages = data?.totalPages || 1;
+  const totalEvents = data?.total || 0;
 
-    let filtered = data.events;
-
-    // Filtrar por búsqueda
-    if (searchQuery) {
-      filtered = filtered.filter((event) =>
-        event.name.toLowerCase().includes(searchQuery.toLowerCase())
-      );
-    }
-
-    return filtered;
-  }, [data?.events, searchQuery]);
+  const handleFilterChange = (setter: (value: string | boolean) => void) => (value: string | boolean) => {
+    setter(value);
+    setPage(1); // Reset to first page on filter change
+  };
 
   const canCreateEvent = user?.role === 'ADMIN' || user?.role === 'CLAN_LEADER';
-
-  if (isLoading) {
-    return <LoadingSpinner />;
-  }
 
   if (error) {
     return (
@@ -60,7 +67,7 @@ export default function EventsPage() {
             Eventos
           </h1>
           <p className="text-military-600 dark:text-gray-400">
-            {data?.count || 0} eventos disponibles
+            {totalEvents} eventos disponibles
           </p>
         </div>
         {canCreateEvent && (
@@ -73,18 +80,24 @@ export default function EventsPage() {
 
       <EventFilters
         searchQuery={searchQuery}
-        onSearchChange={setSearchQuery}
+        onSearchChange={(value) => {
+          setSearchQuery(value);
+        }}
         gameTypeFilter={gameTypeFilter}
-        onGameTypeChange={setGameTypeFilter}
+        onGameTypeChange={(value) => handleFilterChange(setGameTypeFilter)(value)}
         statusFilter={statusFilter}
-        onStatusChange={setStatusFilter}
+        onStatusChange={(value) => handleFilterChange(setStatusFilter)(value)}
         upcomingOnly={upcomingOnly}
-        onUpcomingOnlyChange={setUpcomingOnly}
+        onUpcomingOnlyChange={(value) => handleFilterChange(setUpcomingOnly)(value)}
       />
 
-      {filteredEvents.length === 0 ? (
+      {isLoading ? (
+        <div className="flex justify-center py-12">
+          <LoadingSpinner />
+        </div>
+      ) : events.length === 0 ? (
         <div className="card text-center py-12">
-          <p className="text-military-600 mb-4">No hay eventos disponibles</p>
+          <p className="text-military-600 dark:text-gray-400 mb-4">No hay eventos disponibles</p>
           {canCreateEvent && (
             <Link to="/events/create" className="btn btn-primary inline-flex items-center">
               <Plus className="h-4 w-4 mr-2" />
@@ -93,11 +106,24 @@ export default function EventsPage() {
           )}
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {filteredEvents.map((event) => (
-            <EventCard key={event.id} event={event} />
-          ))}
-        </div>
+        <>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {events.map((event) => (
+              <EventCard key={event.id} event={event} />
+            ))}
+          </div>
+
+          {/* Paginación */}
+          <div className="mt-8">
+            <Pagination
+              currentPage={page}
+              totalPages={totalPages}
+              onPageChange={setPage}
+              totalItems={totalEvents}
+              itemsPerPage={ITEMS_PER_PAGE}
+            />
+          </div>
+        </>
       )}
     </div>
   );

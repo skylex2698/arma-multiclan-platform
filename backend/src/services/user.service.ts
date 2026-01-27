@@ -4,42 +4,72 @@ import { UserRole, UserStatus } from '@prisma/client';
 import { hashPassword, comparePassword } from '../utils/password';
 
 export class UserService {
-  // Listar usuarios con filtros
+  // Listar usuarios con filtros y paginación
   async getAllUsers(filters?: {
     clanId?: string;
     role?: UserRole;
     status?: UserStatus;
+    search?: string;
+    page?: number;
+    limit?: number;
   }) {
-    const users = await prisma.user.findMany({
-      where: {
-        ...(filters?.clanId && { clanId: filters.clanId }),
-        ...(filters?.role && { role: filters.role }),
-        ...(filters?.status && { status: filters.status })
-      },
-      select: {
-        id: true,
-        email: true,
-        nickname: true,
-        role: true,
-        status: true,
-        clanId: true,
-        discordId: true,
-        discordUsername: true,
-        clan: {
-          select: {
-            name: true,
-            tag: true
-          }
-        },
-        createdAt: true
-      },
-      orderBy: [
-        { role: 'desc' },
-        { nickname: 'asc' }
-      ]
-    });
+    const page = filters?.page || 1;
+    const limit = filters?.limit || 20;
+    const skip = (page - 1) * limit;
 
-    return users;
+    // Construir condiciones de búsqueda
+    const where: any = {
+      ...(filters?.clanId && { clanId: filters.clanId }),
+      ...(filters?.role && { role: filters.role }),
+      ...(filters?.status && { status: filters.status }),
+    };
+
+    // Búsqueda por nombre o email
+    if (filters?.search) {
+      where.OR = [
+        { nickname: { contains: filters.search, mode: 'insensitive' } },
+        { email: { contains: filters.search, mode: 'insensitive' } },
+      ];
+    }
+
+    // Obtener total y usuarios en paralelo
+    const [total, users] = await Promise.all([
+      prisma.user.count({ where }),
+      prisma.user.findMany({
+        where,
+        select: {
+          id: true,
+          email: true,
+          nickname: true,
+          role: true,
+          status: true,
+          clanId: true,
+          discordId: true,
+          discordUsername: true,
+          clan: {
+            select: {
+              name: true,
+              tag: true
+            }
+          },
+          createdAt: true
+        },
+        orderBy: [
+          { role: 'desc' },
+          { nickname: 'asc' }
+        ],
+        skip,
+        take: limit,
+      }),
+    ]);
+
+    return {
+      users,
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit),
+    };
   }
 
   // Obtener usuario por ID

@@ -53,17 +53,23 @@ export class EventService {
   // MÉTODOS DE LISTADO
   // ============================================
 
-  // Listar eventos con filtros
+  // Listar eventos con filtros y paginación
   async getAllEvents(filters?: {
     status?: EventStatus;
     gameType?: GameType;
     upcoming?: boolean;
     includeAll?: boolean; // Si true, muestra todos los estados
+    search?: string;
+    page?: number;
+    limit?: number;
   }) {
     // Primero verificar y finalizar eventos expirados
     await this.checkAndFinishExpiredEvents();
 
     const now = new Date();
+    const page = filters?.page || 1;
+    const limit = filters?.limit || 12;
+    const skip = (page - 1) * limit;
 
     // Por defecto: solo eventos ACTIVE, ordenados por fecha más próxima
     const whereClause: Record<string, unknown> = {};
@@ -90,56 +96,67 @@ export class EventService {
       whereClause.status = EventStatus.ACTIVE;
     }
 
-    const events = await prisma.event.findMany({
-      where: whereClause,
-      include: {
-        creator: {
-          select: {
-            id: true,
-            nickname: true,
-            clanId: true,
-            clan: {
-              select: {
-                id: true,
-                name: true,
-                tag: true
+    // Búsqueda por nombre
+    if (filters?.search) {
+      whereClause.name = { contains: filters.search, mode: 'insensitive' };
+    }
+
+    // Obtener total y eventos en paralelo
+    const [total, events] = await Promise.all([
+      prisma.event.count({ where: whereClause }),
+      prisma.event.findMany({
+        where: whereClause,
+        include: {
+          creator: {
+            select: {
+              id: true,
+              nickname: true,
+              clanId: true,
+              clan: {
+                select: {
+                  id: true,
+                  name: true,
+                  tag: true
+                }
               }
             }
-          }
-        },
-        squads: {
-          include: {
-            slots: {
-              include: {
-                user: {
-                  select: {
-                    id: true,
-                    nickname: true,
-                    clan: {
-                      select: {
-                        name: true,
-                        tag: true
+          },
+          squads: {
+            include: {
+              slots: {
+                include: {
+                  user: {
+                    select: {
+                      id: true,
+                      nickname: true,
+                      clan: {
+                        select: {
+                          name: true,
+                          tag: true
+                        }
                       }
                     }
                   }
-                }
-              },
-              orderBy: { order: 'asc' }
-            }
+                },
+                orderBy: { order: 'asc' }
+              }
+            },
+            orderBy: { order: 'asc' }
           },
-          orderBy: { order: 'asc' }
-        },
-        _count: {
-          select: {
-            squads: true
+          _count: {
+            select: {
+              squads: true
+            }
           }
-        }
-      },
-      // Ordenar por fecha más próxima primero
-      orderBy: { scheduledDate: 'asc' }
-    });
+        },
+        // Ordenar por fecha más próxima primero
+        orderBy: { scheduledDate: 'asc' },
+        skip,
+        take: limit,
+      }),
+    ]);
 
-    return events.map(event => ({
+    const eventsWithCounts = events.map(event => ({
       ...event,
       totalSlots: event.squads.reduce((acc, squad) => acc + squad.slots.length, 0),
       occupiedSlots: event.squads.reduce(
@@ -147,6 +164,14 @@ export class EventService {
         0
       )
     }));
+
+    return {
+      events: eventsWithCounts,
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit),
+    };
   }
 
   // Obtener evento por ID

@@ -87,35 +87,35 @@ export default function CreateEventFromTemplatePage() {
     <div>
       <Link
         to="/events"
-        className="inline-flex items-center text-military-600 hover:text-military-900 mb-6"
+        className="inline-flex items-center text-military-600 dark:text-gray-400 hover:text-military-900 dark:hover:text-gray-200 mb-6"
       >
         <ArrowLeft className="h-4 w-4 mr-2" />
         Volver a eventos
       </Link>
 
-      <h1 className="text-3xl font-bold text-military-900 mb-6">
+      <h1 className="text-3xl font-bold text-military-900 dark:text-gray-100 mb-6">
         Crear Evento desde Plantilla
       </h1>
 
       {error && (
-        <div className="card bg-red-50 border border-red-200 mb-6">
-          <p className="text-red-700">{error}</p>
+        <div className="card bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 mb-6">
+          <p className="text-red-700 dark:text-red-400">{error}</p>
         </div>
       )}
 
       {/* Información de la plantilla */}
-      <Card className="mb-6 bg-blue-50 border-blue-200">
+      <Card className="mb-6 bg-blue-50 dark:bg-blue-900/30 border-blue-200 dark:border-blue-800">
         <div className="flex items-center gap-3 mb-2">
-          <Copy className="h-5 w-5 text-blue-600" />
-          <h2 className="text-lg font-bold text-blue-900">
+          <Copy className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+          <h2 className="text-lg font-bold text-blue-900 dark:text-blue-100">
             Usando como plantilla: {template.name}
           </h2>
         </div>
-        <p className="text-sm text-blue-700">
+        <p className="text-sm text-blue-700 dark:text-blue-300">
           Se copiará la estructura de escuadras y slots. Los slots estarán libres
           para que los usuarios se apunten.
         </p>
-        <div className="mt-2 text-sm text-blue-600">
+        <div className="mt-2 text-sm text-blue-600 dark:text-blue-400">
           <strong>Estructura:</strong> {template.squads.length} escuadras,{' '}
           {template.totalSlots} slots totales
         </div>
@@ -124,13 +124,13 @@ export default function CreateEventFromTemplatePage() {
       <form onSubmit={handleSubmit}>
         {/* Información básica */}
         <Card className="mb-6">
-          <h2 className="text-xl font-bold text-military-900 mb-4">
+          <h2 className="text-xl font-bold text-military-900 dark:text-gray-100 mb-4">
             Información del Nuevo Evento
           </h2>
 
           <div className="space-y-4">
             <div>
-              <label className="block text-sm font-medium text-military-700 mb-1">
+              <label className="block text-sm font-medium text-military-700 dark:text-gray-300 mb-1">
                 Nombre del Evento *
               </label>
               <input
@@ -144,7 +144,7 @@ export default function CreateEventFromTemplatePage() {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-military-700 mb-1">
+              <label className="block text-sm font-medium text-military-700 dark:text-gray-300 mb-1">
                 Descripción
               </label>
               <textarea
@@ -158,7 +158,7 @@ export default function CreateEventFromTemplatePage() {
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium text-military-700 mb-1">
+                <label className="block text-sm font-medium text-military-700 dark:text-gray-300 mb-1">
                   Fecha *
                 </label>
                 <input
@@ -171,7 +171,7 @@ export default function CreateEventFromTemplatePage() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-military-700 mb-1">
+                <label className="block text-sm font-medium text-military-700 dark:text-gray-300 mb-1">
                   Hora *
                 </label>
                 <input
@@ -185,7 +185,7 @@ export default function CreateEventFromTemplatePage() {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label className="block text-sm font-medium text-military-700 dark:text-gray-300 mb-2">
                 Briefing del Evento
               </label>
               <BriefingEditorWithTemplates
@@ -193,8 +193,8 @@ export default function CreateEventFromTemplatePage() {
                 onChange={setBriefing}
                 placeholder="Edita el briefing del evento..."
               />
-              <p className="text-xs text-gray-500 mt-2">
-                💡 El briefing se ha copiado de la plantilla. Puedes editarlo libremente.
+              <p className="text-xs text-military-500 dark:text-gray-500 mt-2">
+                El briefing se ha copiado de la plantilla. Puedes editarlo libremente.
               </p>
             </div>
           </div>
@@ -202,7 +202,7 @@ export default function CreateEventFromTemplatePage() {
 
         {/* Vista previa de estructura */}
         <Card className="mb-6">
-          <h2 className="text-xl font-bold text-military-900 mb-4">
+          <h2 className="text-xl font-bold text-military-900 dark:text-gray-100 mb-4">
             Vista Previa de la Estructura
           </h2>
           <div className="space-y-3">
@@ -211,9 +211,9 @@ export default function CreateEventFromTemplatePage() {
               .map((squad) => (
                 <div
                   key={squad.id}
-                  className="p-3 bg-military-50 rounded-lg border border-military-200"
+                  className="p-3 bg-military-50 dark:bg-gray-700 rounded-lg border border-military-200 dark:border-gray-600"
                 >
-                  <p className="font-medium text-military-900 mb-2">
+                  <p className="font-medium text-military-900 dark:text-gray-100 mb-2">
                     {squad.name} - {squad.slots.length} slots
                   </p>
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
@@ -222,7 +222,7 @@ export default function CreateEventFromTemplatePage() {
                       .map((slot) => (
                         <div
                           key={slot.id}
-                          className="text-xs px-2 py-1 bg-white rounded border border-military-200"
+                          className="text-xs px-2 py-1 bg-white dark:bg-gray-800 rounded border border-military-200 dark:border-gray-600 text-military-700 dark:text-gray-300"
                         >
                           {slot.role}
                         </div>

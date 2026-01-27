@@ -54,23 +54,23 @@ export default function LoginPage() {
           </h2>
 
           {error && (
-            <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded mb-4">
+            <div className="bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-400 px-4 py-3 rounded mb-4">
               {error}
             </div>
           )}
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
-              <label className="block text-sm font-medium text-military-700 mb-1">
+              <label className="block text-sm font-medium text-military-700 dark:text-gray-300 mb-1">
                 Email
               </label>
               <div className="relative">
-                <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-military-400" />
+                <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-military-400 dark:text-gray-500" />
                 <input
                   type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  className="w-full pl-10 pr-4 py-2 border border-military-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                  className="w-full pl-10 pr-4 py-2 border border-military-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
                   placeholder="tu@email.com"
                   required
                 />
@@ -78,16 +78,16 @@ export default function LoginPage() {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-military-700 mb-1">
+              <label className="block text-sm font-medium text-military-700 dark:text-gray-300 mb-1">
                 Contraseña
               </label>
               <div className="relative">
-                <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-military-400" />
+                <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-military-400 dark:text-gray-500" />
                 <input
                   type="password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="w-full pl-10 pr-4 py-2 border border-military-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                  className="w-full pl-10 pr-4 py-2 border border-military-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
                   placeholder="••••••••"
                   required
                 />
@@ -114,28 +114,28 @@ export default function LoginPage() {
           {/* Discord Login */}
           <DiscordLoginButton />
 
-          <div className="mt-6 text-center text-sm text-military-600">
+          <div className="mt-6 text-center text-sm text-military-600 dark:text-gray-400">
             ¿No tienes cuenta?{' '}
             <Link
               to="/register"
-              className="text-primary-600 hover:text-primary-700 font-medium"
+              className="text-primary-600 hover:text-primary-700 dark:text-primary-400 dark:hover:text-primary-300 font-medium"
             >
               Regístrate aquí
             </Link>
           </div>
 
           {/* Usuarios de prueba */}
-          <div className="mt-6 pt-6 border-t border-military-200">
-            <p className="text-xs text-military-600 mb-2">Usuarios de prueba:</p>
-            <div className="space-y-1 text-xs text-military-500">
+          <div className="mt-6 pt-6 border-t border-military-200 dark:border-gray-600">
+            <p className="text-xs text-military-600 dark:text-gray-400 mb-2">Usuarios de prueba:</p>
+            <div className="space-y-1 text-xs text-military-500 dark:text-gray-500">
               <p>
-                <strong>Admin:</strong> admin@arma.com / Admin123!
+                <strong className="dark:text-gray-400">Admin:</strong> admin@arma.com / Admin123!
               </p>
               <p>
-                <strong>Líder:</strong> leader@arma.com / Leader123!
+                <strong className="dark:text-gray-400">Líder:</strong> leader@arma.com / Leader123!
               </p>
               <p>
-                <strong>Usuario:</strong> user@arma.com / User123!
+                <strong className="dark:text-gray-400">Usuario:</strong> user@arma.com / User123!
               </p>
             </div>
           </div>

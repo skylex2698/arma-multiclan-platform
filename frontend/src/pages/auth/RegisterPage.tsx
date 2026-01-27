@@ -71,20 +71,20 @@ export default function RegisterPage() {
   if (success) {
     return (
       <div>
-        <div className="bg-green-50 border border-green-200 rounded-lg p-6 mb-6">
+        <div className="bg-green-50 dark:bg-green-900/30 border border-green-200 dark:border-green-800 rounded-lg p-6 mb-6">
           <div className="flex items-center mb-4">
             <div className="bg-green-500 p-2 rounded-full mr-3">
               <UserPlus className="h-6 w-6 text-white" />
             </div>
-            <h2 className="text-2xl font-bold text-green-900">
+            <h2 className="text-2xl font-bold text-green-900 dark:text-green-300">
               ¡Registro Exitoso!
             </h2>
           </div>
-          <p className="text-green-800 mb-4">
+          <p className="text-green-800 dark:text-green-400 mb-4">
             Tu cuenta ha sido creada correctamente. Un administrador o líder de
             clan debe validar tu cuenta antes de que puedas acceder.
           </p>
-          <p className="text-green-700 text-sm">
+          <p className="text-green-700 dark:text-green-500 text-sm">
             Recibirás un email cuando tu cuenta sea validada.
           </p>
         </div>
@@ -92,7 +92,7 @@ export default function RegisterPage() {
         <div className="text-center">
           <Link
             to="/login"
-            className="text-primary-600 hover:text-primary-700 font-medium"
+            className="text-primary-600 hover:text-primary-700 dark:text-primary-400 dark:hover:text-primary-300 font-medium"
           >
             ← Volver al login
           </Link>
@@ -103,12 +103,12 @@ export default function RegisterPage() {
 
   return (
     <div>
-      <h2 className="text-2xl font-bold text-military-900 mb-6">
+      <h2 className="text-2xl font-bold text-military-900 dark:text-gray-100 mb-6">
         Crear Cuenta
       </h2>
 
       {error && (
-        <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg mb-4 flex items-start">
+        <div className="bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-400 px-4 py-3 rounded-lg mb-4 flex items-start">
           <AlertCircle className="h-5 w-5 mr-2 flex-shrink-0 mt-0.5" />
           <span>{error}</span>
         </div>
@@ -118,7 +118,7 @@ export default function RegisterPage() {
         <div>
           <label
             htmlFor="email"
-            className="block text-sm font-medium text-military-700 mb-1"
+            className="block text-sm font-medium text-military-700 dark:text-gray-300 mb-1"
           >
             Email *
           </label>
@@ -137,7 +137,7 @@ export default function RegisterPage() {
         <div>
           <label
             htmlFor="nickname"
-            className="block text-sm font-medium text-military-700 mb-1"
+            className="block text-sm font-medium text-military-700 dark:text-gray-300 mb-1"
           >
             Nickname *
           </label>
@@ -152,7 +152,7 @@ export default function RegisterPage() {
             disabled={loading}
             minLength={3}
           />
-          <p className="text-xs text-military-500 mt-1">
+          <p className="text-xs text-military-500 dark:text-gray-400 mt-1">
             Mínimo 3 caracteres
           </p>
         </div>
@@ -160,7 +160,7 @@ export default function RegisterPage() {
         <div>
           <label
             htmlFor="password"
-            className="block text-sm font-medium text-military-700 mb-1"
+            className="block text-sm font-medium text-military-700 dark:text-gray-300 mb-1"
           >
             Contraseña *
           </label>
@@ -175,7 +175,7 @@ export default function RegisterPage() {
             disabled={loading}
             minLength={8}
           />
-          <p className="text-xs text-military-500 mt-1">
+          <p className="text-xs text-military-500 dark:text-gray-400 mt-1">
             Mínimo 8 caracteres, incluye mayúsculas, minúsculas y números
           </p>
         </div>
@@ -183,7 +183,7 @@ export default function RegisterPage() {
         <div>
           <label
             htmlFor="confirmPassword"
-            className="block text-sm font-medium text-military-700 mb-1"
+            className="block text-sm font-medium text-military-700 dark:text-gray-300 mb-1"
           >
             Confirmar Contraseña *
           </label>
@@ -203,7 +203,7 @@ export default function RegisterPage() {
         <div>
           <label
             htmlFor="clan"
-            className="block text-sm font-medium text-military-700 mb-1"
+            className="block text-sm font-medium text-military-700 dark:text-gray-300 mb-1"
           >
             Clan *
           </label>
@@ -223,7 +223,7 @@ export default function RegisterPage() {
               </option>
             ))}
           </select>
-          <p className="text-xs text-military-500 mt-1">
+          <p className="text-xs text-military-500 dark:text-gray-400 mt-1">
             Un líder de clan o administrador debe aprobar tu solicitud
           </p>
         </div>
@@ -248,11 +248,11 @@ export default function RegisterPage() {
       </form>
 
       <div className="mt-6 text-center">
-        <p className="text-sm text-military-600">
+        <p className="text-sm text-military-600 dark:text-gray-400">
           ¿Ya tienes cuenta?{' '}
           <Link
             to="/login"
-            className="text-primary-600 hover:text-primary-700 font-medium"
+            className="text-primary-600 hover:text-primary-700 dark:text-primary-400 dark:hover:text-primary-300 font-medium"
           >
             Inicia sesión aquí
           </Link>
@@ -260,11 +260,11 @@ export default function RegisterPage() {
       </div>
 
       {/* Información adicional */}
-      <div className="mt-6 p-4 bg-blue-50 rounded-lg border border-blue-200">
-        <p className="text-sm text-blue-900 font-medium mb-2">
+      <div className="mt-6 p-4 bg-blue-50 dark:bg-blue-900/30 rounded-lg border border-blue-200 dark:border-blue-800">
+        <p className="text-sm text-blue-900 dark:text-blue-300 font-medium mb-2">
           📋 Proceso de registro:
         </p>
-        <ol className="text-xs text-blue-800 space-y-1 list-decimal list-inside">
+        <ol className="text-xs text-blue-800 dark:text-blue-400 space-y-1 list-decimal list-inside">
           <li>Completa el formulario con tus datos</li>
           <li>Selecciona el clan al que deseas unirte</li>
           <li>Espera la validación de un administrador o líder de clan</li>

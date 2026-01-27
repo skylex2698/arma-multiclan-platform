@@ -223,32 +223,32 @@ export default function CreateEventPage() {
     <div>
       <Link
         to="/events"
-        className="inline-flex items-center text-military-600 hover:text-military-900 mb-6"
+        className="inline-flex items-center text-military-600 dark:text-gray-400 hover:text-military-900 dark:hover:text-gray-200 mb-6"
       >
         <ArrowLeft className="h-4 w-4 mr-2" />
         Volver a eventos
       </Link>
 
-      <h1 className="text-3xl font-bold text-military-900 mb-6">
+      <h1 className="text-3xl font-bold text-military-900 dark:text-gray-100 mb-6">
         Crear Nuevo Evento
       </h1>
 
       {error && (
-        <div className="card bg-red-50 border border-red-200 mb-6">
-          <p className="text-red-700">{error}</p>
+        <div className="card bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 mb-6">
+          <p className="text-red-700 dark:text-red-400">{error}</p>
         </div>
       )}
 
       <form onSubmit={handleSubmit}>
         {/* Información básica */}
         <Card className="mb-6">
-          <h2 className="text-xl font-bold text-military-900 mb-4">
+          <h2 className="text-xl font-bold text-military-900 dark:text-gray-100 mb-4">
             Información Básica
           </h2>
 
           <div className="space-y-4">
             <div>
-              <label className="block text-sm font-medium text-military-700 mb-2">
+              <label className="block text-sm font-medium text-military-700 dark:text-gray-300 mb-2">
                 Nombre del Evento *
               </label>
               <input
@@ -261,7 +261,7 @@ export default function CreateEventPage() {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-military-700 mb-2">
+              <label className="block text-sm font-medium text-military-700 dark:text-gray-300 mb-2">
                 Descripción
               </label>
               <textarea
@@ -274,7 +274,7 @@ export default function CreateEventPage() {
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div>
-                <label className="block text-sm font-medium text-military-700 mb-2">
+                <label className="block text-sm font-medium text-military-700 dark:text-gray-300 mb-2">
                   Tipo de Juego *
                 </label>
                 <select
@@ -289,7 +289,7 @@ export default function CreateEventPage() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-military-700 mb-2">
+                <label className="block text-sm font-medium text-military-700 dark:text-gray-300 mb-2">
                   Fecha *
                 </label>
                 <input
@@ -302,7 +302,7 @@ export default function CreateEventPage() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-military-700 mb-2">
+                <label className="block text-sm font-medium text-military-700 dark:text-gray-300 mb-2">
                   Hora *
                 </label>
                 <input
@@ -316,7 +316,7 @@ export default function CreateEventPage() {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-military-700 mb-2">
+              <label className="block text-sm font-medium text-military-700 dark:text-gray-300 mb-2">
                 Briefing del Evento
               </label>
               <BriefingEditorWithTemplates
@@ -324,7 +324,7 @@ export default function CreateEventPage() {
                 onChange={setBriefing}
                 placeholder="Escribe el briefing del evento aquí..."
               />
-              <div className="mt-2 text-xs text-gray-500 space-y-1">
+              <div className="mt-2 text-xs text-gray-500 dark:text-gray-400 space-y-1">
                 <p>💡 <strong>Tip:</strong> Usa las plantillas predefinidas para empezar más rápido</p>
                 <p>📝 El briefing admite formato rico: títulos, listas, tablas, imágenes y más</p>
               </div>
@@ -335,7 +335,7 @@ export default function CreateEventPage() {
         {/* Escuadras y Slots */}
         <Card className="mb-6">
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-xl font-bold text-military-900">
+            <h2 className="text-xl font-bold text-military-900 dark:text-gray-100">
               Escuadras y Slots
             </h2>
             <button
@@ -355,15 +355,15 @@ export default function CreateEventPage() {
               return (
                 <div
                   key={squad.id}
-                  className="border-2 border-military-200 rounded-lg overflow-hidden"
+                  className="border-2 border-military-200 dark:border-gray-600 rounded-lg overflow-hidden"
                 >
                   {/* Header */}
-                  <div className="p-4 bg-military-100 flex items-center justify-between">
+                  <div className="p-4 bg-military-100 dark:bg-gray-700 flex items-center justify-between">
                     <div className="flex items-center gap-3 flex-1">
                       <button
                         type="button"
                         onClick={() => toggleSquad(squad.id)}
-                        className="p-1 hover:bg-military-200 rounded"
+                        className="p-1 hover:bg-military-200 dark:hover:bg-gray-600 rounded"
                       >
                         {isExpanded ? (
                           <ChevronDown className="w-5 h-5" />
@@ -381,7 +381,7 @@ export default function CreateEventPage() {
                       />
                     </div>
                     <div className="flex items-center gap-2 ml-4">
-                      <span className="text-sm text-military-600">
+                      <span className="text-sm text-military-600 dark:text-gray-400">
                         {squad.slots.length} slots
                       </span>
                       <button
@@ -396,11 +396,11 @@ export default function CreateEventPage() {
 
                   {/* Contenido expandible */}
                   {isExpanded && (
-                    <div className="p-4 space-y-4">
+                    <div className="p-4 space-y-4 bg-white dark:bg-gray-800">
                       {/* Slots */}
                       <div>
                         <div className="flex items-center justify-between mb-3">
-                          <h4 className="font-medium text-military-900">Slots</h4>
+                          <h4 className="font-medium text-military-900 dark:text-gray-100">Slots</h4>
                           <button
                             type="button"
                             onClick={() => addSlot(squad.id)}
@@ -414,7 +414,7 @@ export default function CreateEventPage() {
                         <div className="space-y-2">
                           {squad.slots.map((slot) => (
                             <div key={slot.id} className="flex items-center gap-2">
-                              <span className="text-sm text-military-600 w-8">
+                              <span className="text-sm text-military-600 dark:text-gray-400 w-8">
                                 {slot.order}.
                               </span>
                               <input
@@ -465,7 +465,7 @@ export default function CreateEventPage() {
             })}
 
             {squads.length === 0 && (
-              <div className="text-center py-8 text-military-500">
+              <div className="text-center py-8 text-military-500 dark:text-gray-400">
                 No hay escuadras. Click en "Agregar Escuadra" para empezar.
               </div>
             )}

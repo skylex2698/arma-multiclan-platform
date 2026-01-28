@@ -284,13 +284,13 @@ arma-multiclan-platform/
 - ✅ **Gestión de avatares** - Subir y eliminar logos de clan
 - ✅ **Paginación** - Lista de eventos y usuarios con paginación
 - ✅ **Filtros mejorados** - Filtro por estado con valor por defecto "Activos"
+- ✅ **Calendario visual** - Vista de eventos en calendario
 
 ### Próximas Funcionalidades
 - [ ] **Estadísticas** - Dashboard con métricas de eventos
 - [ ] **Notificaciones** - Alertas de eventos y cambios
 - [ ] **Bot de Discord** - Gestión de roles y notificaciones automáticas
 - [ ] **Linked Roles** - Sincronización de roles entre plataforma y Discord
-- [ ] **Calendario visual** - Vista de eventos en calendario
 - [ ] **Exportar reportes** - Excel/PDF de eventos y asistencia
 - [ ] **Historial de participación** - Eventos pasados por usuario
 

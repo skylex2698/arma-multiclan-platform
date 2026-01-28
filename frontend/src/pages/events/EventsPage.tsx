@@ -5,13 +5,17 @@ import { useEvents } from '../../hooks/useEvents';
 import { useAuthStore } from '../../store/authStore';
 import { EventCard } from '../../components/events/EventCard';
 import { EventFilters } from '../../components/events/EventFilters';
+import { ViewToggle } from '../../components/events/ViewToggle';
+import { EventCalendar } from '../../components/events/EventCalendar';
 import { LoadingSpinner } from '../../components/ui/LoadingSpinner';
 import { Pagination } from '../../components/ui/Pagination';
 
 const ITEMS_PER_PAGE = 12;
+const CALENDAR_ITEMS_LIMIT = 100; // Load more events for calendar view
 
 export default function EventsPage() {
   const user = useAuthStore((state) => state.user);
+  const [view, setView] = useState<'list' | 'calendar'>('list');
   const [searchQuery, setSearchQuery] = useState('');
   const [gameTypeFilter, setGameTypeFilter] = useState('');
   const [statusFilter, setStatusFilter] = useState('ACTIVE');
@@ -28,13 +32,14 @@ export default function EventsPage() {
   }, [searchQuery]);
 
   // includeAll permite mostrar eventos de cualquier estado
+  // For calendar view, load more events to display across the month
   const { data, isLoading, error } = useEvents({
     gameType: gameTypeFilter || undefined,
     status: statusFilter || undefined,
     includeAll: !statusFilter || statusFilter !== 'ACTIVE' ? true : undefined,
     search: debouncedSearch || undefined,
-    page,
-    limit: ITEMS_PER_PAGE,
+    page: view === 'calendar' ? 1 : page,
+    limit: view === 'calendar' ? CALENDAR_ITEMS_LIMIT : ITEMS_PER_PAGE,
   });
 
   const events = data?.events || [];
@@ -58,7 +63,7 @@ export default function EventsPage() {
 
   return (
     <div>
-      <div className="flex justify-between items-center mb-6">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
         <div>
           <h1 className="text-3xl font-bold text-military-900 dark:text-gray-100 mb-2">
             Eventos
@@ -67,12 +72,15 @@ export default function EventsPage() {
             {totalEvents} eventos disponibles
           </p>
         </div>
-        {canCreateEvent && (
-          <Link to="/events/create" className="btn btn-primary flex items-center">
-            <Plus className="h-4 w-4 mr-2" />
-            Crear Evento
-          </Link>
-        )}
+        <div className="flex items-center gap-3">
+          <ViewToggle view={view} onViewChange={setView} />
+          {canCreateEvent && (
+            <Link to="/events/create" className="btn btn-primary flex items-center">
+              <Plus className="h-4 w-4 mr-2" />
+              Crear Evento
+            </Link>
+          )}
+        </div>
       </div>
 
       <EventFilters
@@ -86,7 +94,9 @@ export default function EventsPage() {
         onStatusChange={(value) => handleFilterChange(setStatusFilter)(value)}
       />
 
-      {isLoading ? (
+      {view === 'calendar' ? (
+        <EventCalendar events={events} isLoading={isLoading} />
+      ) : isLoading ? (
         <div className="flex justify-center py-12">
           <LoadingSpinner />
         </div>

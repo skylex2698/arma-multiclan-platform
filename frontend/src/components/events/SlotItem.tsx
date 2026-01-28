@@ -37,14 +37,19 @@ export function SlotItem({
 
   const isFree = slot.status === 'FREE';
   const isOccupiedByMe = slot.userId === user?.id;
+  const isFinished = eventStatus === 'FINISHED';
   const canInteract = eventStatus === 'ACTIVE' && user;
+
+  // Admin/líder solo puede asignar en eventos activos (no finalizados ni inactivos)
   const canAdminAssign =
+    eventStatus === 'ACTIVE' &&
     (user?.role === 'ADMIN' || user?.role === 'CLAN_LEADER') &&
     onAdminAssign &&
     availableUsers.length > 0;
 
-  // Verificar si puede desapuntar por admin
+  // Admin/líder puede desapuntar solo si el evento no está finalizado
   const canAdminUnassign =
+    !isFinished &&
     slot.status === 'OCCUPIED' &&
     !isOccupiedByMe &&
     onAdminUnassign &&

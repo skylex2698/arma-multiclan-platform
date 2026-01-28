@@ -2,14 +2,15 @@
 
 Plataforma web para gestión de eventos multijugador de Arma 3 y Arma Reforger entre múltiples clanes.
 
-![Version](https://img.shields.io/badge/version-2.1.0-blue.svg)
+![Version](https://img.shields.io/badge/version-2.2.0-blue.svg)
 ![License](https://img.shields.io/badge/license-MIT-green.svg)
 
 ## 📋 Características
 
 ### 🛡️ Gestión de Clanes
 - **Crear y administrar clanes** con nombre, tag y descripción
-- **Subir logos personalizados** (.jpg, .png, .webp)
+- **Subir logos personalizados** (.jpg, .png, .webp, máx. 2MB)
+- **Eliminar avatar** del clan desde el panel de edición
 - **Sistema de miembros** con roles diferenciados
 - **Permisos por rol**: Admin, Líder de Clan, Usuario
 
@@ -25,9 +26,10 @@ Plataforma web para gestión de eventos multijugador de Arma 3 y Arma Reforger e
 - **Crear eventos** con fecha, hora, tipo de juego y briefing
 - **Plantillas reutilizables** - Crea eventos basados en eventos anteriores
 - **Estados de eventos**:
-  - ACTIVO: Evento abierto para inscripciones
-  - INACTIVO: Evento pausado
-  - FINALIZADO: Auto-finalización cuando pasa la fecha programada
+  - ACTIVO: Evento abierto para inscripciones y modificaciones
+  - INACTIVO: Evento pausado (nadie puede apuntarse, pero se puede editar y reactivar)
+  - FINALIZADO: Auto-finalización cuando pasa la fecha (no se puede modificar)
+- **Toggle de estado**: Admin/Líder pueden activar/desactivar eventos
 - **Edición completa**:
   - Información básica (nombre, fecha, descripción)
   - Estructura de escuadras y slots
@@ -276,8 +278,12 @@ arma-multiclan-platform/
 - ✅ **Perfil de usuario** - Ver y editar perfil personal
 - ✅ **Modo claro/oscuro** - Tema con toggle y persistencia
 - ✅ **Estados de eventos** - ACTIVO, INACTIVO, FINALIZADO con auto-finalización
+- ✅ **Toggle de estado** - Activar/desactivar eventos desde el detalle
 - ✅ **Archivos de evento** - Subida de PDF/HTML para briefing y modset
 - ✅ **Layout 3 columnas** - Visualización responsive de escuadras
+- ✅ **Gestión de avatares** - Subir y eliminar logos de clan
+- ✅ **Paginación** - Lista de eventos y usuarios con paginación
+- ✅ **Filtros mejorados** - Filtro por estado con valor por defecto "Activos"
 
 ### Próximas Funcionalidades
 - [ ] **Estadísticas** - Dashboard con métricas de eventos

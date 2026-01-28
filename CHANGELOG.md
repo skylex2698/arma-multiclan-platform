@@ -115,6 +115,91 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ---
 
+## [2.2.0] - 2025-01-28
+
+### ✨ Agregado
+
+**Toggle de Estado de Eventos (ACTIVO ↔ INACTIVO):**
+- Botón para activar/desactivar eventos desde la página de detalle
+- Solo Admin o Líder del clan creador pueden cambiar el estado
+- Eventos INACTIVOS: no se puede apuntar ni asignar usuarios, pero sí editar
+- Eventos FINALIZADOS: no se puede modificar nada
+- Nuevo hook `useChangeEventStatus` en frontend
+- Nuevo endpoint PUT `/events/:id/status` en backend
+
+**Gestión de Avatar de Clan:**
+- Botón "Quitar" para eliminar el avatar del clan
+- Elimina el archivo del servidor y actualiza la base de datos
+- Nuevo endpoint DELETE `/clans/:id/avatar`
+- Nuevo hook `useDeleteClanAvatar` en frontend
+
+**Paginación en Lista de Eventos:**
+- Componente de paginación con navegación por páginas
+- 12 eventos por página
+- Muestra total de eventos disponibles
+
+**Filtros de Eventos Mejorados:**
+- Filtro de estado por defecto en "Activos" (antes era "Todos")
+- Añadida opción "Inactivos" al selector de estado
+- Eliminado checkbox "Solo próximos eventos" (redundante)
+- Filtro "Todos" ahora muestra correctamente todos los estados
+
+### 🔧 Cambiado
+
+**Validación de Subida de Avatar:**
+- Límite de tamaño de imagen reducido a 2MB (antes 5MB en frontend)
+- Ahora consistente entre frontend y backend
+
+**Manejo de FormData en Axios:**
+- Añadido interceptor de request para eliminar Content-Type en FormData
+- Axios ahora configura automáticamente el boundary correcto
+- Resuelto error 400 al subir avatares de clan
+
+### 🐛 Corregido
+
+**Dashboard:**
+- Corregido contador de "Próximos Eventos" (usaba `count` en vez de `total`)
+- Corregido contador de "Usuarios" (mismo problema)
+
+**Backend:**
+- Eliminada función duplicada `changeEventStatus` en event.controller.ts
+- Eliminada función duplicada `changeEventStatus` en event.service.ts
+- Limpieza de import `UserRole` no usado en event.service.ts
+
+### 🔒 Seguridad
+
+**Protección de Eventos Finalizados:**
+- Bloqueado `adminAssignSlot` en eventos FINISHED e INACTIVE
+- Bloqueado `adminUnassignSlot` en eventos FINISHED
+- Frontend oculta botones de asignación en eventos no activos
+- Admin y Líder ya no pueden asignar usuarios a eventos finalizados
+
+### 📚 Archivos Modificados
+
+**Backend:**
+- `src/controllers/event.controller.ts` - Eliminada función duplicada
+- `src/services/event.service.ts` - Eliminada función duplicada, limpieza imports
+- `src/services/slot.service.ts` - Añadida validación de estado en admin assign/unassign
+- `src/services/clan.service.ts` - Soporte para avatarUrl null
+- `src/controllers/clan.controller.ts` - Nuevo método deleteAvatar
+- `src/routes/clan.routes.ts` - Nueva ruta DELETE /:id/avatar
+
+**Frontend:**
+- `src/services/api.ts` - Interceptor para FormData
+- `src/services/clanService.ts` - Método deleteAvatar
+- `src/services/eventService.ts` - Método changeStatus
+- `src/hooks/useClans.ts` - Hook useDeleteClanAvatar
+- `src/hooks/useEvents.ts` - Hook useChangeEventStatus
+- `src/pages/clanes/EditClanPage.tsx` - Validación 2MB, botón quitar avatar
+- `src/pages/events/EventsPage.tsx` - Filtros mejorados, estado por defecto
+- `src/pages/events/EventDetailPage.tsx` - Botón toggle estado
+- `src/pages/dashboard/DashboardPage.tsx` - Corregido uso de `total`
+- `src/components/events/EventFilters.tsx` - Opción INACTIVE, sin checkbox
+- `src/components/events/EventCard.tsx` - Colores de badge consistentes
+- `src/components/events/SlotItem.tsx` - Validación de estado para admin actions
+
+---
+
 ## [2.1.0] - 2025-01-27
 
 ### ✨ Agregado

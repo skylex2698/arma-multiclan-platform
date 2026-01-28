@@ -570,6 +570,14 @@ export class SlotService {
       throw new Error('Slot no encontrado');
     }
 
+    // Verificar que el evento no esté finalizado ni inactivo
+    if (slot.squad.event.status === 'FINISHED') {
+      throw new Error('No se puede asignar usuarios a un evento finalizado');
+    }
+    if (slot.squad.event.status === 'INACTIVE') {
+      throw new Error('No se puede asignar usuarios a un evento inactivo');
+    }
+
     if (slot.status !== 'FREE') {
       throw new Error('El slot ya está ocupado');
     }
@@ -691,6 +699,7 @@ export class SlotService {
               select: {
                 id: true,
                 name: true,
+                status: true,
               },
             },
           },
@@ -700,6 +709,11 @@ export class SlotService {
 
     if (!slot) {
       throw new Error('Slot no encontrado');
+    }
+
+    // Verificar que el evento no esté finalizado
+    if (slot.squad.event.status === 'FINISHED') {
+      throw new Error('No se puede modificar un evento finalizado');
     }
 
     if (slot.status !== 'OCCUPIED' || !slot.userId) {

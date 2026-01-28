@@ -67,7 +67,7 @@ export default function DashboardPage() {
     0
   ) || 0;
 
-  const pendingUsers = usersData?.count || 0;
+  const pendingUsers = usersData?.total || 0;
   const pendingRequests = requestsData?.count || 0;
 
   return (
@@ -104,7 +104,7 @@ export default function DashboardPage() {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
         <StatsCard
           title="Próximos Eventos"
-          value={upcomingEventsData?.count || 0}
+          value={upcomingEventsData?.total || 0}
           icon={Calendar}
           description="Eventos activos"
         />

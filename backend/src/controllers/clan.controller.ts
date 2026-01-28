@@ -179,6 +179,13 @@ class ClanController {
         });
       }
 
+      // Obtener clan actual para eliminar avatar anterior si existe
+      const currentClan = await clanService.getClanById(id as string);
+      if (currentClan.avatarUrl) {
+        const oldFilePath = path.join(process.cwd(), 'public', currentClan.avatarUrl);
+        deleteFile(oldFilePath);
+      }
+
       // Construir URL del archivo
       const avatarUrl = `/uploads/clans/${req.file.filename}`;
 
@@ -192,6 +199,54 @@ class ClanController {
       });
     } catch (error) {
       handleError(res, error, 'uploadAvatar');
+    }
+  }
+
+  async deleteAvatar(req: Request, res: Response) {
+    try {
+      const { id } = req.params;
+      const userId = req.user!.id;
+      const userRole = req.user!.role;
+
+      // Verificar permisos
+      if (userRole !== 'ADMIN') {
+        const user = await prisma.user.findUnique({
+          where: { id: userId },
+          select: { clanId: true, role: true },
+        });
+
+        if (user?.role !== 'CLAN_LEADER' || user?.clanId !== (id as string)) {
+          return res.status(403).json({
+            success: false,
+            message: 'No tienes permisos para modificar este clan',
+          });
+        }
+      }
+
+      // Obtener clan actual
+      const currentClan = await clanService.getClanById(id as string);
+
+      if (!currentClan.avatarUrl) {
+        return res.status(400).json({
+          success: false,
+          message: 'El clan no tiene avatar',
+        });
+      }
+
+      // Eliminar archivo del servidor
+      const filePath = path.join(process.cwd(), 'public', currentClan.avatarUrl);
+      deleteFile(filePath);
+
+      // Actualizar clan quitando la URL del avatar
+      const clan = await clanService.updateClan(id as string, { avatarUrl: null });
+
+      return res.status(200).json({
+        success: true,
+        message: 'Avatar eliminado exitosamente',
+        data: { clan },
+      });
+    } catch (error) {
+      handleError(res, error, 'deleteAvatar');
     }
   }
 }

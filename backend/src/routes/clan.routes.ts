@@ -47,4 +47,7 @@ router.post(
   clanController.uploadAvatar
 );
 
+// Ruta para eliminar avatar
+router.delete('/:id/avatar', authenticate, clanController.deleteAvatar);
+
 export { router as clanRoutes };

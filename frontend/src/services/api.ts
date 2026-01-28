@@ -51,16 +51,30 @@ api.interceptors.response.use(
 );
 
 /**
- * Interceptor de request para logging en desarrollo
+ * Interceptor de request para manejar FormData y logging
  */
-if (import.meta.env.DEV) {
-  api.interceptors.request.use(
-    (config) => {
-      console.debug(`[API] ${config.method?.toUpperCase()} ${config.url}`);
-      return config;
-    },
-    (error) => {
-      return Promise.reject(error);
+api.interceptors.request.use(
+  (config) => {
+    // Si los datos son FormData, eliminar Content-Type para que axios
+    // lo configure automáticamente con el boundary correcto
+    if (config.data instanceof FormData) {
+      // Usar el método delete de AxiosHeaders o set a undefined
+      if (config.headers && typeof config.headers.delete === 'function') {
+        config.headers.delete('Content-Type');
+      } else if (config.headers) {
+        config.headers['Content-Type'] = undefined as unknown as string;
+      }
     }
-  );
-}
+
+    // Logging en desarrollo
+    if (import.meta.env.DEV) {
+      console.debug(`[API] ${config.method?.toUpperCase()} ${config.url}`,
+        config.data instanceof FormData ? '[FormData]' : config.data);
+    }
+
+    return config;
+  },
+  (error) => {
+    return Promise.reject(error);
+  }
+);

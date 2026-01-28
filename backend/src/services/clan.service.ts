@@ -103,7 +103,7 @@ class ClanService {
       name?: string;
       tag?: string;
       description?: string;
-      avatarUrl?: string;
+      avatarUrl?: string | null;
     }
   ) {
     const clan = await prisma.clan.findUnique({

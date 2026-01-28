@@ -118,11 +118,7 @@ export const eventService = {
 
     const response = await api.post<
       ApiResponse<{ event: Event; briefingFileUrl: string }>
-    >(`/events/${eventId}/briefing-file`, formData, {
-      headers: {
-        'Content-Type': 'multipart/form-data',
-      },
-    });
+    >(`/events/${eventId}/briefing-file`, formData);
     return response.data.data;
   },
 
@@ -136,11 +132,7 @@ export const eventService = {
 
     const response = await api.post<
       ApiResponse<{ event: Event; modsetFileUrl: string }>
-    >(`/events/${eventId}/modset-file`, formData, {
-      headers: {
-        'Content-Type': 'multipart/form-data',
-      },
-    });
+    >(`/events/${eventId}/modset-file`, formData);
     return response.data.data;
   },
 

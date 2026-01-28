@@ -74,3 +74,15 @@ export function useUploadClanAvatar(id: string) {
     },
   });
 }
+
+export function useDeleteClanAvatar(id: string) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: () => clanService.deleteAvatar(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['clans'] });
+      queryClient.invalidateQueries({ queryKey: ['clan', id] });
+    },
+  });
+}

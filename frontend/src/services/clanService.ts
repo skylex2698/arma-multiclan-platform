@@ -64,12 +64,15 @@ export const clanService = {
 
     const response = await api.post<ApiResponse<{ clan: Clan; avatarUrl: string }>>(
       `/clans/${id}/avatar`,
-      formData,
-      {
-        headers: {
-          'Content-Type': 'multipart/form-data',
-        },
-      }
+      formData
+    );
+    return response.data.data;
+  },
+
+  // Eliminar avatar
+  deleteAvatar: async (id: string): Promise<{ clan: Clan }> => {
+    const response = await api.delete<ApiResponse<{ clan: Clan }>>(
+      `/clans/${id}/avatar`
     );
     return response.data.data;
   },

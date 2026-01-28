@@ -5,6 +5,7 @@ import {
   useUpdateClan,
   useDeleteClan,
   useUploadClanAvatar,
+  useDeleteClanAvatar,
 } from '../../hooks/useClans';
 import { useAuthStore } from '../../store/authStore';
 import { ArrowLeft, Save, Shield, Trash2, Upload, X } from 'lucide-react';
@@ -21,6 +22,7 @@ export default function EditClanPage() {
   const updateClan = useUpdateClan(id!);
   const deleteClan = useDeleteClan();
   const uploadAvatar = useUploadClanAvatar(id!);
+  const deleteAvatar = useDeleteClanAvatar(id!);
 
   const [name, setName] = useState('');
   const [tag, setTag] = useState('');
@@ -59,9 +61,9 @@ export default function EditClanPage() {
         return;
       }
 
-      // Validar tamaño (5MB máximo)
-      if (file.size > 5 * 1024 * 1024) {
-        setError('El archivo no puede superar los 5MB');
+      // Validar tamaño (2MB máximo)
+      if (file.size > 2 * 1024 * 1024) {
+        setError('El archivo no puede superar los 2MB');
         return;
       }
 
@@ -71,9 +73,35 @@ export default function EditClanPage() {
     }
   };
 
-  const handleRemoveImage = () => {
-    setSelectedFile(null);
-    setPreviewUrl('');
+  const handleRemoveImage = async () => {
+    setError('');
+
+    // Si hay un archivo seleccionado pero no guardado, solo limpiar la selección
+    if (selectedFile) {
+      setSelectedFile(null);
+      // Restaurar la imagen original del servidor si existe
+      if (clanData?.clan.avatarUrl) {
+        setPreviewUrl(`http://localhost:3000${clanData.clan.avatarUrl}`);
+      } else {
+        setPreviewUrl('');
+      }
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+      return;
+    }
+
+    // Si hay una imagen del servidor, eliminarla
+    if (clanData?.clan.avatarUrl) {
+      try {
+        await deleteAvatar.mutateAsync();
+        setPreviewUrl('');
+      } catch (err) {
+        const error = err as { response?: { data?: { message?: string } } };
+        setError(error.response?.data?.message || 'Error al eliminar el avatar');
+      }
+    }
+
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }
@@ -210,7 +238,7 @@ export default function EditClanPage() {
                 type="button"
                 onClick={() => fileInputRef.current?.click()}
                 className="btn btn-secondary flex items-center"
-                disabled={uploadAvatar.isPending}
+                disabled={uploadAvatar.isPending || deleteAvatar.isPending}
               >
                 <Upload className="h-4 w-4 mr-2" />
                 {selectedFile ? 'Cambiar Imagen' : 'Subir Imagen'}
@@ -219,15 +247,16 @@ export default function EditClanPage() {
                 <button
                   type="button"
                   onClick={handleRemoveImage}
-                  className="btn btn-outline flex items-center text-red-600 hover:text-red-700"
+                  disabled={deleteAvatar.isPending}
+                  className="btn btn-outline flex items-center text-red-600 hover:text-red-700 disabled:opacity-50"
                 >
                   <X className="h-4 w-4 mr-1" />
-                  Quitar
+                  {deleteAvatar.isPending ? 'Quitando...' : 'Quitar'}
                 </button>
               )}
             </div>
             <p className="text-xs text-military-500 mt-1">
-              Formatos: JPG, PNG, WEBP (máximo 5MB)
+              Formatos: JPG, PNG, WEBP (máximo 2MB)
             </p>
             {selectedFile && (
               <p className="text-xs text-green-600 mt-2">
@@ -284,7 +313,7 @@ export default function EditClanPage() {
           <div className="flex gap-4 pt-4 border-t border-military-200">
             <button
               type="submit"
-              disabled={updateClan.isPending || uploadAvatar.isPending}
+              disabled={updateClan.isPending || uploadAvatar.isPending || deleteAvatar.isPending}
               className="btn btn-primary flex items-center"
             >
               <Save className="h-4 w-4 mr-2" />

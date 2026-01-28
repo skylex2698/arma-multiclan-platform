@@ -38,12 +38,15 @@ export default function LoginPage() {
     <div className="min-h-screen bg-gradient-to-br from-primary-800 via-primary-700 to-primary-900 dark:from-gray-900 dark:via-gray-800 dark:to-black flex items-center justify-center p-4">
       <div className="w-full max-w-md">
         {/* Logo y título */}
-        <div className="text-center mb-8">
-          <div className="flex justify-center mb-4">
+        <div className="text-center mb-6">
+          <div className="flex justify-center mb-3">
             <Logo size="3xl" withGlow />
           </div>
-          <p className="text-military-200 dark:text-gray-400">
+          <h1 className="text-3xl font-bold text-white mb-1">
             {APP_CONFIG.name}
+          </h1>
+          <p className="text-military-300 dark:text-gray-400 text-sm">
+            Gestión de eventos multiclan
           </p>
         </div>
 

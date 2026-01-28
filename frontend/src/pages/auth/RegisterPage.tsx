@@ -1,12 +1,13 @@
 import { useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { authService } from '../../services/authService';
 import { useClans } from '../../hooks/useClans';
+import { APP_CONFIG } from '../../config/app.config';
 import { UserPlus, Loader2, AlertCircle } from 'lucide-react';
 import { LoadingSpinner } from '../../components/ui/LoadingSpinner';
+import { Logo } from '../../components/ui/Logo';
 
 export default function RegisterPage() {
-  const navigate = useNavigate();
   const { data: clansData, isLoading: loadingClans } = useClans();
 
   const [email, setEmail] = useState('');
@@ -64,141 +65,171 @@ export default function RegisterPage() {
     }
   };
 
+  // Wrapper común para todo el contenido
+  const PageWrapper = ({ children }: { children: React.ReactNode }) => (
+    <div className="min-h-screen bg-gradient-to-br from-military-900 via-military-800 to-military-900 dark:from-gray-900 dark:via-gray-800 dark:to-black flex items-center justify-center p-4">
+      <div className="w-full max-w-md">
+        {/* Logo y título */}
+        <div className="text-center mb-6">
+          <div className="flex justify-center mb-3">
+            <Logo size="3xl" withGlow />
+          </div>
+          <h1 className="text-3xl font-bold text-white mb-1">
+            {APP_CONFIG.name}
+          </h1>
+          <p className="text-military-300 dark:text-gray-400 text-sm">
+            Gestión de eventos multiclan
+          </p>
+        </div>
+
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-2xl p-6 border border-military-200 dark:border-gray-700">
+          {children}
+        </div>
+
+        <p className="text-center text-military-400 dark:text-gray-500 text-xs mt-4">
+          &copy; 2026 Arma Events Platform. Todos los derechos reservados.
+        </p>
+      </div>
+    </div>
+  );
+
   if (loadingClans) {
-    return <LoadingSpinner />;
+    return (
+      <PageWrapper>
+        <LoadingSpinner />
+      </PageWrapper>
+    );
   }
 
   if (success) {
     return (
-      <div>
-        <div className="bg-green-50 dark:bg-green-900/30 border border-green-200 dark:border-green-800 rounded-lg p-6 mb-6">
-          <div className="flex items-center mb-4">
-            <div className="bg-green-500 p-2 rounded-full mr-3">
-              <UserPlus className="h-6 w-6 text-white" />
-            </div>
-            <h2 className="text-2xl font-bold text-green-900 dark:text-green-300">
-              ¡Registro Exitoso!
-            </h2>
+      <PageWrapper>
+        <div className="text-center py-4">
+          <div className="bg-green-500 p-3 rounded-full inline-flex mb-4">
+            <UserPlus className="h-8 w-8 text-white" />
           </div>
-          <p className="text-green-800 dark:text-green-400 mb-4">
-            Tu cuenta ha sido creada correctamente. Un administrador o líder de
-            clan debe validar tu cuenta antes de que puedas acceder.
+          <h2 className="text-xl font-bold text-green-900 dark:text-green-300 mb-3">
+            ¡Registro Exitoso!
+          </h2>
+          <p className="text-green-800 dark:text-green-400 mb-2 text-sm">
+            Tu cuenta ha sido creada correctamente.
           </p>
-          <p className="text-green-700 dark:text-green-500 text-sm">
-            Recibirás un email cuando tu cuenta sea validada.
+          <p className="text-green-700 dark:text-green-500 text-xs mb-4">
+            Un administrador o líder de clan debe validar tu cuenta.
+            Recibirás un email cuando esté activada.
           </p>
-        </div>
-
-        <div className="text-center">
           <Link
             to="/login"
-            className="text-primary-600 hover:text-primary-700 dark:text-primary-400 dark:hover:text-primary-300 font-medium"
+            className="btn btn-primary"
           >
-            ← Volver al login
+            Ir al Login
           </Link>
         </div>
-      </div>
+      </PageWrapper>
     );
   }
 
   return (
-    <div>
-      <h2 className="text-2xl font-bold text-military-900 dark:text-gray-100 mb-6">
+    <PageWrapper>
+      <h2 className="text-xl font-bold text-military-900 dark:text-gray-100 mb-4 text-center">
         Crear Cuenta
       </h2>
 
       {error && (
-        <div className="bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-400 px-4 py-3 rounded-lg mb-4 flex items-start">
-          <AlertCircle className="h-5 w-5 mr-2 flex-shrink-0 mt-0.5" />
+        <div className="bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-400 px-3 py-2 rounded-lg mb-3 flex items-start text-sm">
+          <AlertCircle className="h-4 w-4 mr-2 flex-shrink-0 mt-0.5" />
           <span>{error}</span>
         </div>
       )}
 
-      <form onSubmit={handleSubmit} className="space-y-4">
-        <div>
-          <label
-            htmlFor="email"
-            className="block text-sm font-medium text-military-700 dark:text-gray-300 mb-1"
-          >
-            Email *
-          </label>
-          <input
-            id="email"
-            type="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            className="input"
-            placeholder="tu@email.com"
-            required
-            disabled={loading}
-          />
+      <form onSubmit={handleSubmit} className="space-y-3">
+        {/* Email y Nickname en grid */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div>
+            <label
+              htmlFor="email"
+              className="block text-sm font-medium text-military-700 dark:text-gray-300 mb-1"
+            >
+              Email *
+            </label>
+            <input
+              id="email"
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              className="input text-sm"
+              placeholder="tu@email.com"
+              required
+              disabled={loading}
+            />
+          </div>
+
+          <div>
+            <label
+              htmlFor="nickname"
+              className="block text-sm font-medium text-military-700 dark:text-gray-300 mb-1"
+            >
+              Nickname *
+            </label>
+            <input
+              id="nickname"
+              type="text"
+              value={nickname}
+              onChange={(e) => setNickname(e.target.value)}
+              className="input text-sm"
+              placeholder="Tu nombre en el juego"
+              required
+              disabled={loading}
+              minLength={3}
+            />
+          </div>
         </div>
 
-        <div>
-          <label
-            htmlFor="nickname"
-            className="block text-sm font-medium text-military-700 dark:text-gray-300 mb-1"
-          >
-            Nickname *
-          </label>
-          <input
-            id="nickname"
-            type="text"
-            value={nickname}
-            onChange={(e) => setNickname(e.target.value)}
-            className="input"
-            placeholder="Tu nombre en el juego"
-            required
-            disabled={loading}
-            minLength={3}
-          />
-          <p className="text-xs text-military-500 dark:text-gray-400 mt-1">
-            Mínimo 3 caracteres
-          </p>
-        </div>
+        {/* Contraseñas en grid */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div>
+            <label
+              htmlFor="password"
+              className="block text-sm font-medium text-military-700 dark:text-gray-300 mb-1"
+            >
+              Contraseña *
+            </label>
+            <input
+              id="password"
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              className="input text-sm"
+              placeholder="••••••••"
+              required
+              disabled={loading}
+              minLength={8}
+            />
+          </div>
 
-        <div>
-          <label
-            htmlFor="password"
-            className="block text-sm font-medium text-military-700 dark:text-gray-300 mb-1"
-          >
-            Contraseña *
-          </label>
-          <input
-            id="password"
-            type="password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            className="input"
-            placeholder="••••••••"
-            required
-            disabled={loading}
-            minLength={8}
-          />
-          <p className="text-xs text-military-500 dark:text-gray-400 mt-1">
-            Mínimo 8 caracteres, incluye mayúsculas, minúsculas y números
-          </p>
+          <div>
+            <label
+              htmlFor="confirmPassword"
+              className="block text-sm font-medium text-military-700 dark:text-gray-300 mb-1"
+            >
+              Confirmar *
+            </label>
+            <input
+              id="confirmPassword"
+              type="password"
+              value={confirmPassword}
+              onChange={(e) => setConfirmPassword(e.target.value)}
+              className="input text-sm"
+              placeholder="••••••••"
+              required
+              disabled={loading}
+              minLength={8}
+            />
+          </div>
         </div>
-
-        <div>
-          <label
-            htmlFor="confirmPassword"
-            className="block text-sm font-medium text-military-700 dark:text-gray-300 mb-1"
-          >
-            Confirmar Contraseña *
-          </label>
-          <input
-            id="confirmPassword"
-            type="password"
-            value={confirmPassword}
-            onChange={(e) => setConfirmPassword(e.target.value)}
-            className="input"
-            placeholder="••••••••"
-            required
-            disabled={loading}
-            minLength={8}
-          />
-        </div>
+        <p className="text-xs text-military-500 dark:text-gray-400 -mt-1">
+          Mínimo 8 caracteres con mayúsculas, minúsculas y números
+        </p>
 
         <div>
           <label
@@ -211,7 +242,7 @@ export default function RegisterPage() {
             id="clan"
             value={clanId}
             onChange={(e) => setClanId(e.target.value)}
-            className="input"
+            className="input text-sm"
             required
             disabled={loading}
           >
@@ -223,15 +254,12 @@ export default function RegisterPage() {
               </option>
             ))}
           </select>
-          <p className="text-xs text-military-500 dark:text-gray-400 mt-1">
-            Un líder de clan o administrador debe aprobar tu solicitud
-          </p>
         </div>
 
         <button
           type="submit"
           disabled={loading}
-          className="w-full btn btn-primary flex items-center justify-center"
+          className="w-full btn btn-primary flex items-center justify-center mt-4"
         >
           {loading ? (
             <>
@@ -247,7 +275,7 @@ export default function RegisterPage() {
         </button>
       </form>
 
-      <div className="mt-6 text-center">
+      <div className="mt-4 text-center">
         <p className="text-sm text-military-600 dark:text-gray-400">
           ¿Ya tienes cuenta?{' '}
           <Link
@@ -259,18 +287,15 @@ export default function RegisterPage() {
         </p>
       </div>
 
-      {/* Información adicional */}
-      <div className="mt-6 p-4 bg-blue-50 dark:bg-blue-900/30 rounded-lg border border-blue-200 dark:border-blue-800">
-        <p className="text-sm text-blue-900 dark:text-blue-300 font-medium mb-2">
+      {/* Información adicional - más compacta */}
+      <div className="mt-4 p-3 bg-blue-50 dark:bg-blue-900/30 rounded-lg border border-blue-200 dark:border-blue-800">
+        <p className="text-xs text-blue-900 dark:text-blue-300 font-medium mb-1">
           📋 Proceso de registro:
         </p>
-        <ol className="text-xs text-blue-800 dark:text-blue-400 space-y-1 list-decimal list-inside">
-          <li>Completa el formulario con tus datos</li>
-          <li>Selecciona el clan al que deseas unirte</li>
-          <li>Espera la validación de un administrador o líder de clan</li>
-          <li>Recibirás un email cuando tu cuenta esté activada</li>
-        </ol>
+        <p className="text-xs text-blue-800 dark:text-blue-400">
+          Completa el formulario → Selecciona tu clan → Espera validación → Recibe confirmación por email
+        </p>
       </div>
-    </div>
+    </PageWrapper>
   );
 }

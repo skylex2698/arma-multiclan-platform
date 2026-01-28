@@ -74,7 +74,7 @@ export default function DashboardPage() {
     <div>
       {/* Header */}
       <div className="mb-8">
-        <h1 className="text-3xl font-bold text-military-900 mb-2">
+        <h1 className="text-3xl font-bold text-military-900 dark:text-gray-100 mb-2">
           Bienvenido, {user.nickname}
         </h1>
         <div className="flex items-center gap-2">

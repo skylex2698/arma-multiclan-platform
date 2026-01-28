@@ -14,8 +14,7 @@ export default function EventsPage() {
   const user = useAuthStore((state) => state.user);
   const [searchQuery, setSearchQuery] = useState('');
   const [gameTypeFilter, setGameTypeFilter] = useState('');
-  const [statusFilter, setStatusFilter] = useState('');
-  const [upcomingOnly, setUpcomingOnly] = useState(false);
+  const [statusFilter, setStatusFilter] = useState('ACTIVE');
   const [page, setPage] = useState(1);
 
   // Debounce search
@@ -28,13 +27,11 @@ export default function EventsPage() {
     return () => clearTimeout(timer);
   }, [searchQuery]);
 
-  // Si se selecciona un filtro de estado, necesitamos incluir todos los eventos
-  // para que el backend no filtre solo ACTIVE por defecto
+  // includeAll permite mostrar eventos de cualquier estado
   const { data, isLoading, error } = useEvents({
     gameType: gameTypeFilter || undefined,
     status: statusFilter || undefined,
-    upcoming: upcomingOnly || undefined,
-    includeAll: statusFilter ? true : undefined,
+    includeAll: !statusFilter || statusFilter !== 'ACTIVE' ? true : undefined,
     search: debouncedSearch || undefined,
     page,
     limit: ITEMS_PER_PAGE,
@@ -87,8 +84,6 @@ export default function EventsPage() {
         onGameTypeChange={(value) => handleFilterChange(setGameTypeFilter)(value)}
         statusFilter={statusFilter}
         onStatusChange={(value) => handleFilterChange(setStatusFilter)(value)}
-        upcomingOnly={upcomingOnly}
-        onUpcomingOnlyChange={(value) => handleFilterChange(setUpcomingOnly)(value)}
       />
 
       {isLoading ? (

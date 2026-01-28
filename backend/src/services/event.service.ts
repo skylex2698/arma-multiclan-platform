@@ -3,7 +3,7 @@
 import { prisma } from '../index';
 import { logger } from '../utils/logger';
 import { sanitizeHTML } from '../utils/sanitizer';
-import { EventStatus, GameType, UserRole, SlotStatus } from '@prisma/client';
+import { EventStatus, GameType, SlotStatus } from '@prisma/client';
 
 export class EventService {
   // ============================================
@@ -795,75 +795,6 @@ export class EventService {
     };
   }
 
-  // Cambiar estado del evento con validaciones
-  async changeEventStatus(
-    eventId: string,
-    newStatus: EventStatus,
-    userId: string,
-    userRole: UserRole,
-    userClanId?: string
-  ) {
-    const event = await prisma.event.findUnique({
-      where: { id: eventId },
-      include: {
-        creator: {
-          select: {
-            clanId: true
-          }
-        }
-      }
-    });
-
-    if (!event) {
-      throw new Error('Evento no encontrado');
-    }
-
-    const now = new Date();
-
-    // VALIDACIÓN 1: No se puede cambiar el estado de un evento FINISHED
-    if (event.status === EventStatus.FINISHED) {
-      throw new Error('No se puede modificar un evento finalizado');
-    }
-
-    // VALIDACIÓN 2: Solo ADMIN o CLAN_LEADER del mismo clan que creó el evento
-    if (userRole !== UserRole.ADMIN) {
-      if (userRole !== UserRole.CLAN_LEADER || userClanId !== event.creator.clanId) {
-        throw new Error('No tienes permisos para cambiar el estado de este evento');
-      }
-    }
-
-    // VALIDACIÓN 3: No se puede establecer manualmente el estado FINISHED
-    if (newStatus === EventStatus.FINISHED) {
-      throw new Error('El estado FINISHED solo se establece automáticamente cuando el evento expira');
-    }
-
-    // VALIDACIÓN 4: Para pasar a ACTIVE, la fecha debe ser futura
-    if (newStatus === EventStatus.ACTIVE && event.scheduledDate <= now) {
-      throw new Error('No se puede activar un evento cuya fecha ya ha pasado');
-    }
-
-    const updatedEvent = await prisma.event.update({
-      where: { id: eventId },
-      data: { status: newStatus }
-    });
-
-    // Audit log
-    await prisma.auditLog.create({
-      data: {
-        action: 'EVENT_STATUS_CHANGED',
-        entity: 'Event',
-        entityId: eventId,
-        userId,
-        eventId,
-        details: JSON.stringify({ previousStatus: event.status, newStatus })
-      }
-    });
-
-    logger.info('Event status changed', { eventId, previousStatus: event.status, newStatus, userId });
-
-    return updatedEvent;
-  }
-
   // Eliminar evento
   async deleteEvent(id: string) {
     const event = await prisma.event.findUnique({
@@ -877,6 +808,50 @@ export class EventService {
     await prisma.event.delete({
       where: { id },
     });
+  }
+
+  // Cambiar estado del evento (ACTIVE <-> INACTIVE)
+  async changeEventStatus(id: string, status: EventStatus) {
+    const event = await prisma.event.findUnique({
+      where: { id },
+    });
+
+    if (!event) {
+      throw new Error('Evento no encontrado');
+    }
+
+    // No se puede cambiar el estado de un evento finalizado
+    if (event.status === EventStatus.FINISHED) {
+      throw new Error('No se puede modificar el estado de un evento finalizado');
+    }
+
+    // Solo se puede cambiar entre ACTIVE e INACTIVE
+    if (status !== EventStatus.ACTIVE && status !== EventStatus.INACTIVE) {
+      throw new Error('Estado no válido. Solo se puede cambiar entre Activo e Inactivo');
+    }
+
+    const updatedEvent = await prisma.event.update({
+      where: { id },
+      data: { status },
+      include: {
+        creator: {
+          select: {
+            id: true,
+            nickname: true,
+            clanId: true,
+            clan: {
+              select: {
+                id: true,
+                name: true,
+                tag: true,
+              },
+            },
+          },
+        },
+      },
+    });
+
+    return updatedEvent;
   }
 }
 

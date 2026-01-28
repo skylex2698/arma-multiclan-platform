@@ -15,9 +15,9 @@ export function EventCard({ event }: EventCardProps) {
       case 'ACTIVE':
         return <Badge variant="success">Activo</Badge>;
       case 'INACTIVE':
-        return <Badge variant="default">Inactivo</Badge>;
+        return <Badge variant="warning">Inactivo</Badge>;
       case 'FINISHED':
-        return <Badge variant="warning">Finalizado</Badge>;
+        return <Badge variant="default">Finalizado</Badge>;
       default:
         return null;
     }

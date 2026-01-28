@@ -17,6 +17,7 @@ import {
   Trash2,
   Download,
   ExternalLink,
+  Power,
 } from 'lucide-react';
 import {
   useEvent,
@@ -24,6 +25,7 @@ import {
   useUploadModsetFile,
   useDeleteBriefingFile,
   useDeleteModsetFile,
+  useChangeEventStatus,
 } from '../../hooks/useEvents';
 import { useAssignSlot, useUnassignSlot } from '../../hooks/useSlots';
 import { LoadingSpinner } from '../../components/ui/LoadingSpinner';
@@ -57,6 +59,7 @@ export default function EventDetailPage() {
   const uploadModsetFile = useUploadModsetFile(id!);
   const deleteBriefingFile = useDeleteBriefingFile(id!);
   const deleteModsetFile = useDeleteModsetFile(id!);
+  const changeEventStatus = useChangeEventStatus(id!);
   const briefingFileInputRef = useRef<HTMLInputElement>(null);
   const modsetFileInputRef = useRef<HTMLInputElement>(null);
   const [fileUploadError, setFileUploadError] = useState('');
@@ -113,6 +116,19 @@ export default function EventDetailPage() {
       const error = err as { response?: { data?: { message?: string } } };
       setActionError(
         error.response?.data?.message || 'Error al asignarte al slot'
+      );
+    }
+  };
+
+  const handleToggleStatus = async () => {
+    if (!data?.event) return;
+    const newStatus = data.event.status === 'ACTIVE' ? 'INACTIVE' : 'ACTIVE';
+    try {
+      await changeEventStatus.mutateAsync(newStatus);
+    } catch (err) {
+      const error = err as { response?: { data?: { message?: string } } };
+      setActionError(
+        error.response?.data?.message || 'Error al cambiar el estado del evento'
       );
     }
   };
@@ -243,8 +259,8 @@ export default function EventDetailPage() {
                 event.status === 'ACTIVE'
                   ? 'success'
                   : event.status === 'FINISHED'
-                    ? 'warning'
-                    : 'default'
+                    ? 'default'
+                    : 'warning'
               }
             >
               {event.status === 'ACTIVE'
@@ -270,6 +286,23 @@ export default function EventDetailPage() {
                   <Copy className="h-4 w-4 mr-1" />
                   Usar como Plantilla
                 </Link>
+                <button
+                  onClick={handleToggleStatus}
+                  disabled={changeEventStatus.isPending}
+                  className={`btn btn-sm flex items-center ml-2 ${
+                    event.status === 'ACTIVE'
+                      ? 'btn-outline text-orange-600 hover:bg-orange-50 dark:hover:bg-orange-900/20'
+                      : 'btn-primary'
+                  }`}
+                  title={event.status === 'ACTIVE' ? 'Desactivar evento' : 'Activar evento'}
+                >
+                  <Power className="h-4 w-4 mr-1" />
+                  {changeEventStatus.isPending
+                    ? 'Cambiando...'
+                    : event.status === 'ACTIVE'
+                      ? 'Desactivar'
+                      : 'Activar'}
+                </button>
               </>
             )}
           </div>

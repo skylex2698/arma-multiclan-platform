@@ -169,35 +169,6 @@ export class EventController {
     }
   }
 
-  // PUT /api/events/:id/status
-  async changeEventStatus(req: Request, res: Response) {
-    try {
-      if (!req.user) {
-        return errorResponse(res, 'No autenticado', 401);
-      }
-
-      const id = req.params.id as string;
-      const { status } = req.body;
-
-      if (!status || !Object.values(EventStatus).includes(status)) {
-        return errorResponse(res, 'Estado inválido', 400);
-      }
-
-      const event = await eventService.changeEventStatus(
-        id,
-        status,
-        req.user.id,
-        req.user.role,
-        req.user.clanId || undefined
-      );
-
-      return successResponse(res, { event }, 'Estado del evento actualizado correctamente');
-    } catch (error: any) {
-      logger.error('Error in changeEventStatus', error);
-      return errorResponse(res, error.message || 'Error al cambiar estado del evento', 400);
-    }
-  }
-
   // DELETE /api/events/:id
   async deleteEvent(req: Request, res: Response) {
     try {
@@ -249,6 +220,79 @@ export class EventController {
       return errorResponse(
         res,
         error.message || 'Error al eliminar evento',
+        500
+      );
+    }
+  }
+
+  // PUT /api/events/:id/status
+  async changeEventStatus(req: Request, res: Response) {
+    try {
+      const id = req.params.id as string;
+      const { status } = req.body;
+      const userId = req.user!.id;
+      const userRole = req.user!.role;
+      const userClanId = req.user!.clanId;
+
+      if (!status) {
+        return errorResponse(res, 'El estado es requerido', 400);
+      }
+
+      // Validar que sea un estado válido
+      if (!['ACTIVE', 'INACTIVE'].includes(status)) {
+        return errorResponse(res, 'Estado no válido', 400);
+      }
+
+      // Obtener el evento para verificar permisos
+      const event = await prisma.event.findUnique({
+        where: { id },
+        include: {
+          creator: {
+            select: {
+              id: true,
+              clanId: true,
+            },
+          },
+        },
+      });
+
+      if (!event) {
+        return errorResponse(res, 'Evento no encontrado', 404);
+      }
+
+      // Verificar que no esté finalizado
+      if (event.status === 'FINISHED') {
+        return errorResponse(res, 'No se puede modificar el estado de un evento finalizado', 403);
+      }
+
+      // Verificar permisos:
+      // - Admin puede cambiar cualquier evento
+      // - Líder de clan puede cambiar eventos de su clan
+      const isAdmin = userRole === 'ADMIN';
+      const isClanLeader =
+        userRole === 'CLAN_LEADER' &&
+        userClanId === event.creator?.clanId;
+
+      if (!isAdmin && !isClanLeader) {
+        return errorResponse(
+          res,
+          'No tienes permisos para cambiar el estado de este evento',
+          403
+        );
+      }
+
+      const updatedEvent = await eventService.changeEventStatus(id, status as EventStatus);
+
+      return successResponse(
+        res,
+        { event: updatedEvent },
+        `Evento ${status === 'ACTIVE' ? 'activado' : 'desactivado'} correctamente`
+      );
+    } catch (error: any) {
+      logger.error('Error in changeEventStatus', error);
+      return errorResponse(
+        res,
+        error.message || 'Error al cambiar estado del evento',
         500
       );
     }

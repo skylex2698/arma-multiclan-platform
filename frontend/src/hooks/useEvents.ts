@@ -76,6 +76,18 @@ export function useDeleteEvent() {
   });
 }
 
+export function useChangeEventStatus(id: string) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (status: 'ACTIVE' | 'INACTIVE') => eventService.changeStatus(id, status),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['events'] });
+      queryClient.invalidateQueries({ queryKey: ['event', id] });
+    },
+  });
+}
+
 export function useCreateEventFromTemplate() {
   const queryClient = useQueryClient();
 

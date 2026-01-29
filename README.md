@@ -2,7 +2,7 @@
 
 Plataforma web para gestión de eventos multijugador de Arma 3 y Arma Reforger entre múltiples clanes.
 
-![Version](https://img.shields.io/badge/version-2.2.0-blue.svg)
+![Version](https://img.shields.io/badge/version-2.3.0-blue.svg)
 ![License](https://img.shields.io/badge/license-MIT-green.svg)
 
 ## 📋 Características
@@ -106,67 +106,258 @@ Plataforma web para gestión de eventos multijugador de Arma 3 y Arma Reforger e
 ## 📦 Instalación
 
 ### Requisitos Previos
-- Node.js 18+ y npm
-- PostgreSQL 14+
-- Git
 
-### 1. Clonar el repositorio
+| Software | Versión Mínima | Descarga |
+|----------|---------------|----------|
+| **Node.js** | 18.0.0+ | [nodejs.org](https://nodejs.org/) |
+| **npm** | 9.0.0+ | Incluido con Node.js |
+| **PostgreSQL** | 14.0+ | [postgresql.org](https://www.postgresql.org/download/) |
+| **Git** | 2.0+ | [git-scm.com](https://git-scm.com/) |
+
+> **Nota**: Se recomienda usar Node.js 20 LTS para mejor compatibilidad.
+
+### Verificar Requisitos
+
 ```bash
-git clone <tu-repo>
+# Verificar Node.js
+node --version
+# Debe mostrar v18.x.x o superior
+
+# Verificar npm
+npm --version
+# Debe mostrar 9.x.x o superior
+
+# Verificar PostgreSQL
+psql --version
+# Debe mostrar psql (PostgreSQL) 14.x o superior
+
+# Verificar Git
+git --version
+```
+
+---
+
+### Paso 1: Clonar el Repositorio
+
+```bash
+git clone https://github.com/tu-usuario/arma-multiclan-platform.git
 cd arma-multiclan-platform
 ```
 
-### 2. Configurar Backend
+---
+
+### Paso 2: Configurar la Base de Datos
+
+#### Opción A: PostgreSQL Local
+
+1. Inicia PostgreSQL y crea una base de datos:
+
+```bash
+# En Linux/Mac
+sudo -u postgres psql
+
+# En Windows (PowerShell como Admin)
+psql -U postgres
+```
+
+2. Dentro de psql:
+
+```sql
+CREATE DATABASE arma_platform;
+CREATE USER arma_user WITH ENCRYPTED PASSWORD 'tu_contraseña_segura';
+GRANT ALL PRIVILEGES ON DATABASE arma_platform TO arma_user;
+\q
+```
+
+#### Opción B: Usar Docker (Alternativa)
+
+```bash
+docker run --name arma-postgres \
+  -e POSTGRES_USER=arma_user \
+  -e POSTGRES_PASSWORD=tu_contraseña_segura \
+  -e POSTGRES_DB=arma_platform \
+  -p 5432:5432 \
+  -d postgres:16
+```
+
+---
+
+### Paso 3: Configurar el Backend
+
 ```bash
 cd backend
 npm install
 ```
 
-Crea `.env`:
+#### Crear archivo `.env`
+
+Crea el archivo `backend/.env` con el siguiente contenido:
+
 ```env
-DATABASE_URL="postgresql://usuario:contraseña@localhost:5432/arma_platform"
-JWT_SECRET="tu-secreto-super-seguro-cambialo-en-produccion"
+# ═══════════════════════════════════════════════════════════
+# BASE DE DATOS (OBLIGATORIO)
+# ═══════════════════════════════════════════════════════════
+DATABASE_URL="postgresql://arma_user:tu_contraseña_segura@localhost:5432/arma_platform"
+
+# ═══════════════════════════════════════════════════════════
+# JWT Y AUTENTICACIÓN (OBLIGATORIO)
+# ═══════════════════════════════════════════════════════════
+# Genera un secreto seguro: openssl rand -base64 32
+JWT_SECRET="genera-un-secreto-seguro-de-al-menos-32-caracteres"
 JWT_EXPIRES_IN="7d"
+
+# ═══════════════════════════════════════════════════════════
+# SERVIDOR (OBLIGATORIO)
+# ═══════════════════════════════════════════════════════════
 PORT=3000
 NODE_ENV="development"
 FRONTEND_URL="http://localhost:5173"
 
-# Discord OAuth2 (opcional - para login con Discord)
+# ═══════════════════════════════════════════════════════════
+# DISCORD OAUTH2 (OPCIONAL - para login con Discord)
+# ═══════════════════════════════════════════════════════════
+# Obtén estos valores en https://discord.com/developers/applications
 DISCORD_CLIENT_ID=""
 DISCORD_CLIENT_SECRET=""
 DISCORD_REDIRECT_URI="http://localhost:3000/api/auth/discord/callback"
 
-# Cookies (opcional - ajustar en producción)
+# ═══════════════════════════════════════════════════════════
+# COOKIES (OPCIONAL - ajustar en producción)
+# ═══════════════════════════════════════════════════════════
 COOKIE_SECURE="false"
 COOKIE_SAMESITE="lax"
 ```
 
-Ejecutar migraciones:
+#### Ejecutar Migraciones y Seed
+
 ```bash
+# Generar el cliente de Prisma
+npx prisma generate
+
+# Ejecutar migraciones (crea las tablas)
 npx prisma migrate dev
-npx prisma db seed  # Datos de prueba
+
+# Cargar datos de prueba (usuarios, clanes, eventos de ejemplo)
+npx prisma db seed
 ```
 
-Iniciar servidor:
+#### Iniciar el Backend
+
 ```bash
 npm run dev
 ```
 
-### 3. Configurar Frontend
+El servidor estará disponible en: `http://localhost:3000`
+
+Verifica que funciona accediendo a: `http://localhost:3000/api/health`
+
+---
+
+### Paso 4: Configurar el Frontend
+
+Abre una **nueva terminal** y ejecuta:
+
 ```bash
-cd ../frontend
+cd frontend
 npm install
 ```
 
-Crea `.env`:
+#### Crear archivo `.env`
+
+Crea el archivo `frontend/.env`:
+
 ```env
 VITE_API_URL=http://localhost:3000/api
 ```
 
-Iniciar aplicación:
+#### Iniciar el Frontend
+
 ```bash
 npm run dev
 ```
+
+La aplicación estará disponible en: `http://localhost:5173`
+
+---
+
+### Paso 5: Verificar la Instalación
+
+1. Abre `http://localhost:5173` en tu navegador
+2. Deberías ver la página de login
+3. Inicia sesión con una de las cuentas de prueba (ver sección "Uso")
+
+---
+
+### Comandos Útiles
+
+#### Backend
+
+| Comando | Descripción |
+|---------|-------------|
+| `npm run dev` | Inicia el servidor en modo desarrollo |
+| `npm run build` | Compila TypeScript a JavaScript |
+| `npm start` | Inicia el servidor compilado (producción) |
+| `npx prisma studio` | Abre el panel visual de la base de datos |
+| `npx prisma migrate dev` | Ejecuta migraciones pendientes |
+| `npx prisma db seed` | Carga datos de prueba |
+| `npx prisma generate` | Regenera el cliente de Prisma |
+
+#### Frontend
+
+| Comando | Descripción |
+|---------|-------------|
+| `npm run dev` | Inicia el servidor de desarrollo |
+| `npm run build` | Compila para producción |
+| `npm run preview` | Previsualiza el build de producción |
+| `npm run lint` | Ejecuta el linter (ESLint) |
+
+---
+
+### Solución de Problemas Comunes
+
+#### Error: "Cannot connect to database"
+
+```bash
+# Verifica que PostgreSQL esté corriendo
+# Linux/Mac:
+sudo systemctl status postgresql
+
+# Windows: Abre "Servicios" y busca "postgresql"
+
+# Verifica la conexión manualmente:
+psql -U arma_user -d arma_platform -h localhost
+```
+
+#### Error: "EACCES permission denied" en npm
+
+```bash
+# En Linux/Mac, usa un gestor de versiones de Node:
+# Instala nvm: https://github.com/nvm-sh/nvm
+nvm install 20
+nvm use 20
+```
+
+#### Error: "Prisma migrate dev failed"
+
+```bash
+# Resetea la base de datos (⚠️ BORRA TODOS LOS DATOS)
+npx prisma migrate reset
+
+# O elimina la base de datos y vuelve a crearla
+psql -U postgres -c "DROP DATABASE arma_platform;"
+psql -U postgres -c "CREATE DATABASE arma_platform OWNER arma_user;"
+npx prisma migrate dev
+```
+
+#### El frontend no conecta con el backend
+
+1. Verifica que el backend esté corriendo en `http://localhost:3000`
+2. Verifica que `frontend/.env` tenga `VITE_API_URL=http://localhost:3000/api`
+3. Reinicia el frontend después de cambiar el `.env`
+
+#### Error de CORS
+
+Verifica que `FRONTEND_URL` en `backend/.env` coincida con la URL del frontend (`http://localhost:5173`)
 
 ---
 

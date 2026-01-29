@@ -108,10 +108,55 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 - Estadísticas y reportes
 - Notificaciones en tiempo real
 - Bot de Discord para gestión de roles
-- Calendario visual de eventos
 - Exportar reportes (Excel/PDF)
 - Sistema de asistencia/confirmación
 - Historial de eventos por usuario
+
+---
+
+## [2.3.0] - 2025-01-29
+
+### ✨ Agregado
+
+**Calendario Visual de Eventos:**
+- Nueva vista de calendario mensual en la página de eventos
+- Toggle para cambiar entre vista lista y calendario
+- Navegación entre meses (anterior, siguiente, hoy)
+- Eventos mostrados en su día correspondiente con hora
+- Colores por estado: verde (activo), ámbar (inactivo), gris (finalizado)
+- Click en evento navega al detalle
+- Día actual destacado con fondo y borde
+- Soporte completo de modo oscuro
+- Responsive: días abreviados en móvil
+- Semana inicia en lunes (estándar europeo)
+- Muestra hasta 3 eventos por día, luego "+X más"
+
+**Nuevos Componentes:**
+- `ViewToggle` - Botones para cambiar entre vista lista/calendario
+- `EventCalendar` - Contenedor principal del calendario
+- `CalendarHeader` - Navegación de meses
+- `CalendarGrid` - Grid de 7 columnas con días
+- `CalendarDay` - Celda de día individual
+- `CalendarEventItem` - Evento en el calendario
+
+### 📚 Archivos Creados
+
+**Frontend:**
+- `src/components/events/ViewToggle.tsx`
+- `src/components/events/EventCalendar/index.ts`
+- `src/components/events/EventCalendar/EventCalendar.tsx`
+- `src/components/events/EventCalendar/CalendarHeader.tsx`
+- `src/components/events/EventCalendar/CalendarGrid.tsx`
+- `src/components/events/EventCalendar/CalendarDay.tsx`
+- `src/components/events/EventCalendar/CalendarEventItem.tsx`
+
+### 🔧 Cambiado
+
+**EventsPage:**
+- Añadido estado de vista (lista/calendario)
+- Integrado ViewToggle en el header
+- Renderizado condicional según vista seleccionada
+- En vista calendario se cargan más eventos (límite 100)
 
 ---
 

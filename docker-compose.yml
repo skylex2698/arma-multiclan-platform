@@ -1,0 +1,113 @@
+# ═══════════════════════════════════════════════════════════
+# Docker Compose - Arma Multiclan Platform
+# ═══════════════════════════════════════════════════════════
+#
+# Uso:
+#   Desarrollo:  docker-compose up -d
+#   Producción:  docker-compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+#   Logs:        docker-compose logs -f
+#   Parar:       docker-compose down
+#   Rebuild:     docker-compose up -d --build
+#
+# ═══════════════════════════════════════════════════════════
+
+services:
+  # ─────────────────────────────────────────────────────────
+  # Base de Datos PostgreSQL
+  # ─────────────────────────────────────────────────────────
+  postgres:
+    image: postgres:16-alpine
+    container_name: arma-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-arma_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-arma_password_segura}
+      POSTGRES_DB: ${POSTGRES_DB:-arma_platform}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-arma_user} -d ${POSTGRES_DB:-arma_platform}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - arma-network
+
+  # ─────────────────────────────────────────────────────────
+  # Backend API (Node.js + Express + Prisma)
+  # ─────────────────────────────────────────────────────────
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: arma-backend
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      NODE_ENV: ${NODE_ENV:-production}
+      PORT: 3000
+      DATABASE_URL: postgresql://${POSTGRES_USER:-arma_user}:${POSTGRES_PASSWORD:-arma_password_segura}@postgres:5432/${POSTGRES_DB:-arma_platform}
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET es obligatorio}
+      JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-7d}
+      FRONTEND_URL: ${FRONTEND_URL:-http://localhost}
+      DISCORD_CLIENT_ID: ${DISCORD_CLIENT_ID:-}
+      DISCORD_CLIENT_SECRET: ${DISCORD_CLIENT_SECRET:-}
+      DISCORD_REDIRECT_URI: ${DISCORD_REDIRECT_URI:-}
+      COOKIE_SECURE: ${COOKIE_SECURE:-true}
+      COOKIE_SAMESITE: ${COOKIE_SAMESITE:-strict}
+    volumes:
+      - uploads_data:/app/public/uploads
+    ports:
+      - "${BACKEND_PORT:-3000}:3000"
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - arma-network
+
+  # ─────────────────────────────────────────────────────────
+  # Frontend (React + Nginx)
+  # ─────────────────────────────────────────────────────────
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        VITE_API_URL: ${VITE_API_URL:-http://localhost:3000/api}
+    container_name: arma-frontend
+    restart: unless-stopped
+    depends_on:
+      backend:
+        condition: service_healthy
+    ports:
+      - "${FRONTEND_PORT:-80}:80"
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:80"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - arma-network
+
+# ─────────────────────────────────────────────────────────
+# Volúmenes persistentes
+# ─────────────────────────────────────────────────────────
+volumes:
+  postgres_data:
+    name: arma-postgres-data
+  uploads_data:
+    name: arma-uploads-data
+
+# ─────────────────────────────────────────────────────────
+# Red interna
+# ─────────────────────────────────────────────────────────
+networks:
+  arma-network:
+    name: arma-network
+    driver: bridge

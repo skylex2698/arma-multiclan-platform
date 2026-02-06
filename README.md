@@ -2,7 +2,7 @@
 
 Plataforma web para gestión de eventos multijugador de Arma 3 y Arma Reforger entre múltiples clanes.
 
-![Version](https://img.shields.io/badge/version-2.3.0-blue.svg)
+![Version](https://img.shields.io/badge/version-2.4.0-blue.svg)
 ![License](https://img.shields.io/badge/license-MIT-green.svg)
 
 ## 📋 Características
@@ -361,6 +361,73 @@ Verifica que `FRONTEND_URL` en `backend/.env` coincida con la URL del frontend (
 
 ---
 
+## 🐳 Despliegue con Docker
+
+Para desplegar en un servidor de producción, usa Docker.
+
+### Requisitos
+- Docker 20.10+
+- Docker Compose 2.0+
+
+### Despliegue Rápido
+
+```bash
+# 1. Clonar repositorio
+git clone https://github.com/tu-usuario/arma-multiclan-platform.git
+cd arma-multiclan-platform
+
+# 2. Configurar variables de entorno
+cp .env.example .env
+nano .env  # Editar con tus valores
+
+# 3. Iniciar contenedores
+docker compose up -d --build
+
+# 4. (Opcional) Cargar datos de prueba
+docker compose exec backend npx prisma db seed
+```
+
+### Variables de Entorno Obligatorias
+
+```env
+# Contraseña de PostgreSQL (cámbiala)
+POSTGRES_PASSWORD=tu_contraseña_segura
+
+# Secreto JWT (genera con: openssl rand -base64 32)
+JWT_SECRET=tu_secreto_jwt_generado
+
+# URLs de tu servidor
+VITE_API_URL=http://TU_IP:3000/api
+FRONTEND_URL=http://TU_IP
+```
+
+### Comandos Docker Útiles
+
+```bash
+# Ver estado
+docker compose ps
+
+# Ver logs
+docker compose logs -f
+
+# Reiniciar
+docker compose restart
+
+# Parar
+docker compose down
+
+# Actualizar
+git pull && docker compose up -d --build
+```
+
+### Producción con HTTPS
+
+Para producción, se recomienda usar un proxy inverso (Nginx) con certificado SSL.
+
+📖 **[Ver guía completa de despliegue](DEPLOYMENT.md)**
+
+---
+
 ## 🎮 Uso
 
 ### Acceso Inicial
@@ -476,6 +543,7 @@ arma-multiclan-platform/
 - ✅ **Paginación** - Lista de eventos y usuarios con paginación
 - ✅ **Filtros mejorados** - Filtro por estado con valor por defecto "Activos"
 - ✅ **Calendario visual** - Vista de eventos en calendario
+- ✅ **Docker** - Contenedores para despliegue fácil en servidores
 
 ### Próximas Funcionalidades
 - [ ] **Estadísticas** - Dashboard con métricas de eventos
@@ -486,9 +554,9 @@ arma-multiclan-platform/
 - [ ] **Historial de participación** - Eventos pasados por usuario
 
 ### Deployment
-- [ ] Backend en Railway/Render
-- [ ] Frontend en Vercel
-- [ ] Base de datos en Supabase/Neon
+- ✅ Docker Compose para despliegue en cualquier servidor
+- [ ] Guía para Railway/Render (PaaS)
+- [ ] Guía para Vercel (frontend)
 - [ ] CDN para imágenes
 
 ---

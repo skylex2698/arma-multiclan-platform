@@ -1,0 +1,41 @@
+# Dependencias
+node_modules
+npm-debug.log
+
+# Build output
+dist
+
+# Archivos de entorno (se configuran vía docker build args)
+.env
+.env.local
+.env.*.local
+
+# Logs
+logs
+*.log
+
+# IDE y editor
+.idea
+.vscode
+*.swp
+*.swo
+*~
+
+# Sistema operativo
+.DS_Store
+Thumbs.db
+
+# Testing
+coverage
+.nyc_output
+
+# Git
+.git
+.gitignore
+
+# Docker
+Dockerfile
+.dockerignore
+
+# Documentación
+*.md

@@ -1,0 +1,46 @@
+# Dependencias
+node_modules
+npm-debug.log
+
+# Build output
+dist
+
+# Archivos de entorno (se configuran vía docker-compose)
+.env
+.env.local
+.env.*.local
+
+# Logs
+logs
+*.log
+
+# IDE y editor
+.idea
+.vscode
+*.swp
+*.swo
+*~
+
+# Sistema operativo
+.DS_Store
+Thumbs.db
+
+# Testing
+coverage
+.nyc_output
+
+# Archivos subidos (se montan como volumen)
+public/uploads/*
+!public/uploads/.gitkeep
+
+# Git
+.git
+.gitignore
+
+# Docker
+Dockerfile
+.dockerignore
+
+# Documentación local
+*.md
+!README.md

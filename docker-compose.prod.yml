@@ -1,0 +1,76 @@
+# ═══════════════════════════════════════════════════════════
+# Docker Compose - Producción
+# ═══════════════════════════════════════════════════════════
+#
+# Este archivo extiende docker-compose.yml con configuraciones
+# específicas para producción.
+#
+# Uso:
+#   docker-compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+#
+# ═══════════════════════════════════════════════════════════
+
+services:
+  postgres:
+    # En producción, no exponer el puerto de PostgreSQL al exterior
+    ports: []
+    # Configuración de rendimiento
+    command:
+      - "postgres"
+      - "-c"
+      - "max_connections=100"
+      - "-c"
+      - "shared_buffers=256MB"
+      - "-c"
+      - "effective_cache_size=768MB"
+      - "-c"
+      - "maintenance_work_mem=64MB"
+      - "-c"
+      - "checkpoint_completion_target=0.7"
+      - "-c"
+      - "wal_buffers=16MB"
+      - "-c"
+      - "default_statistics_target=100"
+      - "-c"
+      - "random_page_cost=1.1"
+      - "-c"
+      - "effective_io_concurrency=200"
+
+  backend:
+    # Configuración de producción
+    environment:
+      NODE_ENV: production
+      COOKIE_SECURE: "true"
+      COOKIE_SAMESITE: "strict"
+    # Límites de recursos
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 512M
+        reservations:
+          cpus: '0.25'
+          memory: 256M
+    # Logs
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  frontend:
+    # Límites de recursos
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 128M
+        reservations:
+          cpus: '0.1'
+          memory: 64M
+    # Logs
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"

@@ -114,6 +114,55 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ---
 
+## [2.4.0] - 2025-01-29
+
+### ✨ Agregado
+
+**Docker y Despliegue:**
+- Dockerfile para backend (Node.js multi-stage build)
+- Dockerfile para frontend (Vite + Nginx)
+- docker-compose.yml para orquestación completa
+- docker-compose.prod.yml con configuración de producción
+- Configuración de Nginx para SPA con gzip y cache
+- Health checks para todos los servicios
+- Volúmenes persistentes para datos y uploads
+- Red interna para comunicación entre servicios
+
+**Documentación de Despliegue (DEPLOYMENT.md):**
+- Guía completa de instalación con Docker
+- Requisitos del servidor
+- Configuración de variables de entorno
+- Comandos útiles de Docker
+- Guía de actualización de la aplicación
+- Sistema de backups automáticos
+- Configuración de HTTPS con Nginx/Certbot
+- Solución de problemas comunes
+- Monitoreo y logs
+
+**Archivos de Configuración:**
+- `.env.example` con todas las variables documentadas
+- `.dockerignore` para backend y frontend
+- `nginx.conf` optimizado para producción
+
+### 📚 Archivos Creados
+
+**Raíz:**
+- `docker-compose.yml`
+- `docker-compose.prod.yml`
+- `.env.example`
+- `DEPLOYMENT.md`
+
+**Backend:**
+- `backend/Dockerfile`
+- `backend/.dockerignore`
+
+**Frontend:**
+- `frontend/Dockerfile`
+- `frontend/nginx.conf`
+- `frontend/.dockerignore`
+
+---
+
 ## [2.3.0] - 2025-01-29
 
 ### ✨ Agregado

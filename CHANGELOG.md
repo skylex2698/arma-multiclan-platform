@@ -114,6 +114,62 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ---
 
+## [2.5.0] - 2025-02-06
+
+### 🔧 Cambiado
+
+**Arquitectura Docker: Nginx como Reverse Proxy:**
+- Frontend nginx ahora actúa como reverse proxy hacia el backend
+- `VITE_API_URL` cambiado de URL absoluta a ruta relativa `/api`
+- Eliminados problemas de CORS al servir frontend y API desde el mismo host
+- Funciona desde cualquier IP/dominio sin recompilar el frontend
+- Añadido proxy para `/uploads/*` (archivos estáticos del backend)
+- Nginx usa `$http_host` para preservar el puerto en la cabecera Host
+
+**CORS Multi-Origen:**
+- Soporte para variable `CORS_EXTRA_ORIGINS` con múltiples orígenes separados por comas
+- Permite acceso desde IPs de LAN sin configurar cada una individualmente
+
+**Trust Proxy en Express:**
+- Añadido `app.set('trust proxy', 1)` para leer cabeceras `X-Forwarded-*` de nginx
+- Rate limiting ahora usa la IP real del cliente en vez de la IP interna de Docker
+
+### 🐛 Corregido
+
+**Build de Docker:**
+- Regenerado `frontend/package-lock.json` para sincronizar con `package.json` (npm ci fallaba)
+- Añadido `binaryTargets = ["native", "linux-musl-openssl-3.0.x"]` en Prisma para Alpine Linux
+- Corregida URL del healthcheck: `/health` en vez de `/api/health`
+- Añadido `start_period: 15s` al healthcheck del backend
+
+**Discord OAuth en producción:**
+- `getCookieOptions()` ya no fuerza `Secure=true` en producción; respeta `COOKIE_SECURE` del `.env`
+- `clearJWTCookie()` reutiliza `getCookieOptions()` para opciones consistentes
+- `clearCookie('discord_oauth_state')` ahora incluye todas las opciones coincidentes (httpOnly, secure, sameSite, path)
+- `clearCookie('discord_link_state')` corregido igual
+- Sin estas correcciones, las cookies se descartaban silenciosamente en HTTP
+
+**Configuración de producción:**
+- `COOKIE_SECURE` por defecto `false` (antes `true`, rompía cookies sin HTTPS)
+- `COOKIE_SAMESITE` por defecto `lax` (antes `strict`, rompía flujo OAuth)
+- `DISCORD_REDIRECT_URI` debe incluir el puerto si no es el estándar (80/443)
+
+### 📚 Archivos Modificados
+
+| Archivo | Cambio |
+|---------|--------|
+| `frontend/package-lock.json` | Regenerado |
+| `backend/prisma/schema.prisma` | binaryTargets para Alpine |
+| `backend/Dockerfile` | Healthcheck URL corregida |
+| `docker-compose.yml` | Healthcheck, CORS_EXTRA_ORIGINS, defaults seguros |
+| `frontend/nginx.conf` | Reverse proxy /api/ y /uploads/, $http_host |
+| `backend/src/index.ts` | Trust proxy, CORS multi-origen |
+| `backend/src/utils/jwt.ts` | Cookie Secure sin override, clearCookie consistente |
+| `backend/src/controllers/auth.controller.ts` | clearCookie con opciones completas |
+| `.env.example` | Documentación completa, defaults para multi-máquina |
+
+---
+
 ## [2.4.0] - 2025-01-29
 
 ### ✨ Agregado

@@ -3,11 +3,11 @@
 # ═══════════════════════════════════════════════════════════
 #
 # Uso:
-#   Desarrollo:  docker-compose up -d
-#   Producción:  docker-compose -f docker-compose.yml -f docker-compose.prod.yml up -d
-#   Logs:        docker-compose logs -f
-#   Parar:       docker-compose down
-#   Rebuild:     docker-compose up -d --build
+#   Desarrollo:  docker compose up -d
+#   Producción:  docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+#   Logs:        docker compose logs -f
+#   Parar:       docker compose down
+#   Rebuild:     docker compose up -d --build
 #
 # ═══════════════════════════════════════════════════════════
 
@@ -54,32 +54,34 @@ services:
       JWT_SECRET: ${JWT_SECRET:?JWT_SECRET es obligatorio}
       JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-7d}
       FRONTEND_URL: ${FRONTEND_URL:-http://localhost}
+      CORS_EXTRA_ORIGINS: ${CORS_EXTRA_ORIGINS:-}
       DISCORD_CLIENT_ID: ${DISCORD_CLIENT_ID:-}
       DISCORD_CLIENT_SECRET: ${DISCORD_CLIENT_SECRET:-}
       DISCORD_REDIRECT_URI: ${DISCORD_REDIRECT_URI:-}
-      COOKIE_SECURE: ${COOKIE_SECURE:-true}
-      COOKIE_SAMESITE: ${COOKIE_SAMESITE:-strict}
+      COOKIE_SECURE: ${COOKIE_SECURE:-false}
+      COOKIE_SAMESITE: ${COOKIE_SAMESITE:-lax}
     volumes:
       - uploads_data:/app/public/uploads
     ports:
       - "${BACKEND_PORT:-3000}:3000"
     healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3000/api/health"]
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3000/health"]
       interval: 30s
       timeout: 10s
+      start_period: 15s
       retries: 3
     networks:
       - arma-network
 
   # ─────────────────────────────────────────────────────────
-  # Frontend (React + Nginx)
+  # Frontend (React + Nginx reverse proxy)
   # ─────────────────────────────────────────────────────────
   frontend:
     build:
       context: ./frontend
       dockerfile: Dockerfile
       args:
-        VITE_API_URL: ${VITE_API_URL:-http://localhost:3000/api}
+        VITE_API_URL: ${VITE_API_URL:-/api}
     container_name: arma-frontend
     restart: unless-stopped
     depends_on:

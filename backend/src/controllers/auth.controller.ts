@@ -6,7 +6,7 @@ import { isValidEmail, isStrongPassword, sanitizeNickname } from '../utils/valid
 import { logger } from '../utils/logger';
 import { prisma } from '../index';
 import { generateState, validateState } from '../utils/crypto';
-import { setJWTCookie, clearJWTCookie } from '../utils/jwt';
+import { setJWTCookie, clearJWTCookie, getCookieOptions } from '../utils/jwt';
 
 export class AuthController {
   // POST /api/auth/register/local
@@ -198,8 +198,14 @@ export class AuthController {
         return res.redirect(`${process.env.FRONTEND_URL}/login?error=invalid_state`);
       }
 
-      // Limpiar cookie de state
-      res.clearCookie('discord_oauth_state');
+      // Limpiar cookie de state (con las mismas opciones para que el navegador la elimine)
+      const cookieOpts = getCookieOptions();
+      res.clearCookie('discord_oauth_state', {
+        httpOnly: cookieOpts.httpOnly,
+        secure: cookieOpts.secure,
+        sameSite: cookieOpts.sameSite,
+        path: cookieOpts.path,
+      });
 
       if (!code || typeof code !== 'string') {
         logger.warn('Discord OAuth2 missing code');
@@ -324,8 +330,14 @@ export class AuthController {
         return res.redirect(`${process.env.FRONTEND_URL}/profile?error=invalid_state`);
       }
 
-      // Limpiar cookie de state
-      res.clearCookie('discord_link_state');
+      // Limpiar cookie de state (con las mismas opciones para que el navegador la elimine)
+      const linkCookieOpts = getCookieOptions();
+      res.clearCookie('discord_link_state', {
+        httpOnly: linkCookieOpts.httpOnly,
+        secure: linkCookieOpts.secure,
+        sameSite: linkCookieOpts.sameSite,
+        path: linkCookieOpts.path,
+      });
 
       if (!code || typeof code !== 'string') {
         logger.warn('Discord link missing code');

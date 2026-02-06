@@ -2,7 +2,7 @@
 
 Plataforma web para gestión de eventos multijugador de Arma 3 y Arma Reforger entre múltiples clanes.
 
-![Version](https://img.shields.io/badge/version-2.4.0-blue.svg)
+![Version](https://img.shields.io/badge/version-2.5.0-blue.svg)
 ![License](https://img.shields.io/badge/license-MIT-green.svg)
 
 ## 📋 Características
@@ -365,6 +365,17 @@ Verifica que `FRONTEND_URL` en `backend/.env` coincida con la URL del frontend (
 
 Para desplegar en un servidor de producción, usa Docker.
 
+### Arquitectura
+
+```
+Internet/LAN → [:PUERTO] Nginx (frontend) → Archivos estáticos (React)
+                                           → /api/*    → Backend (Express)
+                                           → /uploads/* → Backend (archivos)
+                         PostgreSQL ← Backend (Prisma ORM)
+```
+
+Nginx actúa como **reverse proxy**: tanto el frontend como la API se sirven desde el mismo host y puerto. Esto elimina problemas de CORS y permite acceder desde cualquier IP/dominio.
+
 ### Requisitos
 - Docker 20.10+
 - Docker Compose 2.0+
@@ -396,9 +407,15 @@ POSTGRES_PASSWORD=tu_contraseña_segura
 # Secreto JWT (genera con: openssl rand -base64 32)
 JWT_SECRET=tu_secreto_jwt_generado
 
-# URLs de tu servidor
-VITE_API_URL=http://TU_IP:3000/api
-FRONTEND_URL=http://TU_IP
+# Ruta relativa del API (nginx reverse proxy)
+VITE_API_URL=/api
+
+# URL pública del frontend (CORS + redirecciones OAuth)
+# IMPORTANTE: incluir el puerto si no es el 80
+FRONTEND_URL=http://TU_DOMINIO_O_IP:PUERTO
+
+# Si usas HTTP (sin HTTPS), las cookies DEBEN ser no-seguras
+COOKIE_SECURE=false
 ```
 
 ### Comandos Docker Útiles
@@ -422,7 +439,7 @@ git pull && docker compose up -d --build
 
 ### Producción con HTTPS
 
-Para producción, se recomienda usar un proxy inverso (Nginx) con certificado SSL.
+Para producción con HTTPS, cambia `COOKIE_SECURE=true` y configura un proxy inverso externo con certificado SSL.
 
 📖 **[Ver guía completa de despliegue](DEPLOYMENT.md)**
 

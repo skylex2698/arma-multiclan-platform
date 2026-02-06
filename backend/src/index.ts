@@ -24,6 +24,11 @@ const PORT = process.env.PORT || 3000;
 const isProduction = process.env.NODE_ENV === 'production';
 
 // ============================================
+// Trust proxy (necesario detrás de nginx/reverse proxy)
+// ============================================
+app.set('trust proxy', 1);
+
+// ============================================
 // SEGURIDAD: Helmet para cabeceras HTTP
 // ============================================
 app.use(helmet({
@@ -60,6 +65,7 @@ app.use(generalLimiter);
 const allowedOrigins = [
   process.env.FRONTEND_URL,
   'http://localhost:5173', // Desarrollo
+  ...(process.env.CORS_EXTRA_ORIGINS ? process.env.CORS_EXTRA_ORIGINS.split(',') : []),
 ].filter(Boolean) as string[];
 
 app.use(cors({

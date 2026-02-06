@@ -76,10 +76,9 @@ export const decodeToken = (token: string): JWTPayload | null => {
 // Opciones de cookie para JWT
 // ============================================
 
-const getCookieOptions = () => {
-  const isProduction = process.env.NODE_ENV === 'production';
-  const isSecure = process.env.COOKIE_SECURE === 'true' || isProduction;
-  const sameSite = (process.env.COOKIE_SAMESITE || (isProduction ? 'strict' : 'lax')) as 'strict' | 'lax' | 'none';
+export const getCookieOptions = () => {
+  const isSecure = process.env.COOKIE_SECURE === 'true';
+  const sameSite = (process.env.COOKIE_SAMESITE || 'lax') as 'strict' | 'lax' | 'none';
 
   return {
     httpOnly: true,
@@ -107,10 +106,11 @@ export const clearJWTCookie = (res: Response, token?: string): void => {
     blacklistToken(token);
   }
 
+  const opts = getCookieOptions();
   res.clearCookie('token', {
-    httpOnly: true,
-    secure: process.env.COOKIE_SECURE === 'true' || process.env.NODE_ENV === 'production',
-    sameSite: (process.env.COOKIE_SAMESITE || 'lax') as 'strict' | 'lax' | 'none',
-    path: '/',
+    httpOnly: opts.httpOnly,
+    secure: opts.secure,
+    sameSite: opts.sameSite,
+    path: opts.path,
   });
 };

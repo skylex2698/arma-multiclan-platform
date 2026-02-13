@@ -281,6 +281,10 @@ export class EventService {
     gameType: GameType;
     scheduledDate: Date;
     creatorId: string;
+    serverName?: string;
+    serverIp?: string;
+    serverPort?: string;
+    serverPassword?: string;
     squads: Array<{
       id?: string; // ID temporal del frontend para mapeo de jerarquía
       name: string;
@@ -316,6 +320,10 @@ export class EventService {
           scheduledDate: data.scheduledDate,
           creatorId: data.creatorId,
           status: EventStatus.ACTIVE,
+          serverName: data.serverName || null,
+          serverIp: data.serverIp || null,
+          serverPort: data.serverPort || null,
+          serverPassword: data.serverPassword || null,
           squads: {
             create: data.squads.map(squad => ({
               name: squad.name,
@@ -540,6 +548,10 @@ export class EventService {
       briefing?: string;
       gameType?: GameType;
       scheduledDate?: Date;
+      serverName?: string;
+      serverIp?: string;
+      serverPort?: string;
+      serverPassword?: string;
       squads?: Array<{
         id?: string;
         name: string;
@@ -739,6 +751,10 @@ export class EventService {
           briefing: data.briefing ? sanitizeHTML(data.briefing) : undefined,
           gameType: data.gameType,
           scheduledDate: data.scheduledDate,
+          ...(data.serverName !== undefined && { serverName: data.serverName || null }),
+          ...(data.serverIp !== undefined && { serverIp: data.serverIp || null }),
+          ...(data.serverPort !== undefined && { serverPort: data.serverPort || null }),
+          ...(data.serverPassword !== undefined && { serverPassword: data.serverPassword || null }),
         },
         include: {
           creator: {
@@ -963,6 +979,104 @@ export class EventService {
     });
 
     return updatedEvent;
+  }
+
+  // Generar token de compartir público
+  async generateShareToken(eventId: string): Promise<string> {
+    const event = await prisma.event.findUnique({ where: { id: eventId } });
+    if (!event) throw new Error('Evento no encontrado');
+
+    // Si ya tiene token, devolverlo
+    if (event.publicShareToken) return event.publicShareToken;
+
+    // Generar token único
+    const crypto = await import('crypto');
+    const token = crypto.randomBytes(16).toString('hex');
+
+    await prisma.event.update({
+      where: { id: eventId },
+      data: { publicShareToken: token },
+    });
+
+    return token;
+  }
+
+  // Obtener evento por token público (sin info de servidor)
+  async getEventByShareToken(token: string) {
+    const event = await prisma.event.findUnique({
+      where: { publicShareToken: token },
+      include: {
+        creator: {
+          select: {
+            id: true,
+            nickname: true,
+            clanId: true,
+            clan: {
+              select: {
+                id: true,
+                name: true,
+                tag: true,
+                avatarUrl: true,
+              },
+            },
+          },
+        },
+        squads: {
+          include: {
+            reservedForClan: {
+              select: {
+                id: true,
+                name: true,
+                tag: true,
+                avatarUrl: true,
+              },
+            },
+            slots: {
+              include: {
+                user: {
+                  select: {
+                    id: true,
+                    nickname: true,
+                    status: true,
+                    clanId: true,
+                    avatarUrl: true,
+                    clan: {
+                      select: {
+                        id: true,
+                        name: true,
+                        tag: true,
+                        avatarUrl: true,
+                      },
+                    },
+                  },
+                },
+              },
+              orderBy: { order: 'asc' as const },
+            },
+          },
+          orderBy: { order: 'asc' as const },
+        },
+      },
+    });
+
+    if (!event) {
+      throw new Error('Evento no encontrado');
+    }
+
+    // OMITIR info de conexión del servidor por seguridad
+    const { serverName, serverIp, serverPort, serverPassword, ...safeEvent } = event;
+
+    const totalSlots = safeEvent.squads.reduce((acc, squad) => acc + squad.slots.length, 0);
+    const occupiedSlots = safeEvent.squads.reduce(
+      (acc, squad) => acc + squad.slots.filter((s) => s.userId !== null).length,
+      0
+    );
+
+    return {
+      ...safeEvent,
+      totalSlots,
+      occupiedSlots,
+    };
   }
 }
 

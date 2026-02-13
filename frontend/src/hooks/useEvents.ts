@@ -48,6 +48,10 @@ export function useUpdateEvent(id: string) {
       briefing?: string;
       gameType?: GameType;
       scheduledDate?: Date;
+      serverName?: string;
+      serverIp?: string;
+      serverPort?: string;
+      serverPassword?: string;
       squads?: Array<{
         id?: string;
         name: string;
@@ -166,5 +170,21 @@ export function useDeleteModsetFile(eventId: string) {
       queryClient.invalidateQueries({ queryKey: ['event', eventId] });
       queryClient.invalidateQueries({ queryKey: ['events'] });
     },
+  });
+}
+
+// Obtener evento público por token
+export function usePublicEvent(token: string) {
+  return useQuery({
+    queryKey: ['public-event', token],
+    queryFn: () => eventService.getPublicEvent(token),
+    enabled: !!token,
+  });
+}
+
+// Generar token de link público
+export function useGenerateShareToken() {
+  return useMutation({
+    mutationFn: (eventId: string) => eventService.generateShareToken(eventId),
   });
 }

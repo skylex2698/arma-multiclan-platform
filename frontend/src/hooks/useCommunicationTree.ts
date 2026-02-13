@@ -17,6 +17,15 @@ export const useCommunicationTree = (eventId: string) => {
   });
 };
 
+// Hook para obtener el árbol público por token
+export const usePublicCommunicationTree = (token: string) => {
+  return useQuery({
+    queryKey: ['publicCommunicationTree', token],
+    queryFn: () => communicationTreeService.getPublicEventTree(token),
+    enabled: !!token,
+  });
+};
+
 // Hook para crear un nodo
 export const useCreateNode = (eventId: string) => {
   const queryClient = useQueryClient();

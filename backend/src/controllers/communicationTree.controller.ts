@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
 import { communicationTreeService } from '../services/communicationTree.service';
+import { prisma } from '../index';
 import { logger } from '../utils/logger';
 
 // GET /events/:eventId/communication-tree
@@ -10,6 +11,29 @@ export const getEventTree = async (req: Request, res: Response) => {
     res.json(nodes);
   } catch (error: any) {
     logger.error('Error fetching communication tree', { error: error.message });
+    res.status(500).json({ message: 'Error al obtener el árbol de comunicaciones' });
+  }
+};
+
+// GET /events/public/:token/communication-tree (público, sin autenticación)
+export const getPublicEventTree = async (req: Request, res: Response) => {
+  try {
+    const token = req.params.token as string;
+
+    // Buscar evento por token público
+    const event = await prisma.event.findUnique({
+      where: { publicShareToken: token },
+      select: { id: true },
+    });
+
+    if (!event) {
+      return res.status(404).json({ message: 'Evento no encontrado' });
+    }
+
+    const nodes = await communicationTreeService.getEventTree(event.id);
+    res.json(nodes);
+  } catch (error: any) {
+    logger.error('Error fetching public communication tree', { error: error.message });
     res.status(500).json({ message: 'Error al obtener el árbol de comunicaciones' });
   }
 };

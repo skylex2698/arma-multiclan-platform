@@ -12,6 +12,7 @@ import EventDetailPage from './pages/events/EventDetailPage';
 import CreateEventPage from './pages/events/CreateEventPage';
 import CreateEventFromTemplatePage from './pages/events/CreateEventFromTemplatePage';
 import EditEventPage from './pages/events/EditEventPage';
+import PublicEventPage from './pages/events/PublicEventPage';
 import ClanesPage from './pages/clanes/ClanesPage';
 import ClanDetailPage from './pages/clanes/ClanDetailPage';
 import CreateClanPage from './pages/clanes/CreateClanPage';
@@ -88,6 +89,10 @@ export const router = createBrowserRouter([
         <ProfilePage />
       </ProtectedRoute>
     ),
+  },
+  {
+    path: '/events/public/:token',
+    element: <PublicEventPage />,
   },
   {
     path: '/events',

@@ -37,6 +37,10 @@ export default function CreateEventPage() {
   const [gameType, setGameType] = useState<GameType>('ARMA_3');
   const [scheduledDate, setScheduledDate] = useState('');
   const [scheduledTime, setScheduledTime] = useState('20:00');
+  const [serverName, setServerName] = useState('');
+  const [serverIp, setServerIp] = useState('');
+  const [serverPort, setServerPort] = useState('');
+  const [serverPassword, setServerPassword] = useState('');
   const [squads, setSquads] = useState<SquadForm[]>([
     {
       id: '1',
@@ -203,6 +207,10 @@ export default function CreateEventPage() {
         briefing: briefing || undefined,
         gameType,
         scheduledDate: dateTime,
+        serverName: serverName || undefined,
+        serverIp: serverIp || undefined,
+        serverPort: serverPort || undefined,
+        serverPassword: serverPassword || undefined,
         squads: formattedSquads,
       });
 
@@ -311,6 +319,61 @@ export default function CreateEventPage() {
                   onChange={(e) => setScheduledTime(e.target.value)}
                   className="input w-full"
                   required
+                />
+              </div>
+            </div>
+
+            {/* Información del servidor */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-military-700 dark:text-gray-300 mb-2">
+                  Nombre del Servidor
+                </label>
+                <input
+                  type="text"
+                  value={serverName}
+                  onChange={(e) => setServerName(e.target.value)}
+                  className="input w-full"
+                  placeholder="ej: [BEAR] Servidor publico"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-military-700 dark:text-gray-300 mb-2">
+                  IP del Servidor
+                </label>
+                <input
+                  type="text"
+                  value={serverIp}
+                  onChange={(e) => setServerIp(e.target.value)}
+                  className="input w-full"
+                  placeholder="ej: 192.168.1.1"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-military-700 dark:text-gray-300 mb-2">
+                  Puerto
+                </label>
+                <input
+                  type="text"
+                  value={serverPort}
+                  onChange={(e) => setServerPort(e.target.value)}
+                  className="input w-full"
+                  placeholder="ej: 2302"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-military-700 dark:text-gray-300 mb-2">
+                  Contraseña del Servidor
+                </label>
+                <input
+                  type="text"
+                  value={serverPassword}
+                  onChange={(e) => setServerPassword(e.target.value)}
+                  className="input w-full"
+                  placeholder="ej: mi_password"
                 />
               </div>
             </div>

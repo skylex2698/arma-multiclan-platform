@@ -33,6 +33,24 @@ export const communicationTreeService = {
     }
   },
 
+  // Obtener árbol público de un evento por token
+  getPublicEventTree: async (token: string): Promise<CommunicationNode[]> => {
+    try {
+      const response = await api.get(`/events/public/${token}/communication-tree`);
+      const data = response.data?.data || response.data;
+      if (Array.isArray(data)) {
+        return data;
+      }
+      return [];
+    } catch (error: any) {
+      if (error.response?.status === 404) {
+        return [];
+      }
+      console.error('Error fetching public communication tree:', error);
+      return [];
+    }
+  },
+
   // Crear un nodo
   createNode: async (
     eventId: string,

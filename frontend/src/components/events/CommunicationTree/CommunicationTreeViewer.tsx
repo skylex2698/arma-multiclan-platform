@@ -12,20 +12,23 @@ import ReactFlow, {
 } from 'reactflow';
 import 'reactflow/dist/style.css';
 import CustomNode from './CustomNode';
-import { useCommunicationTree } from '../../../hooks/useCommunicationTree';
+import { useCommunicationTree, usePublicCommunicationTree } from '../../../hooks/useCommunicationTree';
 import { Download, Loader2 } from 'lucide-react';
 import html2canvas from 'html2canvas';
 
 interface CommunicationTreeViewerProps {
   eventId: string;
+  publicToken?: string; // Si se proporciona, usa la ruta pública sin autenticación
 }
 
 const nodeTypes = {
   custom: CustomNode,
 };
 
-const CommunicationTreeViewer = ({ eventId }: CommunicationTreeViewerProps) => {
-  const { data: nodes, isLoading, error } = useCommunicationTree(eventId);
+const CommunicationTreeViewer = ({ eventId, publicToken }: CommunicationTreeViewerProps) => {
+  const authenticatedQuery = useCommunicationTree(publicToken ? '' : eventId);
+  const publicQuery = usePublicCommunicationTree(publicToken || '');
+  const { data: nodes, isLoading, error } = publicToken ? publicQuery : authenticatedQuery;
 
   // Convertir los nodos del backend a formato de React Flow
   const flowNodes: Node[] = useMemo(() => {

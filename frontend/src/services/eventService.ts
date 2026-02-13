@@ -74,6 +74,10 @@ export const eventService = {
       briefing?: string;
       gameType?: GameType;
       scheduledDate?: Date;
+      serverName?: string;
+      serverIp?: string;
+      serverPort?: string;
+      serverPassword?: string;
       squads?: Array<{
         id?: string;
         name: string;
@@ -152,5 +156,17 @@ export const eventService = {
   // Eliminar archivo de modset
   deleteModsetFile: async (eventId: string): Promise<void> => {
     await api.delete(`/events/${eventId}/modset-file`);
+  },
+
+  // Obtener evento público por token (sin autenticación requerida)
+  getPublicEvent: async (token: string): Promise<{ event: Event }> => {
+    const response = await api.get<ApiResponse<{ event: Event }>>(`/events/public/${token}`);
+    return response.data.data;
+  },
+
+  // Generar token de link público
+  generateShareToken: async (eventId: string): Promise<{ token: string }> => {
+    const response = await api.post<ApiResponse<{ token: string }>>(`/events/${eventId}/share-token`);
+    return response.data.data;
   },
 };

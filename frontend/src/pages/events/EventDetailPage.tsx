@@ -19,6 +19,11 @@ import {
   ExternalLink,
   Power,
   ClipboardCheck,
+  Share2,
+  Server,
+  Eye,
+  EyeOff,
+  Check,
 } from 'lucide-react';
 import {
   useEvent,
@@ -27,6 +32,7 @@ import {
   useDeleteBriefingFile,
   useDeleteModsetFile,
   useChangeEventStatus,
+  useGenerateShareToken,
 } from '../../hooks/useEvents';
 import { useAssignSlot, useUnassignSlot, useReserveSquad } from '../../hooks/useSlots';
 import { LoadingSpinner } from '../../components/ui/LoadingSpinner';
@@ -64,6 +70,9 @@ export default function EventDetailPage() {
   const deleteBriefingFile = useDeleteBriefingFile(id!);
   const deleteModsetFile = useDeleteModsetFile(id!);
   const changeEventStatus = useChangeEventStatus(id!);
+  const generateShareToken = useGenerateShareToken();
+  const [showPassword, setShowPassword] = useState(false);
+  const [shareCopied, setShareCopied] = useState(false);
   const briefingFileInputRef = useRef<HTMLInputElement>(null);
   const modsetFileInputRef = useRef<HTMLInputElement>(null);
   const [fileUploadError, setFileUploadError] = useState('');
@@ -347,6 +356,34 @@ export default function EventDetailPage() {
                 </button>
               </>
             )}
+
+            {/* Botón compartir link público */}
+            {(user?.role === 'ADMIN' || user?.role === 'CLAN_LEADER') && (
+              <button
+                onClick={async () => {
+                  try {
+                    const result = await generateShareToken.mutateAsync(event.id);
+                    const publicUrl = `${window.location.origin}/events/public/${result.token}`;
+                    await navigator.clipboard.writeText(publicUrl);
+                    setShareCopied(true);
+                    setTimeout(() => setShareCopied(false), 2000);
+                  } catch (err) {
+                    const error = err as { response?: { data?: { message?: string } } };
+                    setActionError(error.response?.data?.message || 'Error al generar link público');
+                  }
+                }}
+                disabled={generateShareToken.isPending}
+                className="btn btn-outline btn-sm flex items-center ml-2"
+                title="Copiar link público del evento"
+              >
+                {shareCopied ? (
+                  <Check className="h-4 w-4 mr-1 text-green-600" />
+                ) : (
+                  <Share2 className="h-4 w-4 mr-1" />
+                )}
+                {shareCopied ? 'Copiado' : 'Compartir'}
+              </button>
+            )}
           </div>
         </div>
 
@@ -417,6 +454,84 @@ export default function EventDetailPage() {
           </div>
         </div>
       </Card>
+
+      {/* Información del servidor */}
+      {(event.serverName || event.serverIp || event.serverPort || event.serverPassword) && (
+        <Card className="mb-6">
+          <div className="flex items-center gap-2 mb-3">
+            <Server className="h-5 w-5 text-primary-600" />
+            <h3 className="text-lg font-bold text-military-900 dark:text-gray-100">Conexión al Servidor</h3>
+          </div>
+          {event.serverName && (
+            <div className="mb-3 bg-military-50 dark:bg-gray-700 rounded-lg px-4 py-3">
+              <p className="text-xs text-military-500 dark:text-gray-400">Nombre</p>
+              <p className="font-semibold text-military-900 dark:text-gray-100">{event.serverName}</p>
+            </div>
+          )}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {event.serverIp && (
+              <div className="flex items-center justify-between bg-military-50 dark:bg-gray-700 rounded-lg px-4 py-3">
+                <div>
+                  <p className="text-xs text-military-500 dark:text-gray-400">IP</p>
+                  <p className="font-mono font-medium text-military-900 dark:text-gray-100">{event.serverIp}</p>
+                </div>
+                <button
+                  onClick={() => { navigator.clipboard.writeText(event.serverIp!); }}
+                  className="p-1.5 hover:bg-military-200 dark:hover:bg-gray-600 rounded"
+                  title="Copiar IP"
+                >
+                  <Copy className="h-4 w-4 text-military-500 dark:text-gray-400" />
+                </button>
+              </div>
+            )}
+            {event.serverPort && (
+              <div className="flex items-center justify-between bg-military-50 dark:bg-gray-700 rounded-lg px-4 py-3">
+                <div>
+                  <p className="text-xs text-military-500 dark:text-gray-400">Puerto</p>
+                  <p className="font-mono font-medium text-military-900 dark:text-gray-100">{event.serverPort}</p>
+                </div>
+                <button
+                  onClick={() => { navigator.clipboard.writeText(event.serverPort!); }}
+                  className="p-1.5 hover:bg-military-200 dark:hover:bg-gray-600 rounded"
+                  title="Copiar Puerto"
+                >
+                  <Copy className="h-4 w-4 text-military-500 dark:text-gray-400" />
+                </button>
+              </div>
+            )}
+            {event.serverPassword && (
+              <div className="flex items-center justify-between bg-military-50 dark:bg-gray-700 rounded-lg px-4 py-3">
+                <div>
+                  <p className="text-xs text-military-500 dark:text-gray-400">Contraseña</p>
+                  <p className="font-mono font-medium text-military-900 dark:text-gray-100">
+                    {showPassword ? event.serverPassword : '••••••••'}
+                  </p>
+                </div>
+                <div className="flex items-center gap-1">
+                  <button
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="p-1.5 hover:bg-military-200 dark:hover:bg-gray-600 rounded"
+                    title={showPassword ? 'Ocultar' : 'Mostrar'}
+                  >
+                    {showPassword ? (
+                      <EyeOff className="h-4 w-4 text-military-500 dark:text-gray-400" />
+                    ) : (
+                      <Eye className="h-4 w-4 text-military-500 dark:text-gray-400" />
+                    )}
+                  </button>
+                  <button
+                    onClick={() => { navigator.clipboard.writeText(event.serverPassword!); }}
+                    className="p-1.5 hover:bg-military-200 dark:hover:bg-gray-600 rounded"
+                    title="Copiar Contraseña"
+                  >
+                    <Copy className="h-4 w-4 text-military-500 dark:text-gray-400" />
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        </Card>
+      )}
 
       {/* Aviso de evento finalizado */}
       {isFinished && (

@@ -130,6 +130,12 @@ model Event {
   auditLogs       AuditLog[]
   communicationNodes CommunicationNode[]
 
+  serverName        String?   // Nombre del servidor de juego
+  serverIp          String?   // IP del servidor de juego
+  serverPort        String?   // Puerto del servidor
+  serverPassword    String?   // Contraseña del servidor
+  publicShareToken  String?   @unique  // Token para link público
+
   createdAt       DateTime    @default(now())
   updatedAt       DateTime    @updatedAt
   deletedAt       DateTime?

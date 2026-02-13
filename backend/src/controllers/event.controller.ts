@@ -56,7 +56,7 @@ export class EventController {
         return errorResponse(res, 'No autenticado', 401);
       }
 
-      const { name, description, briefing, gameType, scheduledDate, squads } = req.body;
+      const { name, description, briefing, gameType, scheduledDate, squads, serverName, serverIp, serverPort, serverPassword } = req.body;
 
       // Validaciones
       if (!name || !gameType || !scheduledDate || !squads || !Array.isArray(squads)) {
@@ -81,6 +81,10 @@ export class EventController {
         gameType,
         scheduledDate: new Date(scheduledDate),
         creatorId: req.user.id,
+        serverName,
+        serverIp,
+        serverPort,
+        serverPassword,
         squads
       });
 
@@ -604,6 +608,60 @@ export class EventController {
     } catch (error: any) {
       logger.error('Error in deleteModsetFile', error);
       return errorResponse(res, error.message || 'Error al eliminar archivo', 500);
+    }
+  }
+  // GET /api/events/public/:token
+  async getPublicEvent(req: Request, res: Response) {
+    try {
+      const token = req.params.token as string;
+      const event = await eventService.getEventByShareToken(token);
+      return successResponse(res, { event }, 'Evento público obtenido correctamente');
+    } catch (error: any) {
+      logger.error('Error in getPublicEvent', error);
+      return errorResponse(res, error.message || 'Error al obtener evento público', 404);
+    }
+  }
+
+  // POST /api/events/:id/share-token
+  async generateShareToken(req: Request, res: Response) {
+    try {
+      if (!req.user) {
+        return errorResponse(res, 'No autenticado', 401);
+      }
+
+      const eventId = req.params.id as string;
+
+      // Verificar que el evento existe
+      const event = await prisma.event.findUnique({
+        where: { id: eventId },
+        include: {
+          creator: {
+            select: { id: true, clanId: true },
+          },
+        },
+      });
+
+      if (!event) {
+        return errorResponse(res, 'Evento no encontrado', 404);
+      }
+
+      // Verificar permisos
+      const isAdmin = req.user.role === 'ADMIN';
+      const isCreator = event.creatorId === req.user.id;
+      const isClanLeader =
+        req.user.role === 'CLAN_LEADER' &&
+        req.user.clanId === event.creator?.clanId;
+
+      if (!isAdmin && !isCreator && !isClanLeader) {
+        return errorResponse(res, 'No tienes permisos para compartir este evento', 403);
+      }
+
+      const token = await eventService.generateShareToken(eventId);
+
+      return successResponse(res, { token }, 'Token de compartir generado correctamente');
+    } catch (error: any) {
+      logger.error('Error in generateShareToken', error);
+      return errorResponse(res, error.message || 'Error al generar token de compartir', 500);
     }
   }
 }

@@ -11,6 +11,7 @@ const router = Router();
 
 // Rutas públicas de eventos (sin autenticación)
 router.get('/', eventController.getAllEvents.bind(eventController));
+router.get('/public/:token', eventController.getPublicEvent.bind(eventController));
 router.get('/:id', eventController.getEventById.bind(eventController));
 
 // Todas las demás rutas requieren autenticación
@@ -71,6 +72,13 @@ router.post(
   '/:id/attendance',
   authorize(UserRole.ADMIN, UserRole.CLAN_LEADER),
   attendanceController.saveEventAttendance.bind(attendanceController)
+);
+
+// Generar token de link público (ADMIN, CLAN_LEADER)
+router.post(
+  '/:id/share-token',
+  authorize(UserRole.ADMIN, UserRole.CLAN_LEADER),
+  eventController.generateShareToken.bind(eventController)
 );
 
 // Crear escuadra en un evento (ADMIN, CLAN_LEADER)

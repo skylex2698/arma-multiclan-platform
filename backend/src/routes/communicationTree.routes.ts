@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import {
   getEventTree,
+  getPublicEventTree,
   createNode,
   updateNode,
   deleteNode,
@@ -12,7 +13,10 @@ import { canManageEventCommunication } from '../middlewares/permissions';
 
 const router = Router();
 
-// Todas las rutas requieren autenticación
+// Ruta pública para ver comunicaciones por token (sin autenticación)
+router.get('/public/:token/communication-tree', getPublicEventTree);
+
+// Todas las demás rutas requieren autenticación
 router.use(authenticate);
 
 // GET - Obtener árbol (todos pueden ver)

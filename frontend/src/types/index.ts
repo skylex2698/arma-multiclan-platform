@@ -66,6 +66,11 @@ export interface Event {
   status: EventStatus;
   scheduledDate: string;
   creatorId: string;
+  serverName?: string | null;
+  serverIp?: string | null;
+  serverPort?: string | null;
+  serverPassword?: string | null;
+  publicShareToken?: string | null;
   creator?: {
     id: string;
     nickname: string;
@@ -177,6 +182,10 @@ export interface CreateEventForm {
   briefing?: string;
   gameType: GameType;
   scheduledDate: Date;
+  serverName?: string;
+  serverIp?: string;
+  serverPort?: string;
+  serverPassword?: string;
   squads: {
     id?: string; // ID temporal para mapear jerarquías
     name: string;

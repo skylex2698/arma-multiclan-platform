@@ -10,7 +10,8 @@ export enum UserStatus {
   ACTIVE = 'ACTIVE',
   BLOCKED = 'BLOCKED',
   BANNED = 'BANNED',
-  INACTIVE = 'INACTIVE'
+  INACTIVE = 'INACTIVE',
+  EXTERNAL = 'EXTERNAL',
 }
 
 export enum EventStatus {

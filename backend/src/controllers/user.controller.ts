@@ -394,6 +394,47 @@ export class UserController {
       });
     }
   }
+  // POST /api/users/external
+  async createExternalUser(req: Request, res: Response) {
+    try {
+      if (!req.user) {
+        return errorResponse(res, 'No autenticado', 401);
+      }
+
+      const { nickname, clanId } = req.body;
+
+      if (!nickname || typeof nickname !== 'string') {
+        return errorResponse(res, 'El nombre es obligatorio', 400);
+      }
+
+      // ClanLeader: forzar su propio clan
+      // Admin: puede especificar clan, o usar el suyo por defecto
+      let targetClanId: string;
+      if (req.user.role === UserRole.CLAN_LEADER) {
+        if (!req.user.clanId) {
+          return errorResponse(res, 'No perteneces a ningún clan', 400);
+        }
+        targetClanId = req.user.clanId;
+      } else {
+        // Admin
+        targetClanId = clanId || req.user.clanId;
+        if (!targetClanId) {
+          return errorResponse(res, 'Debes especificar un clan', 400);
+        }
+      }
+
+      const user = await userService.createExternalUser(
+        nickname,
+        targetClanId,
+        req.user.id
+      );
+
+      return successResponse(res, { user }, 'Miembro externo registrado correctamente');
+    } catch (error: any) {
+      logger.error('Error in createExternalUser', error);
+      return errorResponse(res, error.message || 'Error al crear miembro externo', 400);
+    }
+  }
 }
 
 export const userController = new UserController();

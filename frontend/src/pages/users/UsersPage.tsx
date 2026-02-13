@@ -150,6 +150,8 @@ export default function UsersPage() {
       case 'BLOCKED':
       case 'BANNED':
         return 'danger' as const;
+      case 'EXTERNAL':
+        return 'info' as const;
       default:
         return 'default' as const;
     }
@@ -165,6 +167,8 @@ export default function UsersPage() {
         return 'Bloqueado';
       case 'BANNED':
         return 'Baneado';
+      case 'EXTERNAL':
+        return 'Externo';
       default:
         return status;
     }
@@ -278,6 +282,7 @@ export default function UsersPage() {
               <option value="PENDING">Pendiente</option>
               <option value="BLOCKED">Bloqueado</option>
               <option value="BANNED">Baneado</option>
+              <option value="EXTERNAL">Externo</option>
             </select>
           </div>
         </div>

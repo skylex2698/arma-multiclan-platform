@@ -8,7 +8,7 @@ export class UserService {
   async getAllUsers(filters?: {
     clanId?: string;
     role?: UserRole;
-    status?: UserStatus;
+    status?: string;
     search?: string;
     page?: number;
     limit?: number;
@@ -21,8 +21,13 @@ export class UserService {
     const where: any = {
       ...(filters?.clanId && { clanId: filters.clanId }),
       ...(filters?.role && { role: filters.role }),
-      ...(filters?.status && { status: filters.status }),
     };
+
+    // Soporte multi-status (e.g., "ACTIVE,EXTERNAL")
+    if (filters?.status) {
+      const statuses = filters.status.split(',').map(s => s.trim());
+      where.status = statuses.length > 1 ? { in: statuses } : statuses[0];
+    }
 
     // Búsqueda por nombre o email
     if (filters?.search) {
@@ -615,6 +620,51 @@ export class UserService {
         },
       },
     });
+
+    return user;
+  }
+
+  async createExternalUser(nickname: string, clanId: string, createdById: string) {
+    const trimmed = nickname.trim();
+    if (!trimmed || trimmed.length < 2) {
+      throw new Error('El nombre debe tener al menos 2 caracteres');
+    }
+
+    const clan = await prisma.clan.findUnique({ where: { id: clanId } });
+    if (!clan) {
+      throw new Error('Clan no encontrado');
+    }
+
+    const user = await prisma.user.create({
+      data: {
+        nickname: trimmed,
+        clanId,
+        status: UserStatus.EXTERNAL,
+        role: UserRole.USER,
+      },
+      include: {
+        clan: {
+          select: {
+            id: true,
+            name: true,
+            tag: true,
+            avatarUrl: true,
+          },
+        },
+      },
+    });
+
+    await prisma.auditLog.create({
+      data: {
+        action: 'EXTERNAL_USER_CREATED',
+        entity: 'User',
+        entityId: user.id,
+        userId: createdById,
+        details: JSON.stringify({ nickname: trimmed, clanId }),
+      },
+    });
+
+    logger.info('External user created', { userId: user.id, nickname: trimmed, clanId, createdById });
 
     return user;
   }

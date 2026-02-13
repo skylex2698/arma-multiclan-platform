@@ -162,3 +162,15 @@ export function useUpdateUserStatus() {
     },
   });
 }
+
+export function useCreateExternalUser() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ nickname, clanId }: { nickname: string; clanId?: string }) =>
+      userService.createExternalUser(nickname, clanId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['users'] });
+    },
+  });
+}

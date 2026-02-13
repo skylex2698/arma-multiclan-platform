@@ -151,4 +151,13 @@ export const userService = {
     );
     return response.data.data;
   },
+
+  // Crear miembro externo
+  createExternalUser: async (nickname: string, clanId?: string): Promise<{ user: User }> => {
+    const response = await api.post<ApiResponse<{ user: User }>>(
+      '/users/external',
+      { nickname, clanId }
+    );
+    return response.data.data;
+  },
 };

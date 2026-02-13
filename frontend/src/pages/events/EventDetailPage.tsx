@@ -40,7 +40,7 @@ import { es } from 'date-fns/locale';
 import { useState, useRef } from 'react';
 import { useAuthStore } from '../../store/authStore';
 import { useAdminAssignSlot, useAdminUnassignSlot } from '../../hooks/useSlots';
-import { useUsers } from '../../hooks/useUsers';
+import { useUsers, useCreateExternalUser } from '../../hooks/useUsers';
 import { useClans } from '../../hooks/useClans';
 import type { Squad, Slot } from '../../types';
 
@@ -68,11 +68,11 @@ export default function EventDetailPage() {
   const modsetFileInputRef = useRef<HTMLInputElement>(null);
   const [fileUploadError, setFileUploadError] = useState('');
 
-  // Obtener usuarios disponibles para asignación
+  // Obtener usuarios disponibles para asignación (incluye externos)
   const { data: usersData } = useUsers(
     user?.role === 'ADMIN' || user?.role === 'CLAN_LEADER'
       ? {
-          status: 'ACTIVE',
+          status: 'ACTIVE,EXTERNAL',
           ...(user?.role === 'CLAN_LEADER' && user?.clan?.id
             ? { clanId: user.clan.id }
             : {}),
@@ -81,6 +81,7 @@ export default function EventDetailPage() {
   );
 
   const availableUsers = usersData?.users || [];
+  const createExternalUser = useCreateExternalUser();
 
   // Obtener clanes disponibles para reservas de escuadra
   const { data: clansData } = useClans();
@@ -118,6 +119,19 @@ export default function EventDetailPage() {
       const error = err as { response?: { data?: { message?: string } } };
       setActionError(
         error.response?.data?.message || 'Error al desasignar usuario'
+      );
+    }
+  };
+
+  const handleCreateExternalAndAssign = async (slotId: string, nickname: string) => {
+    setActionError('');
+    try {
+      const result = await createExternalUser.mutateAsync({ nickname });
+      await adminAssignSlot.mutateAsync({ slotId, userId: result.user.id });
+    } catch (err) {
+      const error = err as { response?: { data?: { message?: string } } };
+      setActionError(
+        error.response?.data?.message || 'Error al registrar miembro externo'
       );
     }
   };
@@ -688,11 +702,13 @@ export default function EventDetailPage() {
                   onUnassignSlot={handleUnassignSlot}
                   onAdminAssign={handleAdminAssign}
                   onAdminUnassign={handleAdminUnassign}
+                  onCreateExternal={handleCreateExternalAndAssign}
                   isLoading={
                     assignSlot.isPending ||
                     unassignSlot.isPending ||
                     adminAssignSlot.isPending ||
                     adminUnassignSlot.isPending ||
+                    createExternalUser.isPending ||
                     reserveSquad.isPending
                   }
                   eventStatus={event.status}

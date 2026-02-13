@@ -1,7 +1,8 @@
 import { Router } from 'express';
 import { userController } from '../controllers/user.controller';
 import { attendanceController } from '../controllers/attendance.controller';
-import { authenticate, requireAdmin } from '../middlewares/auth.middleware';
+import { authenticate, requireAdmin, authorize } from '../middlewares/auth.middleware';
+import { UserRole } from '@prisma/client';
 import { canViewUsers, canChangeUserRole, canChangeUserStatus } from '../middlewares/permissions';
 
 const router = Router();
@@ -29,6 +30,9 @@ router.post('/clan-change-requests/:id/review', canViewUsers, (req, res) => user
 // Perfil del usuario actual
 router.put('/profile', (req, res) => userController.updateProfile(req, res));
 router.put('/change-password', (req, res) => userController.changePassword(req, res));
+
+// Crear miembro externo (Admin y Líder de Clan)
+router.post('/external', authorize(UserRole.ADMIN, UserRole.CLAN_LEADER), (req, res) => userController.createExternalUser(req, res));
 
 // Fiabilidad de usuario (cualquier autenticado)
 // IMPORTANTE: después de rutas estáticas para evitar que :userId capture "profile", "change-password", etc.

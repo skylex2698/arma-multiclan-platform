@@ -11,6 +11,7 @@ interface SlotItemProps {
   onUnassign: (slotId: string) => void;
   onAdminAssign?: (slotId: string, userId: string) => void;
   onAdminUnassign?: (slotId: string) => void;
+  onCreateExternal?: (slotId: string, nickname: string) => void;
   isLoading: boolean;
   eventStatus: 'ACTIVE' | 'INACTIVE' | 'FINISHED';
   availableUsers?: User[];
@@ -29,6 +30,7 @@ export function SlotItem({
   onUnassign,
   onAdminAssign,
   onAdminUnassign,
+  onCreateExternal,
   isLoading,
   eventStatus,
   availableUsers = [],
@@ -38,6 +40,7 @@ export function SlotItem({
 }: SlotItemProps) {
   const user = useAuthStore((state) => state.user);
   const [showUserSelector, setShowUserSelector] = useState(false);
+  const [externalName, setExternalName] = useState('');
 
   const isFree = slot.status === 'FREE';
   const isOccupiedByMe = slot.userId === user?.id;
@@ -56,8 +59,8 @@ export function SlotItem({
   const canAdminAssign =
     eventStatus === 'ACTIVE' &&
     (user?.role === 'ADMIN' || user?.role === 'CLAN_LEADER') &&
-    onAdminAssign &&
-    availableUsers.length > 0;
+    (onAdminAssign || onCreateExternal) &&
+    (availableUsers.length > 0 || !!onCreateExternal);
 
   // Admin/líder puede desapuntar solo si el evento no está finalizado
   const canAdminUnassign =
@@ -121,6 +124,11 @@ export function SlotItem({
               <p className="text-sm text-military-600 dark:text-gray-400">
                 {slot.user.clan?.tag && `${slot.user.clan.tag} `}
                 {slot.user.nickname}
+                {slot.user.status === 'EXTERNAL' && (
+                  <span className="ml-1 inline-flex items-center px-1 py-0.5 rounded text-[9px] font-semibold bg-purple-100 text-purple-700 dark:bg-purple-600/30 dark:text-purple-300">
+                    EXT
+                  </span>
+                )}
               </p>
             )}
             {isFree && !isReservedForOtherClan && (
@@ -245,9 +253,48 @@ export function SlotItem({
               })
             )}
           </div>
+          {/* Registrar miembro externo */}
+          {onCreateExternal && (
+            <div className="p-2 border-t border-military-200 dark:border-gray-700">
+              <p className="text-[10px] font-semibold text-military-500 dark:text-gray-400 uppercase mb-1">
+                Registrar miembro externo
+              </p>
+              <form
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  const trimmed = externalName.trim();
+                  if (trimmed.length >= 2) {
+                    onCreateExternal(slot.id, trimmed);
+                    setExternalName('');
+                    setShowUserSelector(false);
+                  }
+                }}
+                className="flex gap-1"
+              >
+                <input
+                  type="text"
+                  value={externalName}
+                  onChange={(e) => setExternalName(e.target.value)}
+                  placeholder="Nombre..."
+                  className="input text-xs py-1 px-2 flex-1 min-w-0"
+                  minLength={2}
+                  onClick={(e) => e.stopPropagation()}
+                />
+                <button
+                  type="submit"
+                  disabled={isLoading || externalName.trim().length < 2}
+                  className="btn btn-primary btn-sm text-xs whitespace-nowrap"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <UserPlus className="h-3 w-3" />
+                </button>
+              </form>
+            </div>
+          )}
+
           <div className="p-2 border-t border-military-200 dark:border-gray-700">
             <button
-              onClick={() => setShowUserSelector(false)}
+              onClick={() => { setShowUserSelector(false); setExternalName(''); }}
               className="w-full px-2 py-1 text-xs text-military-600 dark:text-gray-400 hover:text-military-900 dark:hover:text-gray-100 hover:bg-military-50 dark:hover:bg-gray-700 rounded"
             >
               Cancelar

@@ -637,7 +637,7 @@ export class SlotService {
         throw new Error('Usuario no encontrado');
       }
 
-      if (user.status !== 'ACTIVE') {
+      if (user.status !== 'ACTIVE' && user.status !== 'EXTERNAL') {
         throw new Error('El usuario no está activo');
       }
 

@@ -14,6 +14,7 @@ interface SquadSectionProps {
   onUnassignSlot: (slotId: string) => void;
   onAdminAssign?: (slotId: string, userId: string) => void;
   onAdminUnassign?: (slotId: string) => void;
+  onCreateExternal?: (slotId: string, nickname: string) => void;
   isLoading: boolean;
   eventStatus: 'ACTIVE' | 'INACTIVE' | 'FINISHED';
   availableUsers?: User[];
@@ -33,6 +34,7 @@ export function SquadSection({
   onUnassignSlot,
   onAdminAssign,
   onAdminUnassign,
+  onCreateExternal,
   isLoading,
   eventStatus,
   availableUsers = [],
@@ -187,6 +189,7 @@ export function SquadSection({
               onUnassign={onUnassignSlot}
               onAdminAssign={onAdminAssign}
               onAdminUnassign={onAdminUnassign}
+              onCreateExternal={onCreateExternal}
               isLoading={isLoading}
               eventStatus={eventStatus}
               availableUsers={availableUsers}

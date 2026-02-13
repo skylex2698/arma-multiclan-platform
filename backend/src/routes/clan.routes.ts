@@ -13,6 +13,7 @@ router.get('/:id/members', clanController.getMembers);
 router.post('/', authenticate, clanController.create);
 router.put('/:id', authenticate, clanController.updateClan);
 router.delete('/:id', authenticate, clanController.deleteClan);
+router.patch('/:id/restore', authenticate, clanController.restoreClan);
 
 // Nueva ruta para subir avatar con manejo de errores de multer
 router.post(

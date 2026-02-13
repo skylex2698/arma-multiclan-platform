@@ -3,9 +3,11 @@ import type { ApiResponse, Clan, User } from '../types';
 
 export const clanService = {
   // Obtener todos los clanes
-  getAll: async (): Promise<{ clans: Clan[]; count: number }> => {
+  getAll: async (filters?: { deleted?: boolean }): Promise<{ clans: Clan[]; count: number }> => {
+    const params = new URLSearchParams();
+    if (filters?.deleted) params.append('deleted', 'true');
     const response = await api.get<ApiResponse<{ clans: Clan[]; count: number }>>(
-      '/clans'
+      `/clans?${params.toString()}`
     );
     return response.data.data;
   },
@@ -55,6 +57,12 @@ export const clanService = {
   // Eliminar clan (Admin)
   delete: async (id: string): Promise<void> => {
     await api.delete(`/clans/${id}`);
+  },
+
+  // Restaurar clan eliminado (Admin)
+  restore: async (id: string): Promise<{ clan: Clan }> => {
+    const response = await api.patch<ApiResponse<{ clan: Clan }>>(`/clans/${id}/restore`);
+    return response.data.data;
   },
 
   // Subir avatar

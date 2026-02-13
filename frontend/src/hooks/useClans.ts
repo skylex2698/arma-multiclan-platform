@@ -1,10 +1,10 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { clanService } from '../services/clanService';
 
-export function useClans() {
+export function useClans(filters?: { deleted?: boolean }) {
   return useQuery({
-    queryKey: ['clans'],
-    queryFn: () => clanService.getAll(),
+    queryKey: ['clans', filters],
+    queryFn: () => clanService.getAll(filters),
   });
 }
 
@@ -57,6 +57,17 @@ export function useDeleteClan() {
 
   return useMutation({
     mutationFn: (id: string) => clanService.delete(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['clans'] });
+    },
+  });
+}
+
+export function useRestoreClan() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (id: string) => clanService.restore(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['clans'] });
     },

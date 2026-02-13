@@ -1,8 +1,16 @@
 import { prisma } from '../index';
 
 class ClanService {
-  async getAllClans() {
+  async getAllClans(filters?: { deleted?: boolean }) {
+    const whereClause: Record<string, unknown> = {};
+
+    // Si deleted=true, buscar solo clanes soft-deleted (escape hatch del middleware)
+    if (filters?.deleted) {
+      whereClause.deletedAt = { not: null };
+    }
+
     const clans = await prisma.clan.findMany({
+      where: whereClause,
       include: {
         _count: {
           select: { users: true },
@@ -134,14 +142,60 @@ class ClanService {
       throw new Error('Clan no encontrado');
     }
 
+    // Bloquear todos los miembros ACTIVE del clan (mantener clanId para restauración)
     if (clan.users.length > 0) {
-      throw new Error(
-        'No se puede eliminar un clan con miembros. Primero remueve a todos los miembros.'
-      );
+      await prisma.user.updateMany({
+        where: {
+          clanId: id,
+          status: { in: ['ACTIVE', 'PENDING'] },
+        },
+        data: {
+          status: 'BLOCKED',
+        },
+      });
     }
 
+    // Soft-delete el clan (middleware convierte delete → update con deletedAt)
     await prisma.clan.delete({
       where: { id },
+    });
+  }
+
+  async restoreClan(id: string) {
+    // Buscar clan soft-deleted (escape hatch del middleware)
+    const clan = await prisma.clan.findFirst({
+      where: { id, deletedAt: { not: null } },
+    });
+
+    if (!clan) {
+      throw new Error('Clan eliminado no encontrado');
+    }
+
+    // Restaurar el clan
+    await prisma.clan.update({
+      where: { id },
+      data: { deletedAt: null },
+    });
+
+    // Desbloquear miembros que quedaron BLOCKED y siguen asociados a este clan
+    await prisma.user.updateMany({
+      where: {
+        clanId: id,
+        status: 'BLOCKED',
+      },
+      data: {
+        status: 'ACTIVE',
+      },
+    });
+
+    // Devolver el clan restaurado con conteo de miembros
+    return prisma.clan.findUnique({
+      where: { id },
+      include: {
+        _count: {
+          select: { users: true },
+        },
+      },
     });
   }
 }

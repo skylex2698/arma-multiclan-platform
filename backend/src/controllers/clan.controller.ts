@@ -27,7 +27,10 @@ const handleError = (res: Response, error: unknown, context?: string) => {
 class ClanController {
   async getAll(req: Request, res: Response) {
     try {
-      const clans = await clanService.getAllClans();
+      const { deleted } = req.query;
+      const clans = await clanService.getAllClans({
+        deleted: deleted === 'true',
+      });
       return res.status(200).json({
         success: true,
         data: clans,
@@ -135,6 +138,31 @@ class ClanController {
       });
     } catch (error) {
       handleError(res, error);
+    }
+  }
+
+  async restoreClan(req: Request, res: Response) {
+    try {
+      const { id } = req.params;
+      const userRole = req.user!.role;
+
+      // Solo admins pueden restaurar clanes
+      if (userRole !== 'ADMIN') {
+        return res.status(403).json({
+          success: false,
+          message: 'No tienes permisos para restaurar clanes',
+        });
+      }
+
+      const clan = await clanService.restoreClan(id as string);
+
+      return res.status(200).json({
+        success: true,
+        message: 'Clan restaurado exitosamente',
+        data: { clan },
+      });
+    } catch (error) {
+      handleError(res, error, 'restoreClan');
     }
   }
 

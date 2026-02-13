@@ -40,6 +40,12 @@ enum SlotStatus {
   OCCUPIED
 }
 
+enum AttendanceStatus {
+  PRESENT
+  ABSENT_JUSTIFIED
+  NO_SHOW
+}
+
 enum NodeType {
   COMMAND   // Mando principal (ej: ALPHA MANDO)
   SQUAD     // Escuadra (ej: BRAVO, CHARLIE)
@@ -69,8 +75,11 @@ model User {
   auditLogs         AuditLog[]
   clanHistory       ClanHistory[]
   absences          Absence[]
+  attendances       Attendance[]
   clanChangeRequests ClanChangeRequest[]
   oauthAccounts     OAuthAccount[]
+
+  blockedUntil      DateTime?   // Auto-block expiry for NO_SHOW accumulation
 
   createdAt         DateTime    @default(now())
   updatedAt         DateTime    @updatedAt
@@ -116,9 +125,10 @@ model Event {
   
   squads          Squad[]
   absences        Absence[]
+  attendances     Attendance[]
   auditLogs       AuditLog[]
   communicationNodes CommunicationNode[]
-  
+
   createdAt       DateTime    @default(now())
   updatedAt       DateTime    @updatedAt
   deletedAt       DateTime?
@@ -207,6 +217,29 @@ model Absence {
   
   @@unique([userId, eventId])
   @@index([eventId])
+}
+
+model Attendance {
+  id        String           @id @default(uuid())
+
+  userId    String
+  user      User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  eventId   String
+  event     Event            @relation(fields: [eventId], references: [id], onDelete: Cascade)
+
+  slotId    String?          // null para check-ins manuales (walk-ins)
+  status    AttendanceStatus
+  note      String?
+
+  markedBy  String           // userId de quien marco la asistencia
+
+  createdAt DateTime         @default(now())
+  updatedAt DateTime         @updatedAt
+
+  @@unique([userId, eventId])
+  @@index([eventId])
+  @@index([userId])
 }
 
 model ClanChangeRequest {

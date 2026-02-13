@@ -2,6 +2,7 @@ import { Router, Request, Response, NextFunction } from 'express';
 import multer from 'multer';
 import { eventController } from '../controllers/event.controller';
 import { slotController } from '../controllers/slot.controller';
+import { attendanceController } from '../controllers/attendance.controller';
 import { authenticate, authorize } from '../middlewares/auth.middleware';
 import { UserRole } from '@prisma/client';
 import { uploadEventBriefing, uploadEventModset } from '../config/multer.config';
@@ -59,6 +60,18 @@ router.patch(
 
 // Marcar ausencia (cualquier usuario autenticado)
 router.post('/:id/absence', slotController.markAbsence.bind(slotController));
+
+// Asistencia post-evento (ADMIN, CLAN_LEADER)
+router.get(
+  '/:id/attendance',
+  authorize(UserRole.ADMIN, UserRole.CLAN_LEADER),
+  attendanceController.getEventAttendance.bind(attendanceController)
+);
+router.post(
+  '/:id/attendance',
+  authorize(UserRole.ADMIN, UserRole.CLAN_LEADER),
+  attendanceController.saveEventAttendance.bind(attendanceController)
+);
 
 // Crear escuadra en un evento (ADMIN, CLAN_LEADER)
 router.post(

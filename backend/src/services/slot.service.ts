@@ -46,6 +46,12 @@ export class SlotService {
         throw new Error('Usuario no encontrado');
       }
 
+      // Verificar bloqueo temporal por ausencias reiteradas
+      if (userToAssign.blockedUntil && new Date(userToAssign.blockedUntil) > new Date()) {
+        const blockedDate = userToAssign.blockedUntil.toLocaleDateString('es-ES');
+        throw new Error(`Usuario bloqueado temporalmente hasta el ${blockedDate} por ausencias reiteradas`);
+      }
+
       // Verificar reserva de clan en la escuadra
       if (slot.squad.reservedForClanId) {
         if (userToAssign.clanId !== slot.squad.reservedForClanId) {
@@ -633,6 +639,12 @@ export class SlotService {
 
       if (user.status !== 'ACTIVE') {
         throw new Error('El usuario no está activo');
+      }
+
+      // Verificar bloqueo temporal por ausencias reiteradas
+      if (user.blockedUntil && new Date(user.blockedUntil) > new Date()) {
+        const blockedDate = user.blockedUntil.toLocaleDateString('es-ES');
+        throw new Error(`Usuario bloqueado temporalmente hasta el ${blockedDate} por ausencias reiteradas`);
       }
 
       // Verificar reserva de clan en la escuadra

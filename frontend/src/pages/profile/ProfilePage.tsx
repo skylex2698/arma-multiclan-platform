@@ -1,9 +1,11 @@
 import { useState } from 'react';
 import { useAuthStore } from '../../store/authStore';
 import { useUpdateProfile, useChangePassword } from '../../hooks/useUsers';
+import { useUserReliability } from '../../hooks/useAttendance';
 import { Card } from '../../components/ui/Card';
 import { Badge } from '../../components/ui/Badge';
 import { UserAvatar } from '../../components/ui/UserAvatar';
+import { ReliabilityBadge } from '../../components/ui/ReliabilityBadge';
 import { ClanChangeRequestForm } from '../../components/profile/ClanChangeRequestForm';
 import {
   User,
@@ -14,6 +16,7 @@ import {
   Save,
   CheckCircle,
   AlertCircle,
+  BarChart3,
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -22,6 +25,7 @@ export default function ProfilePage() {
   const user = useAuthStore((state) => state.user);
   const updateProfile = useUpdateProfile();
   const changePassword = useChangePassword();
+  const { data: reliabilityData } = useUserReliability(user?.id || '');
 
   // Estado de edición de perfil
   const [isEditingProfile, setIsEditingProfile] = useState(false);
@@ -141,6 +145,9 @@ export default function ProfilePage() {
               <Badge variant={user.status === 'ACTIVE' ? 'success' : 'default'}>
                 {user.status === 'ACTIVE' ? 'Activo' : user.status}
               </Badge>
+              {reliabilityData?.reliability?.score !== null && reliabilityData?.reliability?.score !== undefined && (
+                <ReliabilityBadge score={reliabilityData.reliability.score} size="md" />
+              )}
             </div>
 
             <div className="space-y-2 text-sm text-military-600">
@@ -287,6 +294,63 @@ export default function ProfilePage() {
           </div>
         )}
       </Card>
+
+      {/* Fiabilidad */}
+      {reliabilityData?.reliability && reliabilityData.reliability.totalEvents > 0 && (
+        <Card className="mb-6">
+          <h3 className="text-xl font-bold text-military-900 dark:text-gray-100 flex items-center gap-2 mb-4">
+            <BarChart3 className="h-5 w-5" />
+            Fiabilidad
+          </h3>
+
+          {user.blockedUntil && new Date(user.blockedUntil) > new Date() && (
+            <div className="mb-4 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
+              <p className="text-sm text-red-700 dark:text-red-300">
+                Bloqueado temporalmente hasta el{' '}
+                {new Date(user.blockedUntil).toLocaleDateString('es-ES')} por ausencias reiteradas.
+              </p>
+            </div>
+          )}
+
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+            <div className="text-center p-3 bg-military-50 dark:bg-gray-800 rounded-lg">
+              <p className="text-2xl font-bold text-military-900 dark:text-gray-100">
+                {reliabilityData.reliability.score !== null
+                  ? `${reliabilityData.reliability.score}%`
+                  : '-'}
+              </p>
+              <p className="text-xs text-military-500 dark:text-gray-400">Score</p>
+            </div>
+            <div className="text-center p-3 bg-green-50 dark:bg-green-900/10 rounded-lg">
+              <p className="text-2xl font-bold text-green-700 dark:text-green-400">
+                {reliabilityData.reliability.present}
+              </p>
+              <p className="text-xs text-military-500 dark:text-gray-400">Presente</p>
+            </div>
+            <div className="text-center p-3 bg-amber-50 dark:bg-amber-900/10 rounded-lg">
+              <p className="text-2xl font-bold text-amber-700 dark:text-amber-400">
+                {reliabilityData.reliability.justifiedAbsent}
+              </p>
+              <p className="text-xs text-military-500 dark:text-gray-400">Justificado</p>
+            </div>
+            <div className="text-center p-3 bg-red-50 dark:bg-red-900/10 rounded-lg">
+              <p className="text-2xl font-bold text-red-700 dark:text-red-400">
+                {reliabilityData.reliability.noShow}
+              </p>
+              <p className="text-xs text-military-500 dark:text-gray-400">No-Show</p>
+            </div>
+          </div>
+
+          <p className="text-xs text-military-500 dark:text-gray-500 mt-3">
+            Basado en {reliabilityData.reliability.totalEvents} evento{reliabilityData.reliability.totalEvents !== 1 ? 's' : ''}.
+            {reliabilityData.reliability.recentNoShows > 0 && (
+              <span className="text-red-500">
+                {' '}{reliabilityData.reliability.recentNoShows} no-show{reliabilityData.reliability.recentNoShows !== 1 ? 's' : ''} en los últimos 10 eventos.
+              </span>
+            )}
+          </p>
+        </Card>
+      )}
 
       {/* Cambiar contraseña */}
       <Card>

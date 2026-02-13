@@ -2,13 +2,22 @@ import { useState, useMemo } from 'react';
 import { Users, Search, Filter, ChevronUp, ChevronDown } from 'lucide-react';
 import { useUsers, useUpdateUserRole, useUpdateUserStatus, useChangeUserClan } from '../../hooks/useUsers';
 import { useClans } from '../../hooks/useClans';
+import { useUserReliability } from '../../hooks/useAttendance';
 import { LoadingSpinner } from '../../components/ui/LoadingSpinner';
 import { Card } from '../../components/ui/Card';
 import { Badge } from '../../components/ui/Badge';
 import { UserAvatar } from '../../components/ui/UserAvatar';
+import { ReliabilityBadge } from '../../components/ui/ReliabilityBadge';
 import { Pagination } from '../../components/ui/Pagination';
 import type { UserRole, UserStatus } from '../../types';
 import { useAuthStore } from '../../store/authStore';
+
+function UserReliabilityCell({ userId }: { userId: string }) {
+  const { data } = useUserReliability(userId);
+  const reliability = data?.reliability;
+  if (!reliability) return <span className="text-military-400 dark:text-gray-600">-</span>;
+  return <ReliabilityBadge score={reliability.score} />;
+}
 
 const ITEMS_PER_PAGE = 15;
 
@@ -331,6 +340,11 @@ export default function UsersPage() {
                         <SortIcon field="status" />
                       </button>
                     </th>
+                    <th className="text-left py-3 px-4 hidden lg:table-cell">
+                      <span className="font-semibold text-military-700 dark:text-gray-300">
+                        Fiabilidad
+                      </span>
+                    </th>
                   </tr>
                 </thead>
                 <tbody>
@@ -423,6 +437,11 @@ export default function UsersPage() {
                             {getStatusLabel(user.status)}
                           </Badge>
                         )}
+                      </td>
+
+                      {/* Fiabilidad */}
+                      <td className="py-3 px-4 hidden lg:table-cell">
+                        <UserReliabilityCell userId={user.id} />
                       </td>
                     </tr>
                   ))}

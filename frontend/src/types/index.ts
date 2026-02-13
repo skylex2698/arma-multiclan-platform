@@ -38,6 +38,7 @@ export interface User {
   discordId: string | null;
   discordUsername: string | null;
   clan?: Clan;
+  blockedUntil?: string | null;
   createdAt: string;
   updatedAt?: string;
 }
@@ -216,4 +217,73 @@ export interface UpdateSquadDto {
     order: number;
     isNew?: boolean;
   }>;
+}
+
+// ========== ATTENDANCE TYPES ==========
+
+export type AttendanceStatus = 'PRESENT' | 'ABSENT_JUSTIFIED' | 'NO_SHOW';
+
+export interface Attendance {
+  id: string;
+  userId: string;
+  user: {
+    id: string;
+    nickname: string;
+    clanId: string | null;
+    avatarUrl?: string | null;
+    clan?: { id: string; name: string; tag: string | null };
+  };
+  eventId: string;
+  slotId: string | null;
+  status: AttendanceStatus;
+  note: string | null;
+  markedBy: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface AttendancePrePopulated {
+  userId: string;
+  user: {
+    id: string;
+    nickname: string;
+    clanId: string | null;
+    avatarUrl?: string | null;
+    clan?: { id: string; name: string; tag: string | null };
+  };
+  slotId: string;
+  squadName: string;
+  slotRole: string;
+  status: AttendanceStatus | null;
+  note: string | null;
+}
+
+export interface AttendanceSummary {
+  present: number;
+  noShow: number;
+  justifiedAbsent: number;
+  total: number;
+}
+
+export interface AttendanceResponse {
+  attendances: Attendance[];
+  prePopulated?: AttendancePrePopulated[];
+  summary: AttendanceSummary | null;
+}
+
+export interface SaveAttendanceResponse {
+  attendances: Attendance[];
+  summary: AttendanceSummary;
+  blockedUsers: string[];
+}
+
+export interface ReliabilityScore {
+  userId: string;
+  totalEvents: number;
+  present: number;
+  noShow: number;
+  justifiedAbsent: number;
+  score: number | null;
+  recentNoShows: number;
+  blockedUntil: string | null;
 }

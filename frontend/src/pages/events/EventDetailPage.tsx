@@ -18,6 +18,7 @@ import {
   Download,
   ExternalLink,
   Power,
+  ClipboardCheck,
 } from 'lucide-react';
 import {
   useEvent,
@@ -33,6 +34,7 @@ import { Badge } from '../../components/ui/Badge';
 import { Card } from '../../components/ui/Card';
 import { SquadSection } from '../../components/events/SquadSection';
 import CommunicationTreeViewer from '../../components/events/CommunicationTree/CommunicationTreeViewer';
+import { AttendanceTab } from '../../components/events/AttendanceTab';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { useState, useRef } from 'react';
@@ -42,7 +44,7 @@ import { useUsers } from '../../hooks/useUsers';
 import { useClans } from '../../hooks/useClans';
 import type { Squad, Slot } from '../../types';
 
-type TabType = 'briefing' | 'slots' | 'communications';
+type TabType = 'briefing' | 'slots' | 'communications' | 'attendance';
 
 export default function EventDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -468,6 +470,22 @@ export default function EventDetailPage() {
               <Radio className="h-4 w-4" />
               Comunicaciones
             </button>
+            {isFinished && (user?.role === 'ADMIN' || user?.role === 'CLAN_LEADER') && (
+              <button
+                onClick={() => setActiveTab('attendance')}
+                className={`
+                  py-4 px-1 border-b-2 font-medium text-sm transition-colors inline-flex items-center gap-2
+                  ${
+                    activeTab === 'attendance'
+                      ? 'border-primary-500 text-primary-600'
+                      : 'border-transparent text-military-500 hover:text-military-700 hover:border-military-300'
+                  }
+                `}
+              >
+                <ClipboardCheck className="h-4 w-4" />
+                Asistencia
+              </button>
+            )}
           </nav>
         </div>
       </div>
@@ -707,6 +725,10 @@ export default function EventDetailPage() {
           </div>
           <CommunicationTreeViewer eventId={event.id} />
         </div>
+      )}
+
+      {activeTab === 'attendance' && isFinished && (
+        <AttendanceTab eventId={event.id} />
       )}
     </div>
   );

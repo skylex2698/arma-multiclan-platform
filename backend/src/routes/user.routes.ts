@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { userController } from '../controllers/user.controller';
+import { attendanceController } from '../controllers/attendance.controller';
 import { authenticate, requireAdmin } from '../middlewares/auth.middleware';
 import { canViewUsers, canChangeUserRole, canChangeUserStatus } from '../middlewares/permissions';
 
@@ -28,5 +29,9 @@ router.post('/clan-change-requests/:id/review', canViewUsers, (req, res) => user
 // Perfil del usuario actual
 router.put('/profile', (req, res) => userController.updateProfile(req, res));
 router.put('/change-password', (req, res) => userController.changePassword(req, res));
+
+// Fiabilidad de usuario (cualquier autenticado)
+// IMPORTANTE: después de rutas estáticas para evitar que :userId capture "profile", "change-password", etc.
+router.get('/:userId/reliability', (req, res) => attendanceController.getUserReliability(req, res));
 
 export const userRoutes = router;

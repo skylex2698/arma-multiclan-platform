@@ -12,7 +12,7 @@ import { UserAvatar } from '../ui/UserAvatar';
 import { useEventAttendance, useSaveAttendance } from '../../hooks/useAttendance';
 import { useAuthStore } from '../../store/authStore';
 import type { AttendanceStatus, User } from '../../types';
-import { useAvailableUsers } from '../../hooks/useUsers';
+import { useUsers, useCreateExternalUser } from '../../hooks/useUsers';
 
 interface AttendanceTabProps {
   eventId: string;
@@ -25,6 +25,7 @@ interface AttendanceRow {
     nickname: string;
     clanId: string | null;
     avatarUrl?: string | null;
+    status?: string;
     clan?: { id: string; name: string; tag: string | null };
   };
   slotId: string | null;
@@ -48,16 +49,20 @@ export function AttendanceTab({ eventId }: AttendanceTabProps) {
 
   const [rows, setRows] = useState<AttendanceRow[]>([]);
   const [showAddUser, setShowAddUser] = useState(false);
+  const [externalName, setExternalName] = useState('');
   const [actionError, setActionError] = useState('');
   const [actionSuccess, setActionSuccess] = useState('');
 
   const isClanLeader = currentUser?.role === 'CLAN_LEADER';
   const currentUserClanId = currentUser?.clan?.id || null;
 
-  // Users for walk-in feature
-  const { data: usersData } = useAvailableUsers(
-    isClanLeader && currentUserClanId ? currentUserClanId : undefined
-  );
+  // Users for walk-in feature (incluye externos)
+  const { data: usersData } = useUsers({
+    status: 'ACTIVE,EXTERNAL',
+    ...(isClanLeader && currentUserClanId ? { clanId: currentUserClanId } : {}),
+    limit: 500,
+  });
+  const createExternalUser = useCreateExternalUser();
 
   // Initialize rows from API data
   useEffect(() => {
@@ -119,6 +124,7 @@ export function AttendanceTab({ eventId }: AttendanceTabProps) {
           nickname: walkInUser.nickname,
           clanId: walkInUser.clanId,
           avatarUrl: walkInUser.avatarUrl,
+          status: walkInUser.status,
           clan: walkInUser.clan
             ? { id: walkInUser.clan.id, name: walkInUser.clan.name, tag: walkInUser.clan.tag }
             : undefined,
@@ -134,6 +140,26 @@ export function AttendanceTab({ eventId }: AttendanceTabProps) {
 
   const handleRemoveWalkIn = (userId: string) => {
     setRows((prev) => prev.filter((r) => !(r.userId === userId && r.isWalkIn)));
+  };
+
+  const handleAddExternal = async (nickname: string) => {
+    try {
+      const result = await createExternalUser.mutateAsync({ nickname });
+      const u = result.user;
+      handleAddWalkIn({
+        id: u.id,
+        nickname: u.nickname,
+        clanId: u.clanId,
+        avatarUrl: u.avatarUrl ?? null,
+        clan: u.clan ? { id: u.clan.id, name: u.clan.name, tag: u.clan.tag } : undefined,
+      } as User);
+      setExternalName('');
+    } catch (err) {
+      const error = err as { response?: { data?: { message?: string } } };
+      setActionError(
+        error.response?.data?.message || 'Error al registrar miembro externo'
+      );
+    }
   };
 
   const handleMarkAllPresent = () => {
@@ -325,8 +351,42 @@ export function AttendanceTab({ eventId }: AttendanceTabProps) {
                 ))
               )}
             </div>
+            {/* Registrar miembro externo */}
+            <div className="pt-2 border-t border-military-200 dark:border-gray-700">
+              <p className="text-[10px] font-semibold text-military-500 dark:text-gray-400 uppercase mb-1">
+                Registrar miembro externo
+              </p>
+              <form
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  const trimmed = externalName.trim();
+                  if (trimmed.length >= 2) {
+                    handleAddExternal(trimmed);
+                  }
+                }}
+                className="flex gap-1"
+              >
+                <input
+                  type="text"
+                  value={externalName}
+                  onChange={(e) => setExternalName(e.target.value)}
+                  placeholder="Nombre..."
+                  className="input text-sm py-1 px-2 flex-1 min-w-0"
+                  minLength={2}
+                />
+                <button
+                  type="submit"
+                  disabled={createExternalUser.isPending || externalName.trim().length < 2}
+                  className="btn btn-primary btn-sm text-sm whitespace-nowrap"
+                >
+                  <UserPlus className="h-3.5 w-3.5 mr-1" />
+                  Registrar
+                </button>
+              </form>
+            </div>
+
             <button
-              onClick={() => setShowAddUser(false)}
+              onClick={() => { setShowAddUser(false); setExternalName(''); }}
               className="text-xs text-military-500 hover:text-military-700 dark:text-gray-400 dark:hover:text-gray-200"
             >
               Cancelar
@@ -354,6 +414,11 @@ export function AttendanceTab({ eventId }: AttendanceTabProps) {
                       </span>
                     )}
                     {row.user.nickname}
+                    {row.user.status === 'EXTERNAL' && (
+                      <span className="ml-1 inline-flex items-center px-1 py-0.5 rounded text-[9px] font-semibold bg-purple-100 text-purple-700 dark:bg-purple-600/30 dark:text-purple-300">
+                        EXT
+                      </span>
+                    )}
                   </p>
                   {row.squadName && (
                     <p className="text-xs text-military-500 dark:text-gray-500">

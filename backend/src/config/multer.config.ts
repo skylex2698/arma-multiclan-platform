@@ -4,6 +4,7 @@ import fs from 'fs';
 import crypto from 'crypto';
 import { fileTypeFromFile } from 'file-type';
 import { JSDOM } from 'jsdom';
+import DOMPurify from 'dompurify';
 
 /**
  * Configuración segura de Multer para subida de archivos
@@ -248,97 +249,86 @@ export const validatePdfFile = async (filePath: string): Promise<boolean> => {
 };
 
 /**
- * Tags permitidos en archivos HTML de preset de Arma 3 Launcher.
- * Todo lo que no esté en esta lista se rechaza.
- */
-const MODSET_ALLOWED_TAGS = new Set([
-  'html', 'head', 'body', 'meta', 'title', 'style',
-  'table', 'thead', 'tbody', 'tr', 'td', 'th',
-  'a', 'span', 'div', 'p', 'h1', 'h2', 'h3',
-  'br', 'hr', 'img'
-]);
-
-/**
- * Tags explícitamente peligrosos que nunca deben aparecer.
- */
-const FORBIDDEN_TAGS = new Set([
-  'script', 'iframe', 'object', 'embed', 'form', 'input',
-  'button', 'textarea', 'select', 'applet', 'link',
-  'base', 'svg', 'math'
-]);
-
-/**
- * Valida que un archivo HTML sea un preset genuino de Arma 3 Launcher.
+ * Sanitiza y valida un archivo HTML de modset de Arma 3 Launcher.
  *
- * Comprobaciones:
- * 1. El archivo es parseable como HTML
- * 2. No contiene tags prohibidos (script, iframe, etc.)
- * 3. No contiene atributos event handler (onclick, onerror, etc.)
- * 4. No contiene URIs javascript:
- * 5. Todos los tags están en la whitelist
- * 6. Validación estructural: contiene indicadores de preset Arma 3
- *    (meta[name^="arma:"] o tr[data-type="ModContainer"])
+ * En lugar de solo validar (rechazar/aceptar), sanitiza el HTML con DOMPurify
+ * eliminando cualquier contenido peligroso (scripts, iframes, event handlers,
+ * javascript: URIs, etc.) y luego verifica que sea un preset válido de Arma 3.
+ *
+ * El archivo sanitizado se sobreescribe en disco, de modo que el HTML servido
+ * siempre es seguro.
+ *
+ * @returns { valid: boolean; reason?: string }
  */
-export const validateHtmlFile = async (filePath: string): Promise<boolean> => {
+export const sanitizeAndValidateModsetHtml = async (
+  filePath: string
+): Promise<{ valid: boolean; reason?: string }> => {
   try {
     const content = fs.readFileSync(filePath, 'utf-8');
 
     // Sanity check básico
     if (!content.trim() || content.length < 10) {
-      return false;
+      return { valid: false, reason: 'El archivo está vacío o es demasiado pequeño' };
     }
 
-    // Parsear con JSDOM
-    const dom = new JSDOM(content);
-    const document = dom.window.document;
+    // Crear instancia de DOMPurify con JSDOM
+    const dom = new JSDOM('');
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const purify = DOMPurify(dom.window as any);
 
-    // Obtener TODOS los elementos del documento
-    const allElements = document.querySelectorAll('*');
+    // Sanitizar con DOMPurify — config específica para modsets de Arma 3
+    const sanitized = purify.sanitize(content, {
+      WHOLE_DOCUMENT: true,
+      ALLOWED_TAGS: [
+        // Estructura del documento
+        'html', 'head', 'body', 'meta', 'title', 'style', 'link',
+        // Tablas (estructura principal de los presets)
+        'table', 'thead', 'tbody', 'tr', 'td', 'th',
+        // Contenido
+        'a', 'span', 'div', 'p',
+        'h1', 'h2', 'h3', 'h4', 'h5', 'h6',
+        'br', 'hr', 'img',
+        'strong', 'b', 'em', 'i', 'u',
+        'ul', 'ol', 'li',
+      ],
+      ALLOWED_ATTR: [
+        'href', 'src', 'alt', 'title', 'class', 'id', 'style',
+        'target', 'rel', 'colspan', 'rowspan',
+        'name', 'content', 'charset', 'http-equiv', // meta
+        'type',   // link type
+        'width', 'height',
+      ],
+      ALLOW_DATA_ATTR: true, // data-type="ModContainer", etc.
+      FORBID_TAGS: [
+        'script', 'iframe', 'object', 'embed', 'form', 'input',
+        'button', 'textarea', 'select', 'applet', 'base', 'svg', 'math',
+      ],
+      FORBID_ATTR: [
+        'onerror', 'onload', 'onclick', 'onmouseover', 'onfocus',
+        'onblur', 'onmouseout', 'onkeydown', 'onkeyup', 'onsubmit',
+      ],
+    });
 
-    for (const element of allElements) {
-      const tagName = element.tagName.toLowerCase();
+    // Verificar estructura de Arma 3 en el contenido sanitizado
+    const sanitizedDom = new JSDOM(sanitized);
+    const doc = sanitizedDom.window.document;
 
-      // Check 1: Rechazar tags prohibidos
-      if (FORBIDDEN_TAGS.has(tagName)) {
-        return false;
-      }
+    const armaMeta = doc.querySelector('meta[name^="arma:"]');
+    const modContainers = doc.querySelectorAll('tr[data-type="ModContainer"]');
 
-      // Check 2: Rechazar tags fuera de la whitelist
-      if (!MODSET_ALLOWED_TAGS.has(tagName)) {
-        return false;
-      }
-
-      // Check 3: Rechazar atributos event handler (on*)
-      for (const attr of element.attributes) {
-        const attrName = attr.name.toLowerCase();
-        if (attrName.startsWith('on')) {
-          return false;
-        }
-      }
-
-      // Check 4: Rechazar URIs javascript: en href/src/action
-      const hrefAttr = element.getAttribute('href');
-      const srcAttr = element.getAttribute('src');
-      const actionAttr = element.getAttribute('action');
-
-      for (const uri of [hrefAttr, srcAttr, actionAttr]) {
-        if (uri && uri.trim().toLowerCase().startsWith('javascript:')) {
-          return false;
-        }
-      }
-    }
-
-    // Check 5: Validación estructural - debe parecer un preset de Arma 3
-    const armaMeta = document.querySelector('meta[name^="arma:"]');
-    const modContainers = document.querySelectorAll('tr[data-type="ModContainer"]');
-
-    // Debe tener al menos un indicador de Arma 3
     if (!armaMeta && modContainers.length === 0) {
-      return false;
+      return {
+        valid: false,
+        reason: 'El archivo no parece ser un preset válido de Arma 3 Launcher. '
+          + 'Debe contener metadatos arma: o contenedores de mods (tr[data-type="ModContainer"]).',
+      };
     }
 
-    return true;
+    // Guardar versión sanitizada (sobreescribe el original)
+    fs.writeFileSync(filePath, sanitized, 'utf-8');
+
+    return { valid: true };
   } catch {
-    return false;
+    return { valid: false, reason: 'Error al procesar el archivo HTML' };
   }
 };

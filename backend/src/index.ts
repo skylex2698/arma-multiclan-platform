@@ -104,9 +104,17 @@ app.use('/uploads', express.static(path.join(process.cwd(), 'public', 'uploads')
   maxAge: '1d',
   dotfiles: 'deny',
   index: false,
-  setHeaders: (res) => {
+  setHeaders: (res, filePath) => {
     res.set('X-Content-Type-Options', 'nosniff');
     res.set('Cache-Control', 'public, max-age=86400');
+
+    // Seguridad extra para archivos HTML (modsets): sandbox CSP impide
+    // ejecución de scripts, envío de formularios, popups, etc.
+    // Defensa en profundidad junto con la sanitización DOMPurify en upload.
+    if (filePath.endsWith('.html') || filePath.endsWith('.htm')) {
+      res.set('Content-Security-Policy', 'sandbox');
+      res.set('X-Frame-Options', 'DENY');
+    }
   }
 }));
 

@@ -5,7 +5,7 @@ import { successResponse, errorResponse } from '../utils/responses';
 import { logger } from '../utils/logger';
 import { EventStatus, GameType } from '@prisma/client';
 import { prisma } from '../index';
-import { validatePdfFile, validateHtmlFile, deleteFile } from '../config/multer.config';
+import { validatePdfFile, sanitizeAndValidateModsetHtml, deleteFile } from '../config/multer.config';
 
 export class EventController {
   // GET /api/events
@@ -465,13 +465,17 @@ export class EventController {
         return errorResponse(res, 'No se proporcionó ningún archivo', 400);
       }
 
-      // Validar que sea HTML válido
+      // Sanitizar y validar que sea un preset HTML de Arma 3
       const filePath = path.join(process.cwd(), 'public', 'uploads', 'events', req.file.filename);
-      const isValidHtml = await validateHtmlFile(filePath);
+      const htmlResult = await sanitizeAndValidateModsetHtml(filePath);
 
-      if (!isValidHtml) {
+      if (!htmlResult.valid) {
         deleteFile(filePath);
-        return errorResponse(res, 'El archivo no es un HTML válido', 400);
+        return errorResponse(
+          res,
+          htmlResult.reason || 'El archivo no es un HTML válido de preset de Arma 3',
+          400
+        );
       }
 
       // Eliminar archivo anterior si existe

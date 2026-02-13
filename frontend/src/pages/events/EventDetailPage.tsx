@@ -357,33 +357,31 @@ export default function EventDetailPage() {
               </>
             )}
 
-            {/* Botón compartir link público */}
-            {(user?.role === 'ADMIN' || user?.role === 'CLAN_LEADER') && (
-              <button
-                onClick={async () => {
-                  try {
-                    const result = await generateShareToken.mutateAsync(event.id);
-                    const publicUrl = `${window.location.origin}/events/public/${result.token}`;
-                    await navigator.clipboard.writeText(publicUrl);
-                    setShareCopied(true);
-                    setTimeout(() => setShareCopied(false), 2000);
-                  } catch (err) {
-                    const error = err as { response?: { data?: { message?: string } } };
-                    setActionError(error.response?.data?.message || 'Error al generar link público');
-                  }
-                }}
-                disabled={generateShareToken.isPending}
-                className="btn btn-outline btn-sm flex items-center ml-2"
-                title="Copiar link público del evento"
-              >
-                {shareCopied ? (
-                  <Check className="h-4 w-4 mr-1 text-green-600" />
-                ) : (
-                  <Share2 className="h-4 w-4 mr-1" />
-                )}
-                {shareCopied ? 'Copiado' : 'Compartir'}
-              </button>
-            )}
+            {/* Botón compartir link público (todos los usuarios) */}
+            <button
+              onClick={async () => {
+                try {
+                  const result = await generateShareToken.mutateAsync(event.id);
+                  const publicUrl = `${window.location.origin}/events/public/${result.token}`;
+                  await navigator.clipboard.writeText(publicUrl);
+                  setShareCopied(true);
+                  setTimeout(() => setShareCopied(false), 2000);
+                } catch (err) {
+                  const error = err as { response?: { data?: { message?: string } } };
+                  setActionError(error.response?.data?.message || 'Error al generar link público');
+                }
+              }}
+              disabled={generateShareToken.isPending}
+              className="btn btn-outline btn-sm flex items-center ml-2"
+              title="Copiar link público del evento"
+            >
+              {shareCopied ? (
+                <Check className="h-4 w-4 mr-1 text-green-600" />
+              ) : (
+                <Share2 className="h-4 w-4 mr-1" />
+              )}
+              {shareCopied ? 'Copiado' : 'Compartir'}
+            </button>
           </div>
         </div>
 

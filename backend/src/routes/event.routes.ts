@@ -74,10 +74,9 @@ router.post(
   attendanceController.saveEventAttendance.bind(attendanceController)
 );
 
-// Generar token de link público (ADMIN, CLAN_LEADER)
+// Generar token de link público (cualquier usuario autenticado)
 router.post(
   '/:id/share-token',
-  authorize(UserRole.ADMIN, UserRole.CLAN_LEADER),
   eventController.generateShareToken.bind(eventController)
 );
 

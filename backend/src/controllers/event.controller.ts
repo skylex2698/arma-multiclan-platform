@@ -622,7 +622,7 @@ export class EventController {
     }
   }
 
-  // POST /api/events/:id/share-token
+  // POST /api/events/:id/share-token (cualquier usuario autenticado)
   async generateShareToken(req: Request, res: Response) {
     try {
       if (!req.user) {
@@ -630,31 +630,6 @@ export class EventController {
       }
 
       const eventId = req.params.id as string;
-
-      // Verificar que el evento existe
-      const event = await prisma.event.findUnique({
-        where: { id: eventId },
-        include: {
-          creator: {
-            select: { id: true, clanId: true },
-          },
-        },
-      });
-
-      if (!event) {
-        return errorResponse(res, 'Evento no encontrado', 404);
-      }
-
-      // Verificar permisos
-      const isAdmin = req.user.role === 'ADMIN';
-      const isCreator = event.creatorId === req.user.id;
-      const isClanLeader =
-        req.user.role === 'CLAN_LEADER' &&
-        req.user.clanId === event.creator?.clanId;
-
-      if (!isAdmin && !isCreator && !isClanLeader) {
-        return errorResponse(res, 'No tienes permisos para compartir este evento', 403);
-      }
 
       const token = await eventService.generateShareToken(eventId);
 

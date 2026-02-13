@@ -8,6 +8,7 @@ export function useEvents(filters?: {
   gameType?: string;
   upcoming?: boolean;
   includeAll?: boolean;
+  deleted?: boolean;
   search?: string;
   page?: number;
   limit?: number;
@@ -70,6 +71,17 @@ export function useDeleteEvent() {
 
   return useMutation({
     mutationFn: (id: string) => eventService.delete(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['events'] });
+    },
+  });
+}
+
+export function useRestoreEvent() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (id: string) => eventService.restore(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['events'] });
     },

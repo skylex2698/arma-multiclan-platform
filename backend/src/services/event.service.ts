@@ -59,6 +59,7 @@ export class EventService {
     gameType?: GameType;
     upcoming?: boolean;
     includeAll?: boolean; // Si true, muestra todos los estados
+    deleted?: boolean; // Si true, muestra solo eventos soft-deleted (admin)
     search?: string;
     page?: number;
     limit?: number;
@@ -74,7 +75,11 @@ export class EventService {
     // Por defecto: solo eventos ACTIVE, ordenados por fecha más próxima
     const whereClause: Record<string, unknown> = {};
 
-    if (filters?.includeAll) {
+    // Si se pide ver eventos eliminados (admin), usar escape hatch del middleware
+    if (filters?.deleted) {
+      whereClause.deletedAt = { not: null };
+      // No aplicar filtros de status ni auto-finish en modo deleted
+    } else if (filters?.includeAll) {
       // Mostrar todos los eventos
       if (filters?.status) {
         whereClause.status = filters.status;
@@ -795,7 +800,7 @@ export class EventService {
     };
   }
 
-  // Eliminar evento
+  // Eliminar evento (soft delete con cascade manual)
   async deleteEvent(id: string) {
     const event = await prisma.event.findUnique({
       where: { id },
@@ -805,9 +810,101 @@ export class EventService {
       throw new Error('Evento no encontrado');
     }
 
+    // Cascade manual: soft-delete hijos antes que el padre.
+    // El middleware convierte delete/deleteMany en update/updateMany con deletedAt.
+
+    // 1. Hard-delete communication nodes (no tienen soft delete, son regenerables)
+    await prisma.communicationNode.deleteMany({
+      where: { eventId: id },
+    });
+
+    // 2. Soft-delete todos los slots de las escuadras del evento
+    await prisma.slot.deleteMany({
+      where: { squad: { eventId: id } },
+    });
+
+    // 3. Soft-delete todas las escuadras del evento
+    await prisma.squad.deleteMany({
+      where: { eventId: id },
+    });
+
+    // 4. Soft-delete el evento
     await prisma.event.delete({
       where: { id },
     });
+  }
+
+  // Restaurar evento eliminado (soft delete)
+  async restoreEvent(id: string) {
+    // Buscar evento incluyendo soft-deleted (escape hatch del middleware)
+    const event = await prisma.event.findFirst({
+      where: { id, deletedAt: { not: null } },
+    });
+
+    if (!event) {
+      throw new Error('Evento eliminado no encontrado');
+    }
+
+    // Restaurar en orden: evento → escuadras → slots
+    await prisma.event.update({
+      where: { id },
+      data: { deletedAt: null },
+    });
+
+    await prisma.squad.updateMany({
+      where: { eventId: id, deletedAt: { not: null } },
+      data: { deletedAt: null },
+    });
+
+    await prisma.slot.updateMany({
+      where: { squad: { eventId: id }, deletedAt: { not: null } },
+      data: { deletedAt: null },
+    });
+
+    // Devolver el evento restaurado con sus relaciones
+    const restoredEvent = await prisma.event.findUnique({
+      where: { id },
+      include: {
+        creator: {
+          select: {
+            id: true,
+            nickname: true,
+            clanId: true,
+            clan: {
+              select: {
+                id: true,
+                name: true,
+                tag: true,
+              },
+            },
+          },
+        },
+        squads: {
+          include: {
+            slots: {
+              include: {
+                user: {
+                  select: {
+                    id: true,
+                    nickname: true,
+                    clan: {
+                      select: {
+                        name: true,
+                        tag: true,
+                      },
+                    },
+                  },
+                },
+              },
+              orderBy: { order: 'asc' },
+            },
+          },
+          orderBy: { order: 'asc' },
+        },
+      },
+    });
+
+    return restoredEvent;
   }
 
   // Cambiar estado del evento (ACTIVE <-> INACTIVE)

@@ -43,11 +43,18 @@ router.put(
   eventController.changeEventStatus.bind(eventController)
 );
 
-// Eliminar evento (ADMIN)
+// Eliminar evento (ADMIN, CLAN_LEADER)
 router.delete(
   '/:id',
-  authorize(UserRole.ADMIN),
+  authorize(UserRole.ADMIN, UserRole.CLAN_LEADER),
   eventController.deleteEvent.bind(eventController)
+);
+
+// Restaurar evento eliminado (ADMIN, CLAN_LEADER)
+router.patch(
+  '/:id/restore',
+  authorize(UserRole.ADMIN, UserRole.CLAN_LEADER),
+  eventController.restoreEvent.bind(eventController)
 );
 
 // Marcar ausencia (cualquier usuario autenticado)

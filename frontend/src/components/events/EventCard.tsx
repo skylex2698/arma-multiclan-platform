@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { Calendar, Clock, MapPin, Users } from 'lucide-react';
+import { Calendar, Clock, MapPin, Users, RotateCcw } from 'lucide-react';
 import { Badge } from '../ui/Badge';
 import type { Event } from '../../types';
 import { format } from 'date-fns';
@@ -7,10 +7,16 @@ import { es } from 'date-fns/locale';
 
 interface EventCardProps {
   event: Event;
+  isDeleted?: boolean;
+  onRestore?: () => void;
+  isRestoring?: boolean;
 }
 
-export function EventCard({ event }: EventCardProps) {
+export function EventCard({ event, isDeleted, onRestore, isRestoring }: EventCardProps) {
   const getStatusBadge = () => {
+    if (isDeleted) {
+      return <Badge variant="danger">Eliminado</Badge>;
+    }
     switch (event.status) {
       case 'ACTIVE':
         return <Badge variant="success">Activo</Badge>;
@@ -23,15 +29,12 @@ export function EventCard({ event }: EventCardProps) {
     }
   };
 
-  return (
-    <Link
-      to={`/events/${event.id}`}
-      className="block bg-white dark:bg-gray-800 rounded-lg shadow-md border-2 border-military-200 dark:border-gray-700 hover:shadow-lg transition-all overflow-hidden"
-    >
+  const cardContent = (
+    <>
       {/* Header con estado */}
-      <div className="bg-primary-50 dark:bg-gray-700 px-4 py-3 border-b border-military-200 dark:border-gray-600">
+      <div className={`px-4 py-3 border-b ${isDeleted ? 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800' : 'bg-primary-50 dark:bg-gray-700 border-military-200 dark:border-gray-600'}`}>
         <div className="flex items-center justify-between">
-          <h3 className="text-xl font-bold text-military-900 dark:text-gray-100">
+          <h3 className={`text-xl font-bold ${isDeleted ? 'text-red-900 dark:text-red-200' : 'text-military-900 dark:text-gray-100'}`}>
             {event.name}
           </h3>
           <div className="flex gap-2">
@@ -113,7 +116,43 @@ export function EventCard({ event }: EventCardProps) {
             </p>
           </div>
         )}
+
+        {/* Botón restaurar (solo para eventos eliminados) */}
+        {isDeleted && onRestore && (
+          <div className="mt-3 pt-3 border-t border-red-200 dark:border-red-800">
+            <button
+              type="button"
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                onRestore();
+              }}
+              disabled={isRestoring}
+              className="btn btn-primary w-full flex items-center justify-center"
+            >
+              <RotateCcw className={`h-4 w-4 mr-2 ${isRestoring ? 'animate-spin' : ''}`} />
+              {isRestoring ? 'Restaurando...' : 'Restaurar Evento'}
+            </button>
+          </div>
+        )}
       </div>
+    </>
+  );
+
+  if (isDeleted) {
+    return (
+      <div className="block bg-white dark:bg-gray-800 rounded-lg shadow-md border-2 border-red-300 dark:border-red-800 opacity-75 hover:opacity-100 transition-all overflow-hidden">
+        {cardContent}
+      </div>
+    );
+  }
+
+  return (
+    <Link
+      to={`/events/${event.id}`}
+      className="block bg-white dark:bg-gray-800 rounded-lg shadow-md border-2 border-military-200 dark:border-gray-700 hover:shadow-lg transition-all overflow-hidden"
+    >
+      {cardContent}
     </Link>
   );
 }

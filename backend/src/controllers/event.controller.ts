@@ -11,13 +11,14 @@ export class EventController {
   // GET /api/events
   async getAllEvents(req: Request, res: Response) {
     try {
-      const { status, gameType, upcoming, includeAll, search, page, limit } = req.query;
+      const { status, gameType, upcoming, includeAll, deleted, search, page, limit } = req.query;
 
       const result = await eventService.getAllEvents({
         status: status as EventStatus,
         gameType: gameType as GameType,
         upcoming: upcoming === 'true',
         includeAll: includeAll === 'true',
+        deleted: deleted === 'true',
         search: search as string,
         page: page ? parseInt(page as string, 10) : 1,
         limit: limit ? parseInt(limit as string, 10) : 12,
@@ -220,6 +221,62 @@ export class EventController {
       return errorResponse(
         res,
         error.message || 'Error al eliminar evento',
+        500
+      );
+    }
+  }
+
+  // PATCH /api/events/:id/restore
+  async restoreEvent(req: Request, res: Response) {
+    try {
+      const id = req.params.id as string;
+      const userId = req.user!.id;
+      const userRole = req.user!.role;
+      const userClanId = req.user!.clanId;
+
+      // Buscar el evento eliminado (escape hatch del middleware)
+      const event = await prisma.event.findFirst({
+        where: { id, deletedAt: { not: null } },
+        include: {
+          creator: {
+            select: {
+              id: true,
+              clanId: true,
+            },
+          },
+        },
+      });
+
+      if (!event) {
+        return errorResponse(res, 'Evento eliminado no encontrado', 404);
+      }
+
+      // Verificar permisos (mismo patrón que deleteEvent):
+      // - Admin puede restaurar cualquier evento
+      // - Creador puede restaurar su propio evento
+      // - Líder de clan puede restaurar eventos de su clan
+      const isAdmin = userRole === 'ADMIN';
+      const isCreator = event.creatorId === userId;
+      const isClanLeader =
+        userRole === 'CLAN_LEADER' &&
+        userClanId === event.creator?.clanId;
+
+      if (!isAdmin && !isCreator && !isClanLeader) {
+        return errorResponse(
+          res,
+          'No tienes permisos para restaurar este evento',
+          403
+        );
+      }
+
+      const restoredEvent = await eventService.restoreEvent(id);
+
+      return successResponse(res, { event: restoredEvent }, 'Evento restaurado correctamente');
+    } catch (error: any) {
+      logger.error('Error in restoreEvent', error);
+      return errorResponse(
+        res,
+        error.message || 'Error al restaurar evento',
         500
       );
     }

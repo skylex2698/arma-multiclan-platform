@@ -1,7 +1,7 @@
 import { useState, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { Plus } from 'lucide-react';
-import { useEvents } from '../../hooks/useEvents';
+import { useEvents, useRestoreEvent } from '../../hooks/useEvents';
 import { useAuthStore } from '../../store/authStore';
 import { EventCard } from '../../components/events/EventCard';
 import { EventFilters } from '../../components/events/EventFilters';
@@ -35,8 +35,9 @@ export default function EventsPage() {
   // For calendar view, load more events to display across the month
   const { data, isLoading, error } = useEvents({
     gameType: gameTypeFilter || undefined,
-    status: statusFilter || undefined,
-    includeAll: !statusFilter || statusFilter !== 'ACTIVE' ? true : undefined,
+    status: statusFilter && statusFilter !== 'DELETED' ? statusFilter : undefined,
+    includeAll: !statusFilter || (statusFilter !== 'ACTIVE' && statusFilter !== 'DELETED') ? true : undefined,
+    deleted: statusFilter === 'DELETED' ? true : undefined,
     search: debouncedSearch || undefined,
     page: view === 'calendar' ? 1 : page,
     limit: view === 'calendar' ? CALENDAR_ITEMS_LIMIT : ITEMS_PER_PAGE,
@@ -52,6 +53,10 @@ export default function EventsPage() {
   };
 
   const canCreateEvent = user?.role === 'ADMIN' || user?.role === 'CLAN_LEADER';
+  const canSeeDeleted = user?.role === 'ADMIN' || user?.role === 'CLAN_LEADER';
+  const isDeletedView = statusFilter === 'DELETED';
+
+  const restoreEvent = useRestoreEvent();
 
   if (error) {
     return (
@@ -92,6 +97,7 @@ export default function EventsPage() {
         onGameTypeChange={(value) => handleFilterChange(setGameTypeFilter)(value)}
         statusFilter={statusFilter}
         onStatusChange={(value) => handleFilterChange(setStatusFilter)(value)}
+        isAdmin={canSeeDeleted}
       />
 
       {view === 'calendar' ? (
@@ -114,7 +120,13 @@ export default function EventsPage() {
         <>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {events.map((event) => (
-              <EventCard key={event.id} event={event} />
+              <EventCard
+                key={event.id}
+                event={event}
+                isDeleted={isDeletedView}
+                onRestore={isDeletedView ? () => restoreEvent.mutate(event.id) : undefined}
+                isRestoring={restoreEvent.isPending}
+              />
             ))}
           </div>
 

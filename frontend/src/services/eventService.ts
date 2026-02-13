@@ -17,6 +17,7 @@ export const eventService = {
     gameType?: string;
     upcoming?: boolean;
     includeAll?: boolean;
+    deleted?: boolean;
     search?: string;
     page?: number;
     limit?: number;
@@ -26,6 +27,7 @@ export const eventService = {
     if (filters?.gameType) params.append('gameType', filters.gameType);
     if (filters?.upcoming) params.append('upcoming', 'true');
     if (filters?.includeAll) params.append('includeAll', 'true');
+    if (filters?.deleted) params.append('deleted', 'true');
     if (filters?.search) params.append('search', filters.search);
     if (filters?.page) params.append('page', filters.page.toString());
     if (filters?.limit) params.append('limit', filters.limit.toString());
@@ -106,6 +108,12 @@ export const eventService = {
   // Eliminar evento
   delete: async (id: string): Promise<void> => {
     await api.delete(`/events/${id}`);
+  },
+
+  // Restaurar evento eliminado
+  restore: async (id: string): Promise<{ event: Event }> => {
+    const response = await api.patch<ApiResponse<{ event: Event }>>(`/events/${id}/restore`);
+    return response.data.data;
   },
 
   // Subir archivo de briefing (PDF)

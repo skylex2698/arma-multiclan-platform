@@ -425,7 +425,7 @@ export class SlotService {
     return updatedSquad;
   }
 
-  // Eliminar escuadra
+  // Eliminar escuadra (soft delete con cascade manual)
   async deleteSquad(squadId: string, userId: string) {
     const squad = await prisma.squad.findUnique({
       where: { id: squadId },
@@ -439,6 +439,13 @@ export class SlotService {
       throw new Error('Escuadra no encontrada');
     }
 
+    // Cascade: soft-delete los slots antes de la escuadra
+    // El middleware convierte deleteMany → updateMany con deletedAt
+    await prisma.slot.deleteMany({
+      where: { squadId }
+    });
+
+    // Soft-delete la escuadra (middleware convierte delete → update con deletedAt)
     await prisma.squad.delete({
       where: { id: squadId }
     });

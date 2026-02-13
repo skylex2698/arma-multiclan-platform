@@ -7,6 +7,7 @@ interface EventFiltersProps {
   onGameTypeChange: (type: string) => void;
   statusFilter: string;
   onStatusChange: (status: string) => void;
+  isAdmin?: boolean;
 }
 
 export function EventFilters({
@@ -16,6 +17,7 @@ export function EventFilters({
   onGameTypeChange,
   statusFilter,
   onStatusChange,
+  isAdmin,
 }: EventFiltersProps) {
   return (
     <div className="card mb-6">
@@ -72,6 +74,7 @@ export function EventFilters({
             <option value="INACTIVE">Inactivos</option>
             <option value="FINISHED">Finalizados</option>
             <option value="">Todos</option>
+            {isAdmin && <option value="DELETED">Eliminados</option>}
           </select>
         </div>
       </div>

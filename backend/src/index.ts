@@ -14,10 +14,12 @@ import { slotRoutes, squadRouter } from './routes/slot.routes';
 import communicationTreeRoutes from './routes/communicationTree.routes';
 import { generalLimiter, loginLimiter, registerLimiter, uploadLimiter, sensitiveLimiter } from './middlewares/rateLimiter';
 import { logger } from './utils/logger';
+import { softDeleteMiddleware } from './middlewares/softDelete';
 
 dotenv.config();
 
 export const prisma = new PrismaClient();
+softDeleteMiddleware(prisma);
 
 const app = express();
 const PORT = process.env.PORT || 3000;

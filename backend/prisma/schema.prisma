@@ -85,14 +85,16 @@ model Clan {
   name        String   @unique
   tag         String?
   description String?
-  avatarUrl   String?  // <-- AGREGAR ESTA LÍNEA
+  avatarUrl   String?
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+  deletedAt   DateTime?
 
   users              User[]
   clanChangeRequests ClanChangeRequest[]
 
   @@index([name])
+  @@index([deletedAt])
 }
 
 model Event {
@@ -118,10 +120,12 @@ model Event {
   
   createdAt       DateTime    @default(now())
   updatedAt       DateTime    @updatedAt
-  
+  deletedAt       DateTime?
+
   @@index([status])
   @@index([scheduledDate])
   @@index([creatorId])
+  @@index([deletedAt])
 }
 
 model Squad {
@@ -140,11 +144,13 @@ model Squad {
   event       Event    @relation(fields: [eventId], references: [id], onDelete: Cascade)
   
   slots       Slot[]
-  
+
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
-  
+  deletedAt   DateTime?
+
   @@index([eventId])
+  @@index([deletedAt])
 }
 
 model Slot {
@@ -161,9 +167,11 @@ model Slot {
   
   createdAt   DateTime    @default(now())
   updatedAt   DateTime    @updatedAt
-  
+  deletedAt   DateTime?
+
   @@index([squadId])
   @@index([userId])
+  @@index([deletedAt])
 }
 
 model ClanHistory {

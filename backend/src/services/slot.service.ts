@@ -11,135 +11,151 @@ export class SlotService {
     assignerRole: UserRole,
     assignerClanId: string | null
   ) {
-    // Obtener slot con información completa
-    const slot = await prisma.slot.findUnique({
-      where: { id: slotId },
-      include: {
-        squad: {
-          include: {
-            event: true
-          }
-        },
-        user: true
+    const updatedSlot = await prisma.$transaction(async (tx) => {
+      // Leer slot con información completa (snapshot dentro de la transacción)
+      const slot = await tx.slot.findUnique({
+        where: { id: slotId },
+        include: {
+          squad: {
+            include: {
+              event: true
+            }
+          },
+          user: true
+        }
+      });
+
+      if (!slot) {
+        throw new Error('Slot no encontrado');
       }
-    });
 
-    if (!slot) {
-      throw new Error('Slot no encontrado');
-    }
+      // Verificar que el evento esté activo (fail fast antes de bloquear)
+      if (slot.squad.event.status === EventStatus.FINISHED) {
+        throw new Error('No puedes apuntarte a un evento finalizado');
+      }
+      if (slot.squad.event.status === EventStatus.INACTIVE) {
+        throw new Error('No puedes apuntarte a un evento inactivo. El evento debe estar activo.');
+      }
 
-    // Verificar que el evento esté activo (solo se puede apuntar en eventos ACTIVE)
-    if (slot.squad.event.status === EventStatus.FINISHED) {
-      throw new Error('No puedes apuntarte a un evento finalizado');
-    }
-    if (slot.squad.event.status === EventStatus.INACTIVE) {
-      throw new Error('No puedes apuntarte a un evento inactivo. El evento debe estar activo.');
-    }
+      // Obtener usuario a asignar
+      const userToAssign = await tx.user.findUnique({
+        where: { id: userId }
+      });
 
-    // Verificar que el slot esté libre
-    if (slot.status === SlotStatus.OCCUPIED) {
-      throw new Error('Este slot ya está ocupado');
-    }
+      if (!userToAssign) {
+        throw new Error('Usuario no encontrado');
+      }
 
-    // Obtener usuario a asignar
-    const userToAssign = await prisma.user.findUnique({
-      where: { id: userId }
-    });
-
-    if (!userToAssign) {
-      throw new Error('Usuario no encontrado');
-    }
-
-    // Si no es admin, verificar restricciones
-    if (assignerRole !== UserRole.ADMIN) {
-      // Solo puede apuntarse a sí mismo
-      if (userId !== assignedBy) {
-        // O si es líder de clan, puede apuntar a miembros de su clan
-        if (assignerRole === UserRole.CLAN_LEADER) {
-          if (!assignerClanId || userToAssign.clanId !== assignerClanId) {
-            throw new Error('Solo puedes apuntar a miembros de tu clan');
+      // Si no es admin, verificar restricciones
+      if (assignerRole !== UserRole.ADMIN) {
+        // Solo puede apuntarse a sí mismo
+        if (userId !== assignedBy) {
+          // O si es líder de clan, puede apuntar a miembros de su clan
+          if (assignerRole === UserRole.CLAN_LEADER) {
+            if (!assignerClanId || userToAssign.clanId !== assignerClanId) {
+              throw new Error('Solo puedes apuntar a miembros de tu clan');
+            }
+          } else {
+            throw new Error('Solo puedes apuntarte a ti mismo');
           }
-        } else {
-          throw new Error('Solo puedes apuntarte a ti mismo');
         }
       }
-    }
 
-    // Verificar que el usuario no esté ya en otro slot del mismo evento
-    const existingSlot = await prisma.slot.findFirst({
-      where: {
-        userId: userId,
-        squad: {
-          eventId: slot.squad.eventId
+      // Verificar que el usuario no esté ya en otro slot del mismo evento
+      const existingSlot = await tx.slot.findFirst({
+        where: {
+          userId: userId,
+          squad: {
+            eventId: slot.squad.eventId
+          }
         }
-      }
-    });
+      });
 
-    if (existingSlot) {
-      // Liberar el slot anterior automáticamente
-      await prisma.slot.update({
-        where: { id: existingSlot.id },
+      // Bloquear todos los slots afectados en orden determinista (evita deadlocks)
+      const slotsToLock = [slotId];
+      if (existingSlot && existingSlot.id !== slotId) {
+        slotsToLock.push(existingSlot.id);
+      }
+      slotsToLock.sort();
+
+      for (const lockId of slotsToLock) {
+        await tx.$queryRaw`SELECT id FROM "Slot" WHERE id = ${lockId} FOR UPDATE`;
+      }
+
+      // Re-verificar estado del slot después de adquirir el bloqueo
+      // (puede haber cambiado mientras esperábamos el lock)
+      const lockedSlot = await tx.slot.findUnique({
+        where: { id: slotId },
+        select: { status: true }
+      });
+
+      if (!lockedSlot || lockedSlot.status === SlotStatus.OCCUPIED) {
+        throw new Error('Este slot ya está ocupado');
+      }
+
+      // Liberar el slot anterior si existe
+      if (existingSlot && existingSlot.id !== slotId) {
+        await tx.slot.update({
+          where: { id: existingSlot.id },
+          data: {
+            userId: null,
+            status: SlotStatus.FREE
+          }
+        });
+      }
+
+      // Asignar el nuevo slot
+      const result = await tx.slot.update({
+        where: { id: slotId },
         data: {
-          userId: null,
-          status: SlotStatus.FREE
-        }
-      });
-
-      logger.info('Previous slot freed automatically', {
-        slotId: existingSlot.id,
-        userId
-      });
-    }
-
-    // Asignar el nuevo slot
-    const updatedSlot = await prisma.slot.update({
-      where: { id: slotId },
-      data: {
-        userId: userId,
-        status: SlotStatus.OCCUPIED
-      },
-      include: {
-        user: {
-          select: {
-            id: true,
-            nickname: true,
-            clan: {
-              select: {
-                name: true,
-                tag: true
-              }
-            }
-          }
+          userId: userId,
+          status: SlotStatus.OCCUPIED
         },
-        squad: {
-          select: {
-            name: true,
-            event: {
-              select: {
-                id: true,
-                name: true
+        include: {
+          user: {
+            select: {
+              id: true,
+              nickname: true,
+              clan: {
+                select: {
+                  name: true,
+                  tag: true
+                }
+              }
+            }
+          },
+          squad: {
+            select: {
+              name: true,
+              event: {
+                select: {
+                  id: true,
+                  name: true
+                }
               }
             }
           }
         }
-      }
-    });
+      });
 
-    // Audit log
-    await prisma.auditLog.create({
-      data: {
-        action: 'SLOT_ASSIGNED',
-        entity: 'Slot',
-        entityId: slotId,
-        userId: assignedBy,
-        eventId: slot.squad.eventId,
-        details: JSON.stringify({
-          assignedUserId: userId,
-          slotRole: slot.role,
-          squadName: slot.squad.name,
-          eventName: slot.squad.event.name
-        })
-      }
+      // Audit log dentro de la transacción
+      await tx.auditLog.create({
+        data: {
+          action: 'SLOT_ASSIGNED',
+          entity: 'Slot',
+          entityId: slotId,
+          userId: assignedBy,
+          eventId: slot.squad.eventId,
+          details: JSON.stringify({
+            assignedUserId: userId,
+            slotRole: slot.role,
+            squadName: slot.squad.name,
+            eventName: slot.squad.event.name
+          })
+        }
+      });
+
+      return result;
     });
 
     logger.info('Slot assigned', { slotId, userId, assignedBy });
@@ -154,73 +170,82 @@ export class SlotService {
     requestUserRole: UserRole,
     requestUserClanId: string | null
   ) {
-    const slot = await prisma.slot.findUnique({
-      where: { id: slotId },
-      include: {
-        squad: {
-          include: {
-            event: true
-          }
-        },
-        user: true
+    const { updatedSlot, previousUserId } = await prisma.$transaction(async (tx) => {
+      // Bloquear la fila del slot para evitar modificaciones concurrentes
+      await tx.$queryRaw`SELECT id FROM "Slot" WHERE id = ${slotId} FOR UPDATE`;
+
+      const slot = await tx.slot.findUnique({
+        where: { id: slotId },
+        include: {
+          squad: {
+            include: {
+              event: true
+            }
+          },
+          user: true
+        }
+      });
+
+      if (!slot) {
+        throw new Error('Slot no encontrado');
       }
-    });
 
-    if (!slot) {
-      throw new Error('Slot no encontrado');
-    }
+      if (slot.status !== SlotStatus.OCCUPIED || !slot.userId) {
+        throw new Error('Este slot no está ocupado');
+      }
 
-    if (slot.status !== SlotStatus.OCCUPIED || !slot.userId) {
-      throw new Error('Este slot no está ocupado');
-    }
+      // Verificar que el evento esté activo (solo se puede desapuntar en eventos ACTIVE)
+      if (slot.squad.event.status === EventStatus.FINISHED) {
+        throw new Error('No puedes desapuntarte de un evento finalizado');
+      }
+      if (slot.squad.event.status === EventStatus.INACTIVE) {
+        throw new Error('No puedes desapuntarte de un evento inactivo. El evento debe estar activo.');
+      }
 
-    // Verificar que el evento esté activo (solo se puede desapuntar en eventos ACTIVE)
-    if (slot.squad.event.status === EventStatus.FINISHED) {
-      throw new Error('No puedes desapuntarte de un evento finalizado');
-    }
-    if (slot.squad.event.status === EventStatus.INACTIVE) {
-      throw new Error('No puedes desapuntarte de un evento inactivo. El evento debe estar activo.');
-    }
-
-    // Si no es admin, verificar permisos
-    if (requestUserRole !== UserRole.ADMIN) {
-      // Solo puede desapuntarse a sí mismo
-      if (slot.userId !== requestUserId) {
-        // O si es líder de clan, puede desapuntar a miembros de su clan
-        if (requestUserRole === UserRole.CLAN_LEADER) {
-          if (!requestUserClanId || slot.user?.clanId !== requestUserClanId) {
-            throw new Error('Solo puedes desapuntar a miembros de tu clan');
+      // Si no es admin, verificar permisos
+      if (requestUserRole !== UserRole.ADMIN) {
+        // Solo puede desapuntarse a sí mismo
+        if (slot.userId !== requestUserId) {
+          // O si es líder de clan, puede desapuntar a miembros de su clan
+          if (requestUserRole === UserRole.CLAN_LEADER) {
+            if (!requestUserClanId || slot.user?.clanId !== requestUserClanId) {
+              throw new Error('Solo puedes desapuntar a miembros de tu clan');
+            }
+          } else {
+            throw new Error('Solo puedes desapuntarte a ti mismo');
           }
-        } else {
-          throw new Error('Solo puedes desapuntarte a ti mismo');
         }
       }
-    }
 
-    const updatedSlot = await prisma.slot.update({
-      where: { id: slotId },
-      data: {
-        userId: null,
-        status: SlotStatus.FREE
-      }
+      const prevUserId = slot.userId;
+
+      const result = await tx.slot.update({
+        where: { id: slotId },
+        data: {
+          userId: null,
+          status: SlotStatus.FREE
+        }
+      });
+
+      // Audit log dentro de la transacción
+      await tx.auditLog.create({
+        data: {
+          action: 'SLOT_UNASSIGNED',
+          entity: 'Slot',
+          entityId: slotId,
+          userId: requestUserId,
+          eventId: slot.squad.eventId,
+          details: JSON.stringify({
+            unassignedUserId: prevUserId,
+            slotRole: slot.role
+          })
+        }
+      });
+
+      return { updatedSlot: result, previousUserId: prevUserId };
     });
 
-    // Audit log
-    await prisma.auditLog.create({
-      data: {
-        action: 'SLOT_UNASSIGNED',
-        entity: 'Slot',
-        entityId: slotId,
-        userId: requestUserId,
-        eventId: slot.squad.eventId,
-        details: JSON.stringify({
-          unassignedUserId: slot.userId,
-          slotRole: slot.role
-        })
-      }
-    });
-
-    logger.info('Slot unassigned', { slotId, userId: slot.userId, requestUserId });
+    logger.info('Slot unassigned', { slotId, userId: previousUserId, requestUserId });
 
     return updatedSlot;
   }
@@ -554,199 +579,224 @@ export class SlotService {
   }
 
   async adminAssignSlot(slotId: string, userId: string, assignedBy: string) {
-    // Verificar que el slot existe y está libre
-    const slot = await prisma.slot.findUnique({
-      where: { id: slotId },
-      include: {
-        squad: {
-          include: {
-            event: true,
+    const { result, hadExistingSlot, existingSlotId } = await prisma.$transaction(async (tx) => {
+      // Leer slot con información completa (snapshot dentro de la transacción)
+      const slot = await tx.slot.findUnique({
+        where: { id: slotId },
+        include: {
+          squad: {
+            include: {
+              event: true,
+            },
           },
         },
-      },
-    });
+      });
 
-    if (!slot) {
-      throw new Error('Slot no encontrado');
-    }
+      if (!slot) {
+        throw new Error('Slot no encontrado');
+      }
 
-    // Verificar que el evento no esté finalizado ni inactivo
-    if (slot.squad.event.status === 'FINISHED') {
-      throw new Error('No se puede asignar usuarios a un evento finalizado');
-    }
-    if (slot.squad.event.status === 'INACTIVE') {
-      throw new Error('No se puede asignar usuarios a un evento inactivo');
-    }
+      // Verificar que el evento no esté finalizado ni inactivo (fail fast)
+      if (slot.squad.event.status === 'FINISHED') {
+        throw new Error('No se puede asignar usuarios a un evento finalizado');
+      }
+      if (slot.squad.event.status === 'INACTIVE') {
+        throw new Error('No se puede asignar usuarios a un evento inactivo');
+      }
 
-    if (slot.status !== 'FREE') {
-      throw new Error('El slot ya está ocupado');
-    }
+      // Verificar que el usuario existe y está activo
+      const user = await tx.user.findUnique({
+        where: { id: userId },
+      });
 
-    // Verificar que el usuario existe y está activo
-    const user = await prisma.user.findUnique({
-      where: { id: userId },
-    });
+      if (!user) {
+        throw new Error('Usuario no encontrado');
+      }
 
-    if (!user) {
-      throw new Error('Usuario no encontrado');
-    }
+      if (user.status !== 'ACTIVE') {
+        throw new Error('El usuario no está activo');
+      }
 
-    if (user.status !== 'ACTIVE') {
-      throw new Error('El usuario no está activo');
-    }
-
-    // CAMBIO: Si el usuario ya tiene un slot en este evento, liberarlo primero
-    const existingSlot = await prisma.slot.findFirst({
-      where: {
-        userId: userId,
-        squad: {
-          eventId: slot.squad.eventId,
+      // Buscar si el usuario ya tiene un slot en este evento
+      const existingSlot = await tx.slot.findFirst({
+        where: {
+          userId: userId,
+          squad: {
+            eventId: slot.squad.eventId,
+          },
         },
-      },
+      });
+
+      // Bloquear todos los slots afectados en orden determinista (evita deadlocks)
+      const slotsToLock = [slotId];
+      if (existingSlot && existingSlot.id !== slotId) {
+        slotsToLock.push(existingSlot.id);
+      }
+      slotsToLock.sort();
+
+      for (const lockId of slotsToLock) {
+        await tx.$queryRaw`SELECT id FROM "Slot" WHERE id = ${lockId} FOR UPDATE`;
+      }
+
+      // Re-verificar estado del slot después de adquirir el bloqueo
+      const lockedSlot = await tx.slot.findUnique({
+        where: { id: slotId },
+        select: { status: true },
+      });
+
+      if (!lockedSlot || lockedSlot.status !== 'FREE') {
+        throw new Error('El slot ya está ocupado');
+      }
+
+      // Liberar el slot anterior si existe
+      if (existingSlot && existingSlot.id !== slotId) {
+        await tx.slot.update({
+          where: { id: existingSlot.id },
+          data: {
+            userId: null,
+            status: 'FREE',
+          },
+        });
+      }
+
+      // Asignar el nuevo slot
+      const updatedSlot = await tx.slot.update({
+        where: { id: slotId },
+        data: {
+          userId: userId,
+          status: 'OCCUPIED',
+        },
+        include: {
+          user: {
+            select: {
+              id: true,
+              nickname: true,
+              email: true,
+              role: true,
+              status: true,
+              clanId: true,
+              avatarUrl: true,
+              clan: {
+                select: {
+                  id: true,
+                  name: true,
+                  tag: true,
+                  avatarUrl: true,
+                },
+              },
+            },
+          },
+        },
+      });
+
+      // Registrar en audit log dentro de la transacción
+      await tx.auditLog.create({
+        data: {
+          action: existingSlot ? 'SLOT_MOVED' : 'SLOT_ADMIN_ASSIGNED',
+          entity: 'SLOT',
+          entityId: slotId,
+          userId: assignedBy,
+          details: JSON.stringify({
+            slotId,
+            assignedUserId: userId,
+            eventId: slot.squad.eventId,
+            eventName: slot.squad.event.name,
+            ...(existingSlot && { previousSlotId: existingSlot.id }),
+          }),
+        },
+      });
+
+      return {
+        result: updatedSlot,
+        hadExistingSlot: !!existingSlot,
+        existingSlotId: existingSlot?.id,
+      };
     });
 
-    if (existingSlot) {
-      // Liberar el slot anterior
-      await prisma.slot.update({
-        where: { id: existingSlot.id },
+    logger.info(
+      hadExistingSlot ? 'Slot moved by admin/leader' : 'Slot assigned by admin/leader',
+      {
+        slotId,
+        userId,
+        assignedBy,
+        ...(existingSlotId && { previousSlotId: existingSlotId }),
+      }
+    );
+
+    return result;
+  }
+
+  async adminUnassignSlot(slotId: string, unassignedBy: string) {
+    const { updatedSlot, previousUserId } = await prisma.$transaction(async (tx) => {
+      // Bloquear la fila del slot para evitar modificaciones concurrentes
+      await tx.$queryRaw`SELECT id FROM "Slot" WHERE id = ${slotId} FOR UPDATE`;
+
+      const slot = await tx.slot.findUnique({
+        where: { id: slotId },
+        include: {
+          user: {
+            select: {
+              id: true,
+              nickname: true,
+            },
+          },
+          squad: {
+            include: {
+              event: {
+                select: {
+                  id: true,
+                  name: true,
+                  status: true,
+                },
+              },
+            },
+          },
+        },
+      });
+
+      if (!slot) {
+        throw new Error('Slot no encontrado');
+      }
+
+      // Verificar que el evento no esté finalizado
+      if (slot.squad.event.status === 'FINISHED') {
+        throw new Error('No se puede modificar un evento finalizado');
+      }
+
+      if (slot.status !== 'OCCUPIED' || !slot.userId) {
+        throw new Error('El slot ya está libre');
+      }
+
+      const prevUserId = slot.userId;
+      const prevUserNickname = slot.user?.nickname;
+
+      // Liberar el slot
+      const result = await tx.slot.update({
+        where: { id: slotId },
         data: {
           userId: null,
           status: 'FREE',
         },
       });
 
-      logger.info('Previous slot freed for user movement', {
-        oldSlotId: existingSlot.id,
-        userId,
-        eventId: slot.squad.eventId,
+      // Registrar en audit log dentro de la transacción
+      await tx.auditLog.create({
+        data: {
+          action: 'SLOT_ADMIN_UNASSIGNED',
+          entity: 'SLOT',
+          entityId: slotId,
+          userId: unassignedBy,
+          details: JSON.stringify({
+            slotId,
+            unassignedUserId: prevUserId,
+            unassignedUserNickname: prevUserNickname,
+            eventId: slot.squad.event.id,
+            eventName: slot.squad.event.name,
+          }),
+        },
       });
-    }
 
-    // Asignar el nuevo slot
-    const updatedSlot = await prisma.slot.update({
-      where: { id: slotId },
-      data: {
-        userId: userId,
-        status: 'OCCUPIED',
-      },
-      include: {
-        user: {
-          select: {
-            id: true,
-            nickname: true,
-            email: true,
-            role: true,
-            status: true,
-            clanId: true,
-            avatarUrl: true,
-            clan: {
-              select: {
-                id: true,
-                name: true,
-                tag: true,
-                avatarUrl: true,
-              },
-            },
-          },
-        },
-      },
-    });
-
-    // Registrar en audit log
-    await prisma.auditLog.create({
-      data: {
-        action: existingSlot ? 'SLOT_MOVED' : 'SLOT_ADMIN_ASSIGNED',
-        entity: 'SLOT',
-        entityId: slotId,
-        userId: assignedBy,
-        details: JSON.stringify({
-          slotId,
-          assignedUserId: userId,
-          eventId: slot.squad.eventId,
-          eventName: slot.squad.event.name,
-          ...(existingSlot && { previousSlotId: existingSlot.id }),
-        }),
-      },
-    });
-
-    logger.info(
-      existingSlot ? 'Slot moved by admin/leader' : 'Slot assigned by admin/leader',
-      {
-        slotId,
-        userId,
-        assignedBy,
-        ...(existingSlot && { previousSlotId: existingSlot.id }),
-      }
-    );
-
-    return updatedSlot;
-  }
-
-  async adminUnassignSlot(slotId: string, unassignedBy: string) {
-    // Verificar que el slot existe y está ocupado
-    const slot = await prisma.slot.findUnique({
-      where: { id: slotId },
-      include: {
-        user: {
-          select: {
-            id: true,
-            nickname: true,
-          },
-        },
-        squad: {
-          include: {
-            event: {
-              select: {
-                id: true,
-                name: true,
-                status: true,
-              },
-            },
-          },
-        },
-      },
-    });
-
-    if (!slot) {
-      throw new Error('Slot no encontrado');
-    }
-
-    // Verificar que el evento no esté finalizado
-    if (slot.squad.event.status === 'FINISHED') {
-      throw new Error('No se puede modificar un evento finalizado');
-    }
-
-    if (slot.status !== 'OCCUPIED' || !slot.userId) {
-      throw new Error('El slot ya está libre');
-    }
-
-    const previousUserId = slot.userId;
-    const previousUserNickname = slot.user?.nickname;
-
-    // Liberar el slot
-    const updatedSlot = await prisma.slot.update({
-      where: { id: slotId },
-      data: {
-        userId: null,
-        status: 'FREE',
-      },
-    });
-
-    // Registrar en audit log
-    await prisma.auditLog.create({
-      data: {
-        action: 'SLOT_ADMIN_UNASSIGNED',
-        entity: 'SLOT',
-        entityId: slotId,
-        userId: unassignedBy,
-        details: JSON.stringify({
-          slotId,
-          unassignedUserId: previousUserId,
-          unassignedUserNickname: previousUserNickname,
-          eventId: slot.squad.event.id,
-          eventName: slot.squad.event.name,
-        }),
-      },
+      return { updatedSlot: result, previousUserId: prevUserId };
     });
 
     logger.info('Slot unassigned by admin/leader', {

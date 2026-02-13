@@ -287,126 +287,130 @@ export class EventService {
       parentFrequency: squad.parentFrequency
     }));
 
-    // Paso 1: Crear evento con squads SIN parentSquadId
-    // Esto evita errores de foreign key cuando los padres aún no existen
-    const event = await prisma.event.create({
-      data: {
-        name: data.name,
-        description: data.description,
-        // SEGURIDAD: Sanitizar HTML del briefing para prevenir XSS
-        briefing: data.briefing ? sanitizeHTML(data.briefing) : undefined,
-        gameType: data.gameType,
-        scheduledDate: data.scheduledDate,
-        creatorId: data.creatorId,
-        status: EventStatus.ACTIVE,
-        squads: {
-          create: data.squads.map(squad => ({
-            name: squad.name,
-            order: squad.order,
-            // ========== CAMPOS DE COMUNICACIÓN ==========
-            frequency: squad.frequency || null,
-            isCommand: squad.isCommand || false,
-            // NO asignamos parentSquadId aquí - lo hacemos después
-            parentSquadId: null,
-            parentFrequency: null,
-            // ============================================
-            slots: {
-              create: squad.slots.map(slot => ({
-                role: slot.role,
-                order: slot.order,
-                status: SlotStatus.FREE
-              }))
-            }
-          }))
-        }
-      },
-      include: {
-        creator: {
-          select: {
-            nickname: true
-          }
-        },
-        squads: {
-          include: {
-            slots: true
-          },
-          orderBy: { order: 'asc' }
-        }
-      }
-    });
-
-    // Paso 2: Crear mapeo de IDs temporales a IDs reales
-    // Los squads se crean en el mismo orden que se envían
-    const tempIdToRealId = new Map<string, string>();
-    event.squads.forEach((squad, index) => {
-      const tempId = squadHierarchy[index]?.tempId;
-      if (tempId) {
-        tempIdToRealId.set(tempId, squad.id);
-      }
-    });
-
-    // Paso 3: Actualizar squads que tienen jerarquía
-    const updatePromises: Promise<unknown>[] = [];
-    event.squads.forEach((squad, index) => {
-      const hierarchy = squadHierarchy[index];
-      if (hierarchy?.parentTempId) {
-        const realParentId = tempIdToRealId.get(hierarchy.parentTempId);
-        if (realParentId) {
-          updatePromises.push(
-            prisma.squad.update({
-              where: { id: squad.id },
-              data: {
-                parentSquadId: realParentId,
-                parentFrequency: hierarchy.parentFrequency || null
+    const finalEvent = await prisma.$transaction(async (tx) => {
+      // Paso 1: Crear evento con squads SIN parentSquadId
+      // Esto evita errores de foreign key cuando los padres aún no existen
+      const event = await tx.event.create({
+        data: {
+          name: data.name,
+          description: data.description,
+          // SEGURIDAD: Sanitizar HTML del briefing para prevenir XSS
+          briefing: data.briefing ? sanitizeHTML(data.briefing) : undefined,
+          gameType: data.gameType,
+          scheduledDate: data.scheduledDate,
+          creatorId: data.creatorId,
+          status: EventStatus.ACTIVE,
+          squads: {
+            create: data.squads.map(squad => ({
+              name: squad.name,
+              order: squad.order,
+              // ========== CAMPOS DE COMUNICACIÓN ==========
+              frequency: squad.frequency || null,
+              isCommand: squad.isCommand || false,
+              // NO asignamos parentSquadId aquí - lo hacemos después
+              parentSquadId: null,
+              parentFrequency: null,
+              // ============================================
+              slots: {
+                create: squad.slots.map(slot => ({
+                  role: slot.role,
+                  order: slot.order,
+                  status: SlotStatus.FREE
+                }))
               }
-            })
-          );
-        }
-      }
-    });
-
-    if (updatePromises.length > 0) {
-      await Promise.all(updatePromises);
-    }
-
-    // Recargar el evento con los datos actualizados de jerarquía
-    const finalEvent = await prisma.event.findUnique({
-      where: { id: event.id },
-      include: {
-        creator: {
-          select: {
-            nickname: true
+            }))
           }
         },
-        squads: {
-          include: {
-            slots: true
+        include: {
+          creator: {
+            select: {
+              nickname: true
+            }
           },
-          orderBy: { order: 'asc' }
+          squads: {
+            include: {
+              slots: true
+            },
+            orderBy: { order: 'asc' }
+          }
         }
+      });
+
+      // Paso 2: Crear mapeo de IDs temporales a IDs reales
+      // Los squads se crean en el mismo orden que se envían
+      const tempIdToRealId = new Map<string, string>();
+      event.squads.forEach((squad, index) => {
+        const tempId = squadHierarchy[index]?.tempId;
+        if (tempId) {
+          tempIdToRealId.set(tempId, squad.id);
+        }
+      });
+
+      // Paso 3: Actualizar squads que tienen jerarquía
+      const updatePromises: Promise<unknown>[] = [];
+      event.squads.forEach((squad, index) => {
+        const hierarchy = squadHierarchy[index];
+        if (hierarchy?.parentTempId) {
+          const realParentId = tempIdToRealId.get(hierarchy.parentTempId);
+          if (realParentId) {
+            updatePromises.push(
+              tx.squad.update({
+                where: { id: squad.id },
+                data: {
+                  parentSquadId: realParentId,
+                  parentFrequency: hierarchy.parentFrequency || null
+                }
+              })
+            );
+          }
+        }
+      });
+
+      if (updatePromises.length > 0) {
+        await Promise.all(updatePromises);
       }
+
+      // Paso 4: Recargar el evento con los datos actualizados de jerarquía
+      const reloaded = await tx.event.findUnique({
+        where: { id: event.id },
+        include: {
+          creator: {
+            select: {
+              nickname: true
+            }
+          },
+          squads: {
+            include: {
+              slots: true
+            },
+            orderBy: { order: 'asc' }
+          }
+        }
+      });
+
+      // Paso 5: Audit log
+      await tx.auditLog.create({
+        data: {
+          action: 'EVENT_CREATED',
+          entity: 'Event',
+          entityId: event.id,
+          userId: data.creatorId,
+          eventId: event.id,
+          details: JSON.stringify({
+            name: event.name,
+            gameType: event.gameType,
+            squadCount: event.squads.length,
+            totalSlots: event.squads.reduce((acc, s) => acc + s.slots.length, 0)
+          })
+        }
+      });
+
+      return reloaded!;
     });
 
-    // Audit log
-    await prisma.auditLog.create({
-      data: {
-        action: 'EVENT_CREATED',
-        entity: 'Event',
-        entityId: event.id,
-        userId: data.creatorId,
-        eventId: event.id,
-        details: JSON.stringify({
-          name: event.name,
-          gameType: event.gameType,
-          squadCount: event.squads.length,
-          totalSlots: event.squads.reduce((acc, s) => acc + s.slots.length, 0)
-        })
-      }
-    });
+    logger.info('Event created', { eventId: finalEvent.id, creatorId: data.creatorId });
 
-    logger.info('Event created', { eventId: event.id, creatorId: data.creatorId });
-
-    return finalEvent!;
+    return finalEvent;
   }
 
   // Crear evento desde plantilla
@@ -557,222 +561,213 @@ export class EventService {
       throw new Error('No se puede modificar un evento finalizado');
     }
 
-    // Si se envían escuadras, actualizar estructura completa
-    if (data.squads) {
-      // Helper para verificar si un ID es un UUID válido (real de la BD)
-      const isRealUUID = (id: string | undefined): boolean => {
-        if (!id) return false;
-        const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-        return uuidRegex.test(id);
-      };
+    const updatedEvent = await prisma.$transaction(async (tx) => {
+      // Si se envían escuadras, actualizar estructura completa
+      if (data.squads) {
+        // Helper para verificar si un ID es un UUID válido (real de la BD)
+        const isRealUUID = (sqId: string | undefined): boolean => {
+          if (!sqId) return false;
+          const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+          return uuidRegex.test(sqId);
+        };
 
-      // 1. Eliminar escuadras que ya no existen
-      // Solo consideramos IDs reales (UUIDs) para identificar squads existentes
-      const realSquadIds = data.squads
-        .filter((s) => s.id && isRealUUID(s.id))
-        .map((s) => s.id as string);
-      const squadsToDelete = event.squads.filter(
-        (s) => !realSquadIds.includes(s.id)
-      );
+        // 1. Eliminar escuadras que ya no existen
+        const realSquadIds = data.squads
+          .filter((s) => s.id && isRealUUID(s.id))
+          .map((s) => s.id as string);
+        const squadsToDelete = event.squads.filter(
+          (s) => !realSquadIds.includes(s.id)
+        );
 
-      for (const squad of squadsToDelete) {
-        await prisma.squad.delete({
-          where: { id: squad.id },
-        });
-      }
+        for (const squad of squadsToDelete) {
+          await tx.squad.delete({
+            where: { id: squad.id },
+          });
+        }
 
-      // 2. Guardar info de jerarquía para procesarla después
-      const squadHierarchyInfo: Array<{
-        inputId?: string; // ID del frontend (puede ser temp o real)
-        parentInputId?: string; // parentSquadId del frontend
-        parentFrequency?: string;
-        index: number;
-      }> = data.squads.map((squad, index) => ({
-        inputId: squad.id,
-        parentInputId: squad.parentSquadId,
-        parentFrequency: squad.parentFrequency,
-        index
-      }));
+        // 2. Guardar info de jerarquía para procesarla después
+        const squadHierarchyInfo: Array<{
+          inputId?: string;
+          parentInputId?: string;
+          parentFrequency?: string;
+          index: number;
+        }> = data.squads.map((squad, index) => ({
+          inputId: squad.id,
+          parentInputId: squad.parentSquadId,
+          parentFrequency: squad.parentFrequency,
+          index
+        }));
 
-      // Mapeo de IDs de input a IDs reales
-      const inputIdToRealId = new Map<string, string>();
+        // Mapeo de IDs de input a IDs reales
+        const inputIdToRealId = new Map<string, string>();
 
-      // 3. Actualizar o crear escuadras SIN parentSquadId primero
-      for (let i = 0; i < data.squads.length; i++) {
-        const squadData = data.squads[i];
-        const inputId = squadData.id;
-        const isExisting = inputId && isRealUUID(inputId);
+        // 3. Actualizar o crear escuadras SIN parentSquadId primero
+        for (let i = 0; i < data.squads.length; i++) {
+          const squadData = data.squads[i];
+          const inputId = squadData.id;
+          const isExisting = inputId && isRealUUID(inputId);
 
-        if (isExisting) {
-          // Actualizar escuadra existente
-          const existingSquad = event.squads.find((s) => s.id === inputId);
+          if (isExisting) {
+            // Actualizar escuadra existente
+            const existingSquad = event.squads.find((s) => s.id === inputId);
 
-          if (existingSquad) {
-            // Actualizar sin parentSquadId por ahora
-            await prisma.squad.update({
-              where: { id: inputId },
+            if (existingSquad) {
+              await tx.squad.update({
+                where: { id: inputId },
+                data: {
+                  name: squadData.name,
+                  order: squadData.order,
+                  frequency: squadData.frequency || null,
+                  isCommand: squadData.isCommand || false,
+                },
+              });
+
+              inputIdToRealId.set(inputId, inputId);
+
+              // Manejar slots
+              const newSlotIds = squadData.slots
+                .filter((sl) => sl.id)
+                .map((sl) => sl.id as string);
+              const slotsToDelete = existingSquad.slots.filter(
+                (sl) => !newSlotIds.includes(sl.id)
+              );
+
+              for (const slot of slotsToDelete) {
+                await tx.slot.delete({
+                  where: { id: slot.id },
+                });
+              }
+
+              for (const slotData of squadData.slots) {
+                if (slotData.id) {
+                  await tx.slot.update({
+                    where: { id: slotData.id },
+                    data: {
+                      role: slotData.role,
+                      order: slotData.order,
+                    },
+                  });
+                } else {
+                  await tx.slot.create({
+                    data: {
+                      role: slotData.role,
+                      order: slotData.order,
+                      status: 'FREE',
+                      squadId: inputId,
+                    },
+                  });
+                }
+              }
+            }
+          } else {
+            // Crear nueva escuadra SIN parentSquadId
+            const newSquad = await tx.squad.create({
               data: {
                 name: squadData.name,
                 order: squadData.order,
+                eventId: id,
                 frequency: squadData.frequency || null,
                 isCommand: squadData.isCommand || false,
-                // NO actualizar parentSquadId aquí
+                parentSquadId: null,
+                parentFrequency: null,
+                slots: {
+                  create: squadData.slots.map((slot) => ({
+                    role: slot.role,
+                    order: slot.order,
+                    status: 'FREE',
+                  })),
+                },
               },
             });
 
-            // Registrar mapeo (ID real -> ID real)
-            inputIdToRealId.set(inputId, inputId);
+            if (inputId) {
+              inputIdToRealId.set(inputId, newSquad.id);
+            }
+          }
+        }
 
-            // Manejar slots
-            const newSlotIds = squadData.slots
-              .filter((sl) => sl.id)
-              .map((sl) => sl.id as string);
-            const slotsToDelete = existingSquad.slots.filter(
-              (sl) => !newSlotIds.includes(sl.id)
-            );
+        // 4. Actualizar parentSquadId para todos los squads que tienen jerarquía
+        for (const hierarchy of squadHierarchyInfo) {
+          if (hierarchy.parentInputId) {
+            const currentSquadRealId = hierarchy.inputId
+              ? inputIdToRealId.get(hierarchy.inputId)
+              : null;
 
-            // Eliminar slots que ya no existen
-            for (const slot of slotsToDelete) {
-              await prisma.slot.delete({
-                where: { id: slot.id },
+            let parentRealId: string | null = null;
+            if (isRealUUID(hierarchy.parentInputId)) {
+              parentRealId = hierarchy.parentInputId;
+            } else {
+              parentRealId = inputIdToRealId.get(hierarchy.parentInputId) || null;
+            }
+
+            if (currentSquadRealId && parentRealId) {
+              await tx.squad.update({
+                where: { id: currentSquadRealId },
+                data: {
+                  parentSquadId: parentRealId,
+                  parentFrequency: hierarchy.parentFrequency || null,
+                },
               });
             }
-
-            // Actualizar o crear slots
-            for (const slotData of squadData.slots) {
-              if (slotData.id) {
-                await prisma.slot.update({
-                  where: { id: slotData.id },
-                  data: {
-                    role: slotData.role,
-                    order: slotData.order,
-                  },
-                });
-              } else {
-                await prisma.slot.create({
-                  data: {
-                    role: slotData.role,
-                    order: slotData.order,
-                    status: 'FREE',
-                    squadId: inputId,
-                  },
-                });
-              }
-            }
-          }
-        } else {
-          // Crear nueva escuadra SIN parentSquadId
-          const newSquad = await prisma.squad.create({
-            data: {
-              name: squadData.name,
-              order: squadData.order,
-              eventId: id,
-              frequency: squadData.frequency || null,
-              isCommand: squadData.isCommand || false,
-              parentSquadId: null, // Se asignará después
-              parentFrequency: null,
-              slots: {
-                create: squadData.slots.map((slot) => ({
-                  role: slot.role,
-                  order: slot.order,
-                  status: 'FREE',
-                })),
-              },
-            },
-          });
-
-          // Registrar mapeo (ID temp -> ID real)
-          if (inputId) {
-            inputIdToRealId.set(inputId, newSquad.id);
           }
         }
       }
 
-      // 4. Actualizar parentSquadId para todos los squads que tienen jerarquía
-      for (const hierarchy of squadHierarchyInfo) {
-        if (hierarchy.parentInputId) {
-          // Resolver el ID real del squad actual
-          const currentSquadRealId = hierarchy.inputId
-            ? inputIdToRealId.get(hierarchy.inputId)
-            : null;
-
-          // Resolver el ID real del padre
-          let parentRealId: string | null = null;
-          if (isRealUUID(hierarchy.parentInputId)) {
-            // El padre es un squad existente
-            parentRealId = hierarchy.parentInputId;
-          } else {
-            // El padre es un squad nuevo, buscar en el mapeo
-            parentRealId = inputIdToRealId.get(hierarchy.parentInputId) || null;
-          }
-
-          if (currentSquadRealId && parentRealId) {
-            await prisma.squad.update({
-              where: { id: currentSquadRealId },
-              data: {
-                parentSquadId: parentRealId,
-                parentFrequency: hierarchy.parentFrequency || null,
-              },
-            });
-          }
-        }
-      }
-    }
-
-    // Actualizar información básica del evento
-    const updatedEvent = await prisma.event.update({
-      where: { id },
-      data: {
-        name: data.name,
-        description: data.description,
-        // SEGURIDAD: Sanitizar HTML del briefing para prevenir XSS
-        briefing: data.briefing ? sanitizeHTML(data.briefing) : undefined,
-        gameType: data.gameType,
-        scheduledDate: data.scheduledDate,
-      },
-      include: {
-        creator: {
-          select: {
-            id: true,
-            nickname: true,
-            clan: {
-              select: {
-                name: true,
-                tag: true,
+      // Actualizar información básica del evento
+      return tx.event.update({
+        where: { id },
+        data: {
+          name: data.name,
+          description: data.description,
+          // SEGURIDAD: Sanitizar HTML del briefing para prevenir XSS
+          briefing: data.briefing ? sanitizeHTML(data.briefing) : undefined,
+          gameType: data.gameType,
+          scheduledDate: data.scheduledDate,
+        },
+        include: {
+          creator: {
+            select: {
+              id: true,
+              nickname: true,
+              clan: {
+                select: {
+                  name: true,
+                  tag: true,
+                },
               },
             },
           },
-        },
-        squads: {
-          include: {
-            slots: {
-              include: {
-                user: {
-                  select: {
-                    id: true,
-                    nickname: true,
-                    email: true,
-                    role: true,
-                    status: true,
-                    clanId: true,
-                    avatarUrl: true,
-                    clan: {
-                      select: {
-                        id: true,
-                        name: true,
-                        tag: true,
-                        avatarUrl: true,
+          squads: {
+            include: {
+              slots: {
+                include: {
+                  user: {
+                    select: {
+                      id: true,
+                      nickname: true,
+                      email: true,
+                      role: true,
+                      status: true,
+                      clanId: true,
+                      avatarUrl: true,
+                      clan: {
+                        select: {
+                          id: true,
+                          name: true,
+                          tag: true,
+                          avatarUrl: true,
+                        },
                       },
                     },
                   },
                 },
+                orderBy: { order: 'asc' },
               },
-              orderBy: { order: 'asc' },
             },
+            orderBy: { order: 'asc' },
           },
-          orderBy: { order: 'asc' },
         },
-      },
+      });
     });
 
     // Calcular slots ocupados
@@ -810,27 +805,28 @@ export class EventService {
       throw new Error('Evento no encontrado');
     }
 
-    // Cascade manual: soft-delete hijos antes que el padre.
+    // Cascade manual atómico: soft-delete hijos antes que el padre.
     // El middleware convierte delete/deleteMany en update/updateMany con deletedAt.
+    await prisma.$transaction(async (tx) => {
+      // 1. Hard-delete communication nodes (no tienen soft delete, son regenerables)
+      await tx.communicationNode.deleteMany({
+        where: { eventId: id },
+      });
 
-    // 1. Hard-delete communication nodes (no tienen soft delete, son regenerables)
-    await prisma.communicationNode.deleteMany({
-      where: { eventId: id },
-    });
+      // 2. Soft-delete todos los slots de las escuadras del evento
+      await tx.slot.deleteMany({
+        where: { squad: { eventId: id } },
+      });
 
-    // 2. Soft-delete todos los slots de las escuadras del evento
-    await prisma.slot.deleteMany({
-      where: { squad: { eventId: id } },
-    });
+      // 3. Soft-delete todas las escuadras del evento
+      await tx.squad.deleteMany({
+        where: { eventId: id },
+      });
 
-    // 3. Soft-delete todas las escuadras del evento
-    await prisma.squad.deleteMany({
-      where: { eventId: id },
-    });
-
-    // 4. Soft-delete el evento
-    await prisma.event.delete({
-      where: { id },
+      // 4. Soft-delete el evento
+      await tx.event.delete({
+        where: { id },
+      });
     });
   }
 
@@ -845,63 +841,65 @@ export class EventService {
       throw new Error('Evento eliminado no encontrado');
     }
 
-    // Restaurar en orden: evento → escuadras → slots
-    await prisma.event.update({
-      where: { id },
-      data: { deletedAt: null },
-    });
+    // Restaurar atómicamente: evento → escuadras → slots
+    const restoredEvent = await prisma.$transaction(async (tx) => {
+      await tx.event.update({
+        where: { id },
+        data: { deletedAt: null },
+      });
 
-    await prisma.squad.updateMany({
-      where: { eventId: id, deletedAt: { not: null } },
-      data: { deletedAt: null },
-    });
+      await tx.squad.updateMany({
+        where: { eventId: id, deletedAt: { not: null } },
+        data: { deletedAt: null },
+      });
 
-    await prisma.slot.updateMany({
-      where: { squad: { eventId: id }, deletedAt: { not: null } },
-      data: { deletedAt: null },
-    });
+      await tx.slot.updateMany({
+        where: { squad: { eventId: id }, deletedAt: { not: null } },
+        data: { deletedAt: null },
+      });
 
-    // Devolver el evento restaurado con sus relaciones
-    const restoredEvent = await prisma.event.findUnique({
-      where: { id },
-      include: {
-        creator: {
-          select: {
-            id: true,
-            nickname: true,
-            clanId: true,
-            clan: {
-              select: {
-                id: true,
-                name: true,
-                tag: true,
+      // Devolver el evento restaurado con sus relaciones
+      return tx.event.findUnique({
+        where: { id },
+        include: {
+          creator: {
+            select: {
+              id: true,
+              nickname: true,
+              clanId: true,
+              clan: {
+                select: {
+                  id: true,
+                  name: true,
+                  tag: true,
+                },
               },
             },
           },
-        },
-        squads: {
-          include: {
-            slots: {
-              include: {
-                user: {
-                  select: {
-                    id: true,
-                    nickname: true,
-                    clan: {
-                      select: {
-                        name: true,
-                        tag: true,
+          squads: {
+            include: {
+              slots: {
+                include: {
+                  user: {
+                    select: {
+                      id: true,
+                      nickname: true,
+                      clan: {
+                        select: {
+                          name: true,
+                          tag: true,
+                        },
                       },
                     },
                   },
                 },
+                orderBy: { order: 'asc' },
               },
-              orderBy: { order: 'asc' },
             },
+            orderBy: { order: 'asc' },
           },
-          orderBy: { order: 'asc' },
         },
-      },
+      });
     });
 
     return restoredEvent;

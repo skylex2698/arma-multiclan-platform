@@ -256,7 +256,7 @@ export class SlotService {
     userId: string,
     reason?: string
   ) {
-    // Verificar que el evento existe
+    // Lecturas de validación fuera de la transacción
     const event = await prisma.event.findUnique({
       where: { id: eventId }
     });
@@ -265,7 +265,6 @@ export class SlotService {
       throw new Error('Evento no encontrado');
     }
 
-    // Buscar si el usuario tiene un slot en este evento
     const slot = await prisma.slot.findFirst({
       where: {
         userId: userId,
@@ -278,49 +277,52 @@ export class SlotService {
       }
     });
 
-    // Crear registro de ausencia
-    const absence = await prisma.absence.create({
-      data: {
-        userId,
-        eventId,
-        reason
-      }
-    });
-
-    // Si tenía un slot, liberarlo
-    if (slot) {
-      await prisma.slot.update({
-        where: { id: slot.id },
+    // Escrituras atómicas dentro de la transacción
+    const result = await prisma.$transaction(async (tx) => {
+      // Crear registro de ausencia
+      const absence = await tx.absence.create({
         data: {
-          userId: null,
-          status: SlotStatus.FREE
+          userId,
+          eventId,
+          reason
         }
       });
 
-      logger.info('Slot freed due to absence', { slotId: slot.id, userId });
-    }
-
-    // Audit log
-    await prisma.auditLog.create({
-      data: {
-        action: 'ABSENCE_MARKED',
-        entity: 'Event',
-        entityId: eventId,
-        userId: userId,
-        eventId: eventId,
-        details: JSON.stringify({
-          reason,
-          slotFreed: !!slot
-        })
+      // Si tenía un slot, liberarlo
+      if (slot) {
+        await tx.slot.update({
+          where: { id: slot.id },
+          data: {
+            userId: null,
+            status: SlotStatus.FREE
+          }
+        });
       }
+
+      // Audit log
+      await tx.auditLog.create({
+        data: {
+          action: 'ABSENCE_MARKED',
+          entity: 'Event',
+          entityId: eventId,
+          userId: userId,
+          eventId: eventId,
+          details: JSON.stringify({
+            reason,
+            slotFreed: !!slot
+          })
+        }
+      });
+
+      return { absence, slotFreed: !!slot };
     });
 
+    if (slot) {
+      logger.info('Slot freed due to absence', { slotId: slot.id, userId });
+    }
     logger.info('Absence marked', { eventId, userId });
 
-    return {
-      absence,
-      slotFreed: !!slot
-    };
+    return result;
   }
 
   // Crear escuadra

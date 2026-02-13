@@ -41,9 +41,11 @@ COPY --from=builder /app/package*.json ./
 COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/prisma ./prisma
+COPY --from=builder /app/entrypoint.sh ./entrypoint.sh
 
-# Crear directorio para uploads
+# Crear directorio para uploads y dar permisos al entrypoint
 RUN mkdir -p /app/public/uploads/clans /app/public/uploads/events && \
+    chmod +x /app/entrypoint.sh && \
     chown -R nodejs:nodejs /app
 
 # Cambiar a usuario no-root
@@ -60,5 +62,5 @@ ENV PORT=3000
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
     CMD wget --no-verbose --tries=1 --spider http://localhost:3000/health || exit 1
 
-# Comando de inicio
-CMD ["sh", "-c", "npx prisma migrate deploy && node dist/index.js"]
+# Entrypoint: espera DB, migra, arranca
+ENTRYPOINT ["sh", "/app/entrypoint.sh"]

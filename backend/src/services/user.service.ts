@@ -417,6 +417,7 @@ export class UserService {
     reviewerClanId: string | null,
     approved: boolean
   ) {
+    // Lecturas de validación fuera de la transacción
     const request = await prisma.clanChangeRequest.findUnique({
       where: { id: requestId },
       include: { user: true }
@@ -439,53 +440,61 @@ export class UserService {
 
     const newStatus = approved ? 'APPROVED' : 'REJECTED';
 
-    // Actualizar la solicitud
-    const updatedRequest = await prisma.clanChangeRequest.update({
-      where: { id: requestId },
-      data: {
-        status: newStatus,
-        reviewedBy: reviewerId,
-        reviewedAt: new Date()
+    // Escrituras atómicas dentro de la transacción
+    const updatedRequest = await prisma.$transaction(async (tx) => {
+      // Actualizar la solicitud
+      const updated = await tx.clanChangeRequest.update({
+        where: { id: requestId },
+        data: {
+          status: newStatus,
+          reviewedBy: reviewerId,
+          reviewedAt: new Date()
+        }
+      });
+
+      // Si fue aprobada, cambiar el clan del usuario
+      if (approved) {
+        // Lecturas consistentes dentro de la transacción
+        const previousClanName = request.user.clanId
+          ? (await tx.clan.findUnique({ where: { id: request.user.clanId } }))?.name
+          : null;
+
+        const newClanName = (await tx.clan.findUnique({ where: { id: request.targetClanId } }))?.name;
+
+        await tx.user.update({
+          where: { id: request.userId },
+          data: { clanId: request.targetClanId }
+        });
+
+        // Registrar en historial
+        await tx.clanHistory.create({
+          data: {
+            userId: request.userId,
+            previousClan: previousClanName,
+            newClan: newClanName || null,
+            reason: request.reason || 'Solicitud aprobada'
+          }
+        });
+
+        // Audit log
+        await tx.auditLog.create({
+          data: {
+            action: 'CLAN_CHANGE_APPROVED',
+            entity: 'ClanChangeRequest',
+            entityId: requestId,
+            userId: reviewerId,
+            details: JSON.stringify({
+              requestUserId: request.userId,
+              targetClanId: request.targetClanId
+            })
+          }
+        });
       }
+
+      return updated;
     });
 
-    // Si fue aprobada, cambiar el clan del usuario
     if (approved) {
-      const previousClanName = request.user.clanId
-        ? (await prisma.clan.findUnique({ where: { id: request.user.clanId } }))?.name
-        : null;
-      
-      const newClanName = (await prisma.clan.findUnique({ where: { id: request.targetClanId } }))?.name;
-
-      await prisma.user.update({
-        where: { id: request.userId },
-        data: { clanId: request.targetClanId }
-      });
-
-      // Registrar en historial
-      await prisma.clanHistory.create({
-        data: {
-          userId: request.userId,
-          previousClan: previousClanName,
-          newClan: newClanName || null,
-          reason: request.reason || 'Solicitud aprobada'
-        }
-      });
-
-      // Audit log
-      await prisma.auditLog.create({
-        data: {
-          action: 'CLAN_CHANGE_APPROVED',
-          entity: 'ClanChangeRequest',
-          entityId: requestId,
-          userId: reviewerId,
-          details: JSON.stringify({
-            requestUserId: request.userId,
-            targetClanId: request.targetClanId
-          })
-        }
-      });
-
       logger.info('Clan change request approved', { requestId, userId: request.userId, reviewerId });
     } else {
       logger.info('Clan change request rejected', { requestId, userId: request.userId, reviewerId });

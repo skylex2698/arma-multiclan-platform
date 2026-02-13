@@ -3,6 +3,7 @@ import path from 'path';
 import fs from 'fs';
 import crypto from 'crypto';
 import { fileTypeFromFile } from 'file-type';
+import { JSDOM } from 'jsdom';
 
 /**
  * Configuración segura de Multer para subida de archivos
@@ -247,19 +248,96 @@ export const validatePdfFile = async (filePath: string): Promise<boolean> => {
 };
 
 /**
- * Valida que un archivo HTML sea texto (no tiene magic bytes específicos)
- * Verificamos que el contenido sea texto válido
+ * Tags permitidos en archivos HTML de preset de Arma 3 Launcher.
+ * Todo lo que no esté en esta lista se rechaza.
+ */
+const MODSET_ALLOWED_TAGS = new Set([
+  'html', 'head', 'body', 'meta', 'title', 'style',
+  'table', 'thead', 'tbody', 'tr', 'td', 'th',
+  'a', 'span', 'div', 'p', 'h1', 'h2', 'h3',
+  'br', 'hr', 'img'
+]);
+
+/**
+ * Tags explícitamente peligrosos que nunca deben aparecer.
+ */
+const FORBIDDEN_TAGS = new Set([
+  'script', 'iframe', 'object', 'embed', 'form', 'input',
+  'button', 'textarea', 'select', 'applet', 'link',
+  'base', 'svg', 'math'
+]);
+
+/**
+ * Valida que un archivo HTML sea un preset genuino de Arma 3 Launcher.
+ *
+ * Comprobaciones:
+ * 1. El archivo es parseable como HTML
+ * 2. No contiene tags prohibidos (script, iframe, etc.)
+ * 3. No contiene atributos event handler (onclick, onerror, etc.)
+ * 4. No contiene URIs javascript:
+ * 5. Todos los tags están en la whitelist
+ * 6. Validación estructural: contiene indicadores de preset Arma 3
+ *    (meta[name^="arma:"] o tr[data-type="ModContainer"])
  */
 export const validateHtmlFile = async (filePath: string): Promise<boolean> => {
   try {
     const content = fs.readFileSync(filePath, 'utf-8');
-    // Verificar que contenga estructura HTML básica
-    const hasHtmlStructure = content.includes('<') && content.includes('>');
-    // Verificar que no contenga scripts maliciosos obvios (básico)
-    const hasNoMaliciousScript = !content.includes('javascript:') &&
-                                  !content.includes('onerror=') &&
-                                  !content.includes('onload=');
-    return hasHtmlStructure && hasNoMaliciousScript;
+
+    // Sanity check básico
+    if (!content.trim() || content.length < 10) {
+      return false;
+    }
+
+    // Parsear con JSDOM
+    const dom = new JSDOM(content);
+    const document = dom.window.document;
+
+    // Obtener TODOS los elementos del documento
+    const allElements = document.querySelectorAll('*');
+
+    for (const element of allElements) {
+      const tagName = element.tagName.toLowerCase();
+
+      // Check 1: Rechazar tags prohibidos
+      if (FORBIDDEN_TAGS.has(tagName)) {
+        return false;
+      }
+
+      // Check 2: Rechazar tags fuera de la whitelist
+      if (!MODSET_ALLOWED_TAGS.has(tagName)) {
+        return false;
+      }
+
+      // Check 3: Rechazar atributos event handler (on*)
+      for (const attr of element.attributes) {
+        const attrName = attr.name.toLowerCase();
+        if (attrName.startsWith('on')) {
+          return false;
+        }
+      }
+
+      // Check 4: Rechazar URIs javascript: en href/src/action
+      const hrefAttr = element.getAttribute('href');
+      const srcAttr = element.getAttribute('src');
+      const actionAttr = element.getAttribute('action');
+
+      for (const uri of [hrefAttr, srcAttr, actionAttr]) {
+        if (uri && uri.trim().toLowerCase().startsWith('javascript:')) {
+          return false;
+        }
+      }
+    }
+
+    // Check 5: Validación estructural - debe parecer un preset de Arma 3
+    const armaMeta = document.querySelector('meta[name^="arma:"]');
+    const modContainers = document.querySelectorAll('tr[data-type="ModContainer"]');
+
+    // Debe tener al menos un indicador de Arma 3
+    if (!armaMeta && modContainers.length === 0) {
+      return false;
+    }
+
+    return true;
   } catch {
     return false;
   }

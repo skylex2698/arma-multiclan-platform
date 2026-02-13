@@ -331,6 +331,74 @@ export class SlotController {
       );
     }
   }
+
+  // PATCH /api/squads/:id/reserve
+  async reserveSquad(req: Request, res: Response) {
+    try {
+      if (!req.user) {
+        return errorResponse(res, 'No autenticado', 401);
+      }
+
+      const squadId = req.params.id as string;
+      const { clanId } = req.body;
+
+      // Verificar permisos: ADMIN, creador del evento, o CLAN_LEADER del clan del creador
+      const squad = await prisma.squad.findUnique({
+        where: { id: squadId },
+        include: {
+          event: {
+            include: {
+              creator: {
+                select: { id: true, clanId: true },
+              },
+            },
+          },
+        },
+      });
+
+      if (!squad) {
+        return errorResponse(res, 'Escuadra no encontrada', 404);
+      }
+
+      const userRole = req.user.role;
+      const userId = req.user.id;
+      const userClanId = req.user.clanId;
+
+      const isAdmin = userRole === 'ADMIN';
+      const isCreator = squad.event.creatorId === userId;
+      const isCreatorClanLeader =
+        userRole === 'CLAN_LEADER' &&
+        userClanId &&
+        userClanId === squad.event.creator.clanId;
+
+      if (!isAdmin && !isCreator && !isCreatorClanLeader) {
+        return errorResponse(
+          res,
+          'No tienes permisos para reservar escuadras en este evento',
+          403
+        );
+      }
+
+      const updatedSquad = await slotService.reserveSquad(
+        squadId,
+        clanId ?? null,
+        req.user.id
+      );
+
+      const message = clanId
+        ? 'Escuadra reservada para el clan correctamente'
+        : 'Reserva de clan eliminada correctamente';
+
+      return successResponse(res, { squad: updatedSquad }, message);
+    } catch (error: any) {
+      logger.error('Error in reserveSquad', error);
+      return errorResponse(
+        res,
+        error.message || 'Error al reservar escuadra',
+        500
+      );
+    }
+  }
 }
 
 export const slotController = new SlotController();

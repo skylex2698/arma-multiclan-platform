@@ -46,6 +46,15 @@ export class SlotService {
         throw new Error('Usuario no encontrado');
       }
 
+      // Verificar reserva de clan en la escuadra
+      if (slot.squad.reservedForClanId) {
+        if (userToAssign.clanId !== slot.squad.reservedForClanId) {
+          if (assignerRole !== UserRole.ADMIN) {
+            throw new Error('Esta escuadra está reservada para otro clan');
+          }
+        }
+      }
+
       // Si no es admin, verificar restricciones
       if (assignerRole !== UserRole.ADMIN) {
         // Solo puede apuntarse a sí mismo
@@ -626,6 +635,20 @@ export class SlotService {
         throw new Error('El usuario no está activo');
       }
 
+      // Verificar reserva de clan en la escuadra
+      // adminAssignSlot es llamado por ADMIN y CLAN_LEADER
+      // ADMIN puede forzar, CLAN_LEADER no puede asignar a escuadra reservada de otro clan
+      if (slot.squad.reservedForClanId && user.clanId !== slot.squad.reservedForClanId) {
+        // Verificar quién está haciendo la asignación
+        const assigner = await tx.user.findUnique({
+          where: { id: assignedBy },
+          select: { role: true }
+        });
+        if (assigner?.role !== UserRole.ADMIN) {
+          throw new Error('Esta escuadra está reservada para otro clan');
+        }
+      }
+
       // Buscar si el usuario ya tiene un slot en este evento
       const existingSlot = await tx.slot.findFirst({
         where: {
@@ -815,6 +838,111 @@ export class SlotService {
     });
 
     return updatedSlot;
+  }
+
+  // Reservar escuadra para un clan
+  async reserveSquad(
+    squadId: string,
+    clanId: string | null,
+    requestUserId: string
+  ) {
+    // Buscar squad con evento
+    const squad = await prisma.squad.findUnique({
+      where: { id: squadId },
+      include: {
+        event: {
+          include: {
+            creator: {
+              select: { id: true, clanId: true }
+            }
+          }
+        }
+      }
+    });
+
+    if (!squad) {
+      throw new Error('Escuadra no encontrada');
+    }
+
+    // Verificar que el evento esté activo
+    if (squad.event.status === EventStatus.FINISHED) {
+      throw new Error('No se puede reservar escuadras en un evento finalizado');
+    }
+    if (squad.event.status === EventStatus.INACTIVE) {
+      throw new Error('No se puede reservar escuadras en un evento inactivo');
+    }
+
+    // Si clanId no es null, verificar que el clan existe
+    if (clanId) {
+      const clan = await prisma.clan.findUnique({ where: { id: clanId } });
+      if (!clan) {
+        throw new Error('Clan no encontrado');
+      }
+    }
+
+    // Actualizar reserva
+    const updatedSquad = await prisma.squad.update({
+      where: { id: squadId },
+      data: { reservedForClanId: clanId },
+      include: {
+        reservedForClan: {
+          select: {
+            id: true,
+            name: true,
+            tag: true,
+            avatarUrl: true,
+          },
+        },
+        slots: {
+          include: {
+            user: {
+              select: {
+                id: true,
+                nickname: true,
+                email: true,
+                role: true,
+                status: true,
+                clanId: true,
+                avatarUrl: true,
+                clan: {
+                  select: {
+                    id: true,
+                    name: true,
+                    tag: true,
+                    avatarUrl: true,
+                  },
+                },
+              },
+            },
+          },
+          orderBy: { order: 'asc' },
+        },
+      },
+    });
+
+    // Audit log
+    await prisma.auditLog.create({
+      data: {
+        action: clanId ? 'SQUAD_RESERVED' : 'SQUAD_RESERVATION_REMOVED',
+        entity: 'Squad',
+        entityId: squadId,
+        userId: requestUserId,
+        eventId: squad.eventId,
+        details: JSON.stringify({
+          squadName: squad.name,
+          clanId,
+          clanName: updatedSquad.reservedForClan?.name || null,
+        }),
+      },
+    });
+
+    logger.info(clanId ? 'Squad reserved for clan' : 'Squad reservation removed', {
+      squadId,
+      clanId,
+      userId: requestUserId,
+    });
+
+    return updatedSquad;
   }
 }
 

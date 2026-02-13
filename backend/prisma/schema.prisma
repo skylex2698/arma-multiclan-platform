@@ -92,6 +92,7 @@ model Clan {
 
   users              User[]
   clanChangeRequests ClanChangeRequest[]
+  reservedSquads     Squad[]  @relation("ClanSquadReservation")
 
   @@index([name])
   @@index([deletedAt])
@@ -140,9 +141,12 @@ model Squad {
   childSquads      Squad[]  @relation("SquadHierarchy")
   parentFrequency  String?  // Frecuencia para comunicarse con el padre
   
+  reservedForClanId String?
+  reservedForClan   Clan?    @relation("ClanSquadReservation", fields: [reservedForClanId], references: [id], onDelete: SetNull)
+
   eventId     String
   event       Event    @relation(fields: [eventId], references: [id], onDelete: Cascade)
-  
+
   slots       Slot[]
 
   createdAt   DateTime @default(now())
@@ -150,6 +154,7 @@ model Squad {
   deletedAt   DateTime?
 
   @@index([eventId])
+  @@index([reservedForClanId])
   @@index([deletedAt])
 }
 

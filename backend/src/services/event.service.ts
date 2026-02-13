@@ -128,6 +128,14 @@ export class EventService {
           },
           squads: {
             include: {
+              reservedForClan: {
+                select: {
+                  id: true,
+                  name: true,
+                  tag: true,
+                  avatarUrl: true,
+                },
+              },
               slots: {
                 include: {
                   user: {
@@ -205,6 +213,14 @@ export class EventService {
         },
         squads: {
           include: {
+            reservedForClan: {
+              select: {
+                id: true,
+                name: true,
+                tag: true,
+                avatarUrl: true,
+              },
+            },
             slots: {
               include: {
                 user: {

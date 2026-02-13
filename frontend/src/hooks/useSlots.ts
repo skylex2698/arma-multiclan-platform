@@ -47,3 +47,15 @@ export function useAdminUnassignSlot() {
     },
   });
 }
+
+export function useReserveSquad(eventId: string) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ squadId, clanId }: { squadId: string; clanId: string | null }) =>
+      slotService.reserveSquad(squadId, clanId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['event', eventId] });
+    },
+  });
+}

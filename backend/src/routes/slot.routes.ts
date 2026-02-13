@@ -48,6 +48,13 @@ squadRouter.post(
   slotController.createSlot.bind(slotController)
 );
 
+squadRouter.patch(
+  '/:id/reserve',
+  authenticate,
+  authorize(UserRole.ADMIN, UserRole.CLAN_LEADER),
+  slotController.reserveSquad.bind(slotController)
+);
+
 // SEGURIDAD: Rutas admin requieren autorización explícita
 router.post(
   '/:id/admin-assign',

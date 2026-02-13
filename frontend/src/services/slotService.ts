@@ -46,4 +46,13 @@ export const slotService = {
     );
     return response.data.data;
   },
+
+  // Reservar escuadra para un clan
+  reserveSquad: async (squadId: string, clanId: string | null): Promise<{ squad: unknown }> => {
+    const response = await api.patch<ApiResponse<{ squad: unknown }>>(
+      `/squads/${squadId}/reserve`,
+      { clanId }
+    );
+    return response.data.data;
+  },
 };

@@ -93,6 +93,14 @@ export interface Squad {
   childSquads?: Squad[];      // Escuadras hijas
   parentFrequency?: string;   // Frecuencia para comunicarse con el padre
 
+  reservedForClanId?: string | null;
+  reservedForClan?: {
+    id: string;
+    name: string;
+    tag: string | null;
+    avatarUrl: string | null;
+  } | null;
+
   slots: Slot[];
   createdAt: string;
   updatedAt?: string;

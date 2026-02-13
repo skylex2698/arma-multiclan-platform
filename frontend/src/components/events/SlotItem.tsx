@@ -1,4 +1,4 @@
-import { UserPlus, UserMinus, UserCog } from 'lucide-react';
+import { UserPlus, UserMinus, UserCog, Shield } from 'lucide-react';
 import { Badge } from '../ui/Badge';
 import { UserAvatar } from '../ui/UserAvatar';
 import type { Slot, User } from '../../types';
@@ -19,6 +19,8 @@ interface SlotItemProps {
     squadName?: string;
     slotRole?: string;
   };
+  squadReservedForClanId?: string | null;
+  currentUserClanId?: string | null;
 }
 
 export function SlotItem({
@@ -31,6 +33,8 @@ export function SlotItem({
   eventStatus,
   availableUsers = [],
   getUserSlotInfo,
+  squadReservedForClanId,
+  currentUserClanId,
 }: SlotItemProps) {
   const user = useAuthStore((state) => state.user);
   const [showUserSelector, setShowUserSelector] = useState(false);
@@ -38,7 +42,15 @@ export function SlotItem({
   const isFree = slot.status === 'FREE';
   const isOccupiedByMe = slot.userId === user?.id;
   const isFinished = eventStatus === 'FINISHED';
-  const canInteract = eventStatus === 'ACTIVE' && user;
+  const isAdmin = user?.role === 'ADMIN';
+
+  // Verificar si la escuadra esta reservada para otro clan
+  const isReservedForOtherClan =
+    !!squadReservedForClanId &&
+    currentUserClanId !== squadReservedForClanId &&
+    !isAdmin;
+
+  const canInteract = eventStatus === 'ACTIVE' && user && !isReservedForOtherClan;
 
   // Admin/líder solo puede asignar en eventos activos (no finalizados ni inactivos)
   const canAdminAssign =
@@ -78,7 +90,8 @@ export function SlotItem({
       <div
         className={`
           flex items-center justify-between p-3 rounded-lg border-2 transition-all
-          ${isFree ? 'slot-free' : ''}
+          ${isFree && !isReservedForOtherClan ? 'slot-free' : ''}
+          ${isFree && isReservedForOtherClan ? 'border-amber-200 dark:border-amber-800 bg-amber-50/50 dark:bg-amber-900/10' : ''}
           ${isOccupiedByMe ? 'slot-mine' : ''}
           ${slot.status === 'OCCUPIED' && !isOccupiedByMe ? 'slot-occupied' : ''}
           ${canInteract && (isFree || isOccupiedByMe) && !showUserSelector ? 'cursor-pointer hover:shadow-md' : 'cursor-default'}
@@ -89,8 +102,16 @@ export function SlotItem({
           {slot.user ? (
             <UserAvatar user={slot.user} size="md" showBorder={true} />
           ) : (
-            <div className="w-10 h-10 rounded-full bg-military-100 dark:bg-gray-600 flex items-center justify-center border-2 border-military-200 dark:border-gray-500">
-              <UserPlus className="h-5 w-5 text-military-400 dark:text-gray-400" />
+            <div className={`w-10 h-10 rounded-full flex items-center justify-center border-2 ${
+              isReservedForOtherClan
+                ? 'bg-amber-100 dark:bg-amber-900/30 border-amber-200 dark:border-amber-800'
+                : 'bg-military-100 dark:bg-gray-600 border-military-200 dark:border-gray-500'
+            }`}>
+              {isReservedForOtherClan ? (
+                <Shield className="h-5 w-5 text-amber-400 dark:text-amber-600" />
+              ) : (
+                <UserPlus className="h-5 w-5 text-military-400 dark:text-gray-400" />
+              )}
             </div>
           )}
 
@@ -102,8 +123,11 @@ export function SlotItem({
                 {slot.user.nickname}
               </p>
             )}
-            {isFree && (
+            {isFree && !isReservedForOtherClan && (
               <p className="text-sm text-military-500 dark:text-gray-500">Slot disponible</p>
+            )}
+            {isFree && isReservedForOtherClan && (
+              <p className="text-sm text-amber-500 dark:text-amber-400">Reservado</p>
             )}
           </div>
         </div>
@@ -112,7 +136,7 @@ export function SlotItem({
           {isOccupiedByMe && (
             <>
               <Badge variant="success">Tú</Badge>
-              {canInteract && (
+              {eventStatus === 'ACTIVE' && user && (
                 <button
                   className="btn btn-danger btn-sm"
                   disabled={isLoading}

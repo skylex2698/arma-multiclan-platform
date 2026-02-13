@@ -27,7 +27,7 @@ import {
   useDeleteModsetFile,
   useChangeEventStatus,
 } from '../../hooks/useEvents';
-import { useAssignSlot, useUnassignSlot } from '../../hooks/useSlots';
+import { useAssignSlot, useUnassignSlot, useReserveSquad } from '../../hooks/useSlots';
 import { LoadingSpinner } from '../../components/ui/LoadingSpinner';
 import { Badge } from '../../components/ui/Badge';
 import { Card } from '../../components/ui/Card';
@@ -39,6 +39,7 @@ import { useState, useRef } from 'react';
 import { useAuthStore } from '../../store/authStore';
 import { useAdminAssignSlot, useAdminUnassignSlot } from '../../hooks/useSlots';
 import { useUsers } from '../../hooks/useUsers';
+import { useClans } from '../../hooks/useClans';
 import type { Squad, Slot } from '../../types';
 
 type TabType = 'briefing' | 'slots' | 'communications';
@@ -53,6 +54,7 @@ export default function EventDetailPage() {
   const [activeTab, setActiveTab] = useState<TabType>('briefing');
   const adminAssignSlot = useAdminAssignSlot();
   const adminUnassignSlot = useAdminUnassignSlot();
+  const reserveSquad = useReserveSquad(id!);
 
   // Hooks para archivos
   const uploadBriefingFile = useUploadBriefingFile(id!);
@@ -78,19 +80,43 @@ export default function EventDetailPage() {
 
   const availableUsers = usersData?.users || [];
 
+  // Obtener clanes disponibles para reservas de escuadra
+  const { data: clansData } = useClans();
+  const availableClans = clansData?.clans || [];
+
+  const handleReserveSquad = async (squadId: string, clanId: string | null) => {
+    setActionError('');
+    try {
+      await reserveSquad.mutateAsync({ squadId, clanId });
+    } catch (err) {
+      const error = err as { response?: { data?: { message?: string } } };
+      setActionError(
+        error.response?.data?.message || 'Error al reservar escuadra'
+      );
+    }
+  };
+
   const handleAdminAssign = async (slotId: string, userId: string) => {
+    setActionError('');
     try {
       await adminAssignSlot.mutateAsync({ slotId, userId });
     } catch (err) {
-      console.error('Error al asignar usuario:', err);
+      const error = err as { response?: { data?: { message?: string } } };
+      setActionError(
+        error.response?.data?.message || 'Error al asignar usuario'
+      );
     }
   };
 
   const handleAdminUnassign = async (slotId: string) => {
+    setActionError('');
     try {
       await adminUnassignSlot.mutateAsync(slotId);
     } catch (err) {
-      console.error('Error al desasignar usuario:', err);
+      const error = err as { response?: { data?: { message?: string } } };
+      setActionError(
+        error.response?.data?.message || 'Error al desasignar usuario'
+      );
     }
   };
 
@@ -648,11 +674,15 @@ export default function EventDetailPage() {
                     assignSlot.isPending ||
                     unassignSlot.isPending ||
                     adminAssignSlot.isPending ||
-                    adminUnassignSlot.isPending
+                    adminUnassignSlot.isPending ||
+                    reserveSquad.isPending
                   }
                   eventStatus={event.status}
                   availableUsers={availableUsers}
                   getUserSlotInfo={getUserSlotInfo}
+                  canEditEvent={canEditEvent}
+                  availableClans={availableClans}
+                  onReserveSquad={handleReserveSquad}
                 />
               ))}
           </div>

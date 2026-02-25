@@ -11,7 +11,7 @@ echo "Timestamp: $(date -u '+%Y-%m-%dT%H:%M:%SZ')"
 # Step 1: Wait for database connection
 # ─────────────────────────────────────────────
 echo ""
-echo "[1/3] Waiting for database connection..."
+echo "[1/4] Waiting for database connection..."
 
 MAX_RETRIES=30
 RETRY_INTERVAL=2
@@ -33,7 +33,7 @@ echo "  Database connection established."
 # Step 2: Run Prisma migrations
 # ─────────────────────────────────────────────
 echo ""
-echo "[2/3] Running Prisma migrations..."
+echo "[2/4] Running Prisma migrations..."
 
 if npx prisma migrate deploy 2>&1; then
   echo "  Migrations completed successfully."
@@ -44,10 +44,20 @@ else
 fi
 
 # ─────────────────────────────────────────────
-# Step 3: Start the application
+# Step 3: Initialize default admin user
 # ─────────────────────────────────────────────
 echo ""
-echo "[3/3] Starting application..."
+echo "[3/4] Initializing default admin user (if needed)..."
+
+node dist/scripts/init-admin.js
+
+echo "  Admin initialization completed."
+
+# ─────────────────────────────────────────────
+# Step 4: Start the application
+# ─────────────────────────────────────────────
+echo ""
+echo "[4/4] Starting application..."
 echo "============================================"
 echo ""
 

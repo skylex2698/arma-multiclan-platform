@@ -23,7 +23,9 @@ export default function LoginPage() {
     try {
       const response = await authService.login({ email, password });
       setAuth(response.user, response.token);
-      navigate('/dashboard');
+      navigate(
+        response.user.mustCreateClanOnboarding ? '/clanes/create?onboarding=true' : '/dashboard'
+      );
     } catch (err) {
       const error = err as { response?: { data?: { message?: string } } };
       setError(
@@ -127,21 +129,22 @@ export default function LoginPage() {
             </Link>
           </div>
 
-          {/* Usuarios de prueba */}
-          <div className="mt-6 pt-6 border-t border-military-200 dark:border-gray-600">
-            <p className="text-xs text-military-600 dark:text-gray-400 mb-2">Usuarios de prueba:</p>
-            <div className="space-y-1 text-xs text-military-500 dark:text-gray-500">
-              <p>
-                <strong className="dark:text-gray-400">Admin:</strong> admin@arma.com / Admin123!
-              </p>
-              <p>
-                <strong className="dark:text-gray-400">Líder:</strong> leader@arma.com / Leader123!
-              </p>
-              <p>
-                <strong className="dark:text-gray-400">Usuario:</strong> user@arma.com / User123!
-              </p>
+          {import.meta.env.DEV && (
+            <div className="mt-6 pt-6 border-t border-military-200 dark:border-gray-600">
+              <p className="text-xs text-military-600 dark:text-gray-400 mb-2">Usuarios de prueba:</p>
+              <div className="space-y-1 text-xs text-military-500 dark:text-gray-500">
+                <p>
+                  <strong className="dark:text-gray-400">Admin:</strong> admin@arma.com / Admin123!
+                </p>
+                <p>
+                  <strong className="dark:text-gray-400">Líder:</strong> leader@arma.com / Leader123!
+                </p>
+                <p>
+                  <strong className="dark:text-gray-400">Usuario:</strong> user@arma.com / User123!
+                </p>
+              </div>
             </div>
-          </div>
+          )}
         </div>
       </div>
     </div>

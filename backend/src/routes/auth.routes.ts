@@ -6,7 +6,10 @@ const router = Router();
 
 // Rutas públicas - Local auth
 router.post('/register/local', authController.registerLocal.bind(authController));
+router.post('/register/discord', authController.completeDiscordRegistration.bind(authController));
 router.post('/login/local', authController.loginLocal.bind(authController));
+router.post('/forgot-password', authController.forgotPassword.bind(authController));
+router.post('/reset-password', authController.resetPassword.bind(authController));
 
 // Rutas públicas - Discord OAuth2 (login)
 router.get('/discord/start', authController.discordStart.bind(authController));

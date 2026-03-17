@@ -12,8 +12,19 @@ export const authService = {
     return response.data.data;
   },
 
-  getMe: async (): Promise<AuthResponse> => {
-    const response = await api.get<ApiResponse<AuthResponse>>('/auth/me');
+  completeDiscordRegistration: async (data: {
+    discordId: string;
+    discordUsername: string;
+    email?: string;
+    nickname: string;
+    clanId: string;
+  }): Promise<{ user: User }> => {
+    const response = await api.post<ApiResponse<{ user: User }>>('/auth/register/discord', data);
+    return response.data.data;
+  },
+
+  getMe: async (): Promise<{ user: User }> => {
+    const response = await api.get<ApiResponse<{ user: User }>>('/auth/me');
     return response.data.data;
   },
 };

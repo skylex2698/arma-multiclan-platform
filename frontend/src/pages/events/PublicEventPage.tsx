@@ -17,16 +17,18 @@ import { usePublicEvent } from '../../hooks/useEvents';
 import { LoadingSpinner } from '../../components/ui/LoadingSpinner';
 import { Badge } from '../../components/ui/Badge';
 import { Card } from '../../components/ui/Card';
-import CommunicationTreeViewer from '../../components/events/CommunicationTree/CommunicationTreeViewer';
-import { format } from 'date-fns';
-import { es } from 'date-fns/locale';
+import { AutomaticCommunicationChart } from '../../components/events/AutomaticCommunicationChart';
 import { useState } from 'react';
 import type { Squad, Slot } from '../../types';
+import {
+  formatDateInTimezone,
+  formatTimeInTimezone,
+  getTimezoneShortName,
+  getUserTimezone,
+} from '../../utils/eventTime';
+import { getAssetUrl } from '../../utils/url';
 
 type PublicTabType = 'briefing' | 'slots' | 'communications';
-
-const getBackendUrl = () =>
-  import.meta.env.VITE_API_URL?.replace('/api', '') || 'http://localhost:3000';
 
 export default function PublicEventPage() {
   const { token } = useParams<{ token: string }>();
@@ -63,6 +65,21 @@ export default function PublicEventPage() {
   }
 
   const event = data.event;
+  const eventTimezone = event.timezone || 'UTC';
+  const userTimezone = getUserTimezone();
+  const eventDateLabel = formatDateInTimezone(event.scheduledDate, eventTimezone);
+  const eventTimeLabel = formatTimeInTimezone(event.scheduledDate, eventTimezone);
+  const eventShortTimezone = getTimezoneShortName(
+    event.scheduledDate,
+    eventTimezone
+  );
+  const localDateLabel = formatDateInTimezone(event.scheduledDate, userTimezone);
+  const localTimeLabel = formatTimeInTimezone(event.scheduledDate, userTimezone);
+  const localShortTimezone = getTimezoneShortName(
+    event.scheduledDate,
+    userTimezone
+  );
+  const showLocalSchedule = userTimezone !== eventTimezone;
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
@@ -72,9 +89,6 @@ export default function PublicEventPage() {
           <h2 className="text-lg font-bold text-military-900 dark:text-gray-100">
             Arma Multiclan Platform
           </h2>
-          <Link to="/register" className="btn btn-primary btn-sm">
-            Registrarse
-          </Link>
         </div>
       </header>
 
@@ -109,7 +123,7 @@ export default function PublicEventPage() {
             </Badge>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+          <div className="grid grid-cols-1 gap-4 mb-4 md:grid-cols-2 xl:grid-cols-4">
             <div className="flex items-center text-military-600 dark:text-gray-400">
               <Calendar className="h-5 w-5 mr-3" />
               <div>
@@ -117,11 +131,7 @@ export default function PublicEventPage() {
                   Fecha
                 </p>
                 <p className="font-medium text-military-900 dark:text-gray-100">
-                  {format(
-                    new Date(event.scheduledDate),
-                    "d 'de' MMMM, yyyy",
-                    { locale: es }
-                  )}
+                  {eventDateLabel}
                 </p>
               </div>
             </div>
@@ -130,15 +140,33 @@ export default function PublicEventPage() {
               <Clock className="h-5 w-5 mr-3" />
               <div>
                 <p className="text-xs text-military-500 dark:text-gray-500">
-                  Hora
+                  Hora del evento
                 </p>
                 <p className="font-medium text-military-900 dark:text-gray-100">
-                  {format(new Date(event.scheduledDate), 'HH:mm', {
-                    locale: es,
-                  })}
+                  {eventTimeLabel} {eventShortTimezone}
+                </p>
+                <p className="text-xs text-military-500 dark:text-gray-500">
+                  {eventTimezone}
                 </p>
               </div>
             </div>
+
+            {showLocalSchedule && (
+              <div className="flex items-center text-military-600 dark:text-gray-400">
+                <Clock className="h-5 w-5 mr-3" />
+                <div>
+                  <p className="text-xs text-military-500 dark:text-gray-500">
+                    Tu hora local
+                  </p>
+                  <p className="font-medium text-military-900 dark:text-gray-100">
+                    {localTimeLabel} {localShortTimezone}
+                  </p>
+                  <p className="text-xs text-military-500 dark:text-gray-500">
+                    {localDateLabel}
+                  </p>
+                </div>
+              </div>
+            )}
 
             <div className="flex items-center text-military-600 dark:text-gray-400">
               <MapPin className="h-5 w-5 mr-3" />
@@ -147,7 +175,7 @@ export default function PublicEventPage() {
                   Juego
                 </p>
                 <p className="font-medium text-military-900 dark:text-gray-100">
-                  {event.gameType === 'ARMA_3' ? 'Arma 3' : 'Arma Reforger'}
+                  {event.game.name}
                 </p>
               </div>
             </div>
@@ -240,92 +268,81 @@ export default function PublicEventPage() {
           <div className="space-y-6">
             {/* Archivos del evento */}
             {(event.briefingFileUrl || event.modsetFileUrl) && (
-              <Card>
-                <h2 className="text-xl font-bold text-military-900 dark:text-gray-100 mb-4 flex items-center gap-2">
-                  <FileText className="h-5 w-5" />
-                  Archivos del Evento
-                </h2>
+              <section className="panel">
+                <div className="panel-header">
+                  <div>
+                    <h2 className="section-title">Archivos del evento</h2>
+                  </div>
+                </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {/* Briefing PDF */}
+                <div className="divide-y divide-military-200 dark:divide-gray-700">
                   {event.briefingFileUrl && (
-                    <div className="p-4 border border-military-200 dark:border-gray-600 rounded-lg">
-                      <div className="flex items-center gap-2 mb-3">
-                        <FileText className="h-5 w-5 text-red-600" />
-                        <h3 className="font-semibold text-military-900 dark:text-gray-100">
-                          Briefing (PDF)
-                        </h3>
+                    <div className="flex flex-col gap-2 py-3 first:pt-0 last:pb-0 md:flex-row md:items-center md:justify-between">
+                      <div className="min-w-0">
+                        <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
+                          <FileText className="h-4 w-4 shrink-0 text-red-500" />
+                          <h3 className="font-semibold text-military-900 dark:text-gray-100">
+                            Briefing PDF
+                          </h3>
+                          <span className="section-caption">Disponible</span>
+                        </div>
                       </div>
-                      <div className="space-y-2">
-                        <div className="flex items-center gap-2 p-2 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded">
-                          <FileText className="h-4 w-4 text-green-600" />
-                          <span className="text-sm text-green-700 dark:text-green-400 flex-1">
-                            Archivo disponible
-                          </span>
-                        </div>
-                        <div className="flex gap-2">
-                          <a
-                            href={`${getBackendUrl()}${event.briefingFileUrl}`}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="btn btn-primary btn-sm flex items-center gap-1"
-                          >
-                            <ExternalLink className="h-4 w-4" />
-                            Abrir
-                          </a>
-                          <a
-                            href={`${getBackendUrl()}${event.briefingFileUrl}`}
-                            download
-                            className="btn btn-secondary btn-sm flex items-center gap-1"
-                          >
-                            <Download className="h-4 w-4" />
-                            Descargar
-                          </a>
-                        </div>
+
+                      <div className="flex min-h-11 flex-wrap items-center gap-2">
+                        <a
+                          href={getAssetUrl(event.briefingFileUrl) || undefined}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="btn btn-primary btn-sm"
+                        >
+                          <ExternalLink className="h-4 w-4" />
+                          Abrir
+                        </a>
+                        <a
+                          href={getAssetUrl(event.briefingFileUrl) || undefined}
+                          download
+                          className="toolbar-link"
+                        >
+                          Descargar
+                        </a>
                       </div>
                     </div>
                   )}
 
-                  {/* Modset HTML */}
                   {event.modsetFileUrl && (
-                    <div className="p-4 border border-military-200 dark:border-gray-600 rounded-lg">
-                      <div className="flex items-center gap-2 mb-3">
-                        <Package className="h-5 w-5 text-blue-600" />
-                        <h3 className="font-semibold text-military-900 dark:text-gray-100">
-                          Modset (HTML)
-                        </h3>
+                    <div className="flex flex-col gap-2 py-3 first:pt-0 last:pb-0 md:flex-row md:items-center md:justify-between">
+                      <div className="min-w-0">
+                        <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
+                          <Package className="h-4 w-4 shrink-0 text-blue-500" />
+                          <h3 className="font-semibold text-military-900 dark:text-gray-100">
+                            Modset HTML
+                          </h3>
+                          <span className="section-caption">Disponible</span>
+                        </div>
                       </div>
-                      <div className="space-y-2">
-                        <div className="flex items-center gap-2 p-2 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded">
-                          <Package className="h-4 w-4 text-green-600" />
-                          <span className="text-sm text-green-700 dark:text-green-400 flex-1">
-                            Archivo disponible
-                          </span>
-                        </div>
-                        <div className="flex gap-2">
-                          <a
-                            href={`${getBackendUrl()}${event.modsetFileUrl}`}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="btn btn-primary btn-sm flex items-center gap-1"
-                          >
-                            <ExternalLink className="h-4 w-4" />
-                            Abrir
-                          </a>
-                          <a
-                            href={`${getBackendUrl()}${event.modsetFileUrl}`}
-                            download
-                            className="btn btn-secondary btn-sm flex items-center gap-1"
-                          >
-                            <Download className="h-4 w-4" />
-                            Descargar
-                          </a>
-                        </div>
+
+                      <div className="flex min-h-11 flex-wrap items-center gap-2">
+                        <a
+                          href={getAssetUrl(event.modsetFileUrl) || undefined}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="btn btn-primary btn-sm"
+                        >
+                          <ExternalLink className="h-4 w-4" />
+                          Abrir
+                        </a>
+                        <a
+                          href={getAssetUrl(event.modsetFileUrl) || undefined}
+                          download
+                          className="toolbar-link"
+                        >
+                          Descargar
+                        </a>
                       </div>
                     </div>
                   )}
                 </div>
-              </Card>
+              </section>
             )}
 
             {/* Contenido del briefing */}
@@ -385,7 +402,7 @@ export default function PublicEventPage() {
                           <Shield className="h-4 w-4 text-amber-600 dark:text-amber-400 flex-shrink-0" />
                           {squad.reservedForClan.avatarUrl ? (
                             <img
-                              src={`${getBackendUrl()}${squad.reservedForClan.avatarUrl}`}
+                              src={getAssetUrl(squad.reservedForClan.avatarUrl) || undefined}
                               alt={squad.reservedForClan.name}
                               className="w-5 h-5 rounded-full object-cover flex-shrink-0"
                             />
@@ -473,12 +490,9 @@ export default function PublicEventPage() {
         {activeTab === 'communications' && (
           <div>
             <h2 className="text-2xl font-bold text-military-900 dark:text-gray-100 mb-4">
-              Arbol de Comunicaciones
+              Plan de Comunicaciones
             </h2>
-            <CommunicationTreeViewer
-              eventId={event.id}
-              publicToken={token}
-            />
+            <AutomaticCommunicationChart event={event} />
           </div>
         )}
 

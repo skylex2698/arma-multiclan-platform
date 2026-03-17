@@ -38,6 +38,7 @@ services:
 
   backend:
     # Configuración de producción
+    ports: []
     environment:
       NODE_ENV: production
       COOKIE_SECURE: "true"

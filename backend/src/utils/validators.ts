@@ -4,15 +4,26 @@
  */
 
 /**
+ * Normaliza un email para comparaciones y persistencia
+ */
+export const normalizeEmail = (email: string): string => {
+  if (!email || typeof email !== 'string') return '';
+  return email.trim().toLowerCase();
+};
+
+/**
  * Valida formato de email
  */
 export const isValidEmail = (email: string): boolean => {
   if (!email || typeof email !== 'string') return false;
 
+  const normalizedEmail = normalizeEmail(email);
+  if (!normalizedEmail) return false;
+
   // RFC 5322 simplified
   const emailRegex = /^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$/;
 
-  return email.length <= 254 && emailRegex.test(email);
+  return normalizedEmail.length <= 254 && emailRegex.test(normalizedEmail);
 };
 
 /**

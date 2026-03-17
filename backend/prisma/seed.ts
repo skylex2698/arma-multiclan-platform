@@ -8,6 +8,7 @@ async function main() {
 
   // Limpiar datos existentes
   await prisma.auditLog.deleteMany();
+  await prisma.gameIdentity.deleteMany();
   await prisma.absence.deleteMany();
   await prisma.clanHistory.deleteMany();
   await prisma.slot.deleteMany();
@@ -15,13 +16,37 @@ async function main() {
   await prisma.event.deleteMany();
   await prisma.user.deleteMany();
   await prisma.clan.deleteMany();
+  await prisma.game.deleteMany();
+
+  const arma3 = await prisma.game.create({
+    data: {
+      slug: 'arma-3',
+      name: 'Arma 3',
+      supportsModsetHtml: true,
+      identityMode: 'STEAM64',
+      identityLabel: 'Steam64',
+      sortOrder: 1,
+    },
+  });
+
+  const reforger = await prisma.game.create({
+    data: {
+      slug: 'arma-reforger',
+      name: 'Arma Reforger',
+      supportsModsetHtml: false,
+      identityMode: 'MANUAL',
+      identityLabel: 'Identificador de Reforger',
+      sortOrder: 2,
+    },
+  });
 
   // Crear clanes
   const clanAlfa = await prisma.clan.create({
     data: {
       name: 'Clan Alfa',
       tag: '[ALFA]',
-      description: 'Unidad de élite especializada en operaciones tácticas'
+      description: 'Unidad de élite especializada en operaciones tácticas',
+      primaryGameId: arma3.id,
     }
   });
 
@@ -29,7 +54,8 @@ async function main() {
     data: {
       name: 'Clan Bravo',
       tag: '[BRAVO]',
-      description: 'Unidad de reconocimiento y apoyo'
+      description: 'Unidad de reconocimiento y apoyo',
+      primaryGameId: reforger.id,
     }
   });
 
@@ -37,7 +63,8 @@ async function main() {
     data: {
       name: 'Clan Charlie',
       tag: '[CHARLIE]',
-      description: 'Unidad aerotransportada'
+      description: 'Unidad aerotransportada',
+      primaryGameId: arma3.id,
     }
   });
 

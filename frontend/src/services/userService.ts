@@ -1,5 +1,5 @@
 import { api } from './api';
-import type { ApiResponse, User, ClanChangeRequest, UserRole, UserStatus } from '../types';
+import type { ApiResponse, User, ClanChangeRequest, ClanCreationRequest, UserRole, UserStatus } from '../types';
 
 export interface PaginatedUsersResponse {
   users: User[];
@@ -50,7 +50,7 @@ export const userService = {
   // Cambiar rol
   changeRole: async (
     id: string,
-    role: 'USER' | 'CLAN_LEADER' | 'ADMIN'
+    role: 'USER' | 'OPERATIONS_OFFICER' | 'RECRUITER' | 'CLAN_LEADER' | 'ADMIN'
   ): Promise<{ user: User }> => {
     const response = await api.put<ApiResponse<{ user: User }>>(
       `/users/${id}/role`,
@@ -76,6 +76,37 @@ export const userService = {
     const response = await api.put<ApiResponse<{ user: User }>>(
       `/users/${id}/clan`,
       { clanId }
+    );
+    return response.data.data;
+  },
+
+  adminUpdateProfile: async (
+    id: string,
+    data: { nickname?: string; email?: string | null; timezone?: string }
+  ): Promise<{ user: User }> => {
+    const response = await api.put<ApiResponse<{ user: User }>>(
+      `/users/${id}/admin-profile`,
+      data
+    );
+    return response.data.data;
+  },
+
+  adminResetPassword: async (
+    id: string
+  ): Promise<{ temporaryPassword: string }> => {
+    const response = await api.post<
+      ApiResponse<{ temporaryPassword: string }>
+    >(`/users/${id}/reset-password`);
+    return response.data.data;
+  },
+
+  adminUpdatePermissions: async (
+    id: string,
+    permissions: string[]
+  ): Promise<{ user: User }> => {
+    const response = await api.put<ApiResponse<{ user: User }>>(
+      `/users/${id}/permissions`,
+      { permissions }
     );
     return response.data.data;
   },
@@ -109,6 +140,7 @@ export const userService = {
   updateProfile: async (data: {
     nickname?: string;
     email?: string;
+    timezone?: string;
   }): Promise<{ user: User }> => {
     const response = await api.put<ApiResponse<{ user: User }>>(
       '/users/profile',
@@ -123,6 +155,12 @@ export const userService = {
     newPassword: string;
   }): Promise<void> => {
     await api.put('/users/change-password', data);
+  },
+
+  selfResetPassword: async (data: {
+    newPassword: string;
+  }): Promise<void> => {
+    await api.put('/users/reset-password/self', data);
   },
 
   // Actualizar rol de usuario
@@ -157,6 +195,41 @@ export const userService = {
     const response = await api.post<ApiResponse<{ user: User }>>(
       '/users/external',
       { nickname, clanId }
+    );
+    return response.data.data;
+  },
+
+  deleteUser: async (userId: string): Promise<void> => {
+    await api.delete(`/users/${userId}`);
+  },
+
+  getClanCreationRequests: async (filters?: {
+    status?: string;
+  }): Promise<{ requests: ClanCreationRequest[]; count: number }> => {
+    const params = new URLSearchParams();
+    if (filters?.status) params.append('status', filters.status);
+
+    const response = await api.get<
+      ApiResponse<{ requests: ClanCreationRequest[]; count: number }>
+    >(`/users/clan-creation-requests?${params.toString()}`);
+    return response.data.data;
+  },
+
+  reviewClanCreationRequest: async (
+    id: string,
+    approved: boolean,
+    reviewNote?: string
+  ): Promise<{ request: ClanCreationRequest }> => {
+    const response = await api.post<ApiResponse<{ request: ClanCreationRequest }>>(
+      `/users/clan-creation-requests/${id}/review`,
+      { approved, reviewNote }
+    );
+    return response.data.data;
+  },
+
+  getCurrentApprovedClanCreationRequest: async (): Promise<{ request: ClanCreationRequest }> => {
+    const response = await api.get<ApiResponse<{ request: ClanCreationRequest }>>(
+      '/users/profile/clan-creation-request'
     );
     return response.data.data;
   },

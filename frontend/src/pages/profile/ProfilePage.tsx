@@ -1,7 +1,12 @@
 import { useState } from 'react';
 import { useAuthStore } from '../../store/authStore';
-import { useUpdateProfile, useChangePassword } from '../../hooks/useUsers';
+import {
+  useUpdateProfile,
+  useChangePassword,
+  useSelfResetPassword,
+} from '../../hooks/useUsers';
 import { useUserReliability } from '../../hooks/useAttendance';
+import { useCurrentUserGameIdentities, useGames, useUpsertCurrentUserGameIdentity } from '../../hooks/useGames';
 import { Card } from '../../components/ui/Card';
 import { Badge } from '../../components/ui/Badge';
 import { UserAvatar } from '../../components/ui/UserAvatar';
@@ -17,20 +22,28 @@ import {
   CheckCircle,
   AlertCircle,
   BarChart3,
+  Gamepad2,
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
+import { getAllTimezoneOptions } from '../../utils/eventTime';
+import { getRoleBadgeVariant, getRoleDisplayName } from '../../utils/permissions';
 
 export default function ProfilePage() {
   const user = useAuthStore((state) => state.user);
   const updateProfile = useUpdateProfile();
   const changePassword = useChangePassword();
+  const selfResetPassword = useSelfResetPassword();
   const { data: reliabilityData } = useUserReliability(user?.id || '');
+  const { data: gamesData } = useGames();
+  const { data: identitiesData } = useCurrentUserGameIdentities();
+  const upsertIdentity = useUpsertCurrentUserGameIdentity();
 
   // Estado de edición de perfil
   const [isEditingProfile, setIsEditingProfile] = useState(false);
   const [nickname, setNickname] = useState(user?.nickname || '');
   const [email, setEmail] = useState(user?.email || '');
+  const [timezone, setTimezone] = useState(user?.timezone || 'Europe/Madrid');
   const [profileError, setProfileError] = useState('');
   const [profileSuccess, setProfileSuccess] = useState('');
 
@@ -41,6 +54,8 @@ export default function ProfilePage() {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [passwordError, setPasswordError] = useState('');
   const [passwordSuccess, setPasswordSuccess] = useState('');
+  const [passwordMode, setPasswordMode] = useState<'change' | 'reset'>('change');
+  const [identityDrafts, setIdentityDrafts] = useState<Record<string, string>>({});
 
   if (!user) {
     return (
@@ -56,7 +71,7 @@ export default function ProfilePage() {
     setProfileSuccess('');
 
     try {
-      await updateProfile.mutateAsync({ nickname, email });
+      await updateProfile.mutateAsync({ nickname, email, timezone });
       setProfileSuccess('Perfil actualizado correctamente');
       setIsEditingProfile(false);
       
@@ -102,25 +117,36 @@ export default function ProfilePage() {
     }
   };
 
-  const getRoleBadgeVariant = (role: string) => {
-    switch (role) {
-      case 'ADMIN':
-        return 'danger' as const;
-      case 'CLAN_LEADER':
-        return 'warning' as const;
-      default:
-        return 'info' as const;
-    }
-  };
+  const handleSelfResetPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setPasswordError('');
+    setPasswordSuccess('');
 
-  const getRoleLabel = (role: string) => {
-    switch (role) {
-      case 'ADMIN':
-        return 'Administrador';
-      case 'CLAN_LEADER':
-        return 'Líder de Clan';
-      default:
-        return 'Usuario';
+    if (newPassword !== confirmPassword) {
+      setPasswordError('Las contraseñas no coinciden');
+      return;
+    }
+
+    if (newPassword.length < 8) {
+      setPasswordError('La contraseña debe tener al menos 8 caracteres');
+      return;
+    }
+
+    try {
+      await selfResetPassword.mutateAsync({ newPassword });
+      setPasswordSuccess('Contraseña restablecida correctamente');
+      setIsChangingPassword(false);
+      setPasswordMode('change');
+      setCurrentPassword('');
+      setNewPassword('');
+      setConfirmPassword('');
+
+      setTimeout(() => setPasswordSuccess(''), 3000);
+    } catch (err) {
+      const error = err as { response?: { data?: { message?: string } } };
+      setPasswordError(
+        error.response?.data?.message || 'Error al restablecer contraseña'
+      );
     }
   };
 
@@ -140,7 +166,7 @@ export default function ProfilePage() {
             
             <div className="flex items-center gap-2 mb-4">
               <Badge variant={getRoleBadgeVariant(user.role)}>
-                {getRoleLabel(user.role)}
+                {getRoleDisplayName(user.role)}
               </Badge>
               <Badge variant={user.status === 'ACTIVE' ? 'success' : 'default'}>
                 {user.status === 'ACTIVE' ? 'Activo' : user.status}
@@ -177,8 +203,78 @@ export default function ProfilePage() {
                     : 'Fecha desconocida'}
                 </span>
               </div>
+
+              <div className="flex items-center gap-2">
+                <Calendar className="h-4 w-4" />
+                <span>Zona horaria: {user.timezone || 'Europe/Madrid'}</span>
+              </div>
             </div>
           </div>
+        </div>
+      </Card>
+
+      <Card className="mb-6">
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-xl font-bold text-military-900 flex items-center gap-2">
+            <Gamepad2 className="h-5 w-5" />
+            Identidades de juego opcionales
+          </h3>
+        </div>
+
+        <div className="space-y-3">
+          {(gamesData?.games || [])
+            .filter((game) => game.identityMode !== 'NONE')
+            .map((game) => {
+              const currentIdentity = identitiesData?.identities.find(
+                (identity) => identity.gameId === game.id
+              );
+              const draftValue =
+                identityDrafts[game.id] ??
+                currentIdentity?.value ??
+                '';
+
+              return (
+                <div
+                  key={game.id}
+                  className="grid gap-3 rounded-md border border-military-200 p-3 dark:border-gray-700 md:grid-cols-[220px_minmax(0,1fr)_auto]"
+                >
+                  <div className="min-w-0">
+                    <p className="text-sm font-semibold text-military-900 dark:text-gray-100">
+                      {game.name}
+                    </p>
+                    <p className="section-caption">
+                      {game.identityLabel || 'Identidad'}
+                    </p>
+                  </div>
+
+                  <input
+                    value={draftValue}
+                    onChange={(e) =>
+                      setIdentityDrafts((prev) => ({
+                        ...prev,
+                        [game.id]: e.target.value,
+                      }))
+                    }
+                    className="input"
+                    placeholder={game.identityLabel || 'Identidad'}
+                  />
+
+                  <button
+                    type="button"
+                    className="btn btn-primary btn-sm"
+                    disabled={upsertIdentity.isPending}
+                    onClick={() =>
+                      upsertIdentity.mutate({
+                        gameId: game.id,
+                        data: { value: draftValue },
+                      })
+                    }
+                  >
+                    Guardar
+                  </button>
+                </div>
+              );
+            })}
         </div>
       </Card>
 
@@ -214,6 +310,7 @@ export default function ProfilePage() {
                 setIsEditingProfile(true);
                 setNickname(user.nickname);
                 setEmail(user.email || '');
+                setTimezone(user.timezone || 'Europe/Madrid');
               }}
               className="btn btn-secondary btn-sm"
             >
@@ -261,6 +358,23 @@ export default function ProfilePage() {
                 />
               </div>
 
+              <div>
+                <label className="block text-sm font-medium text-military-700 mb-1">
+                  Zona horaria
+                </label>
+                <select
+                  value={timezone}
+                  onChange={(e) => setTimezone(e.target.value)}
+                  className="input"
+                >
+                  {getAllTimezoneOptions().map((option) => (
+                    <option key={option} value={option}>
+                      {option}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
               <div className="flex gap-2">
                 <button
                   type="submit"
@@ -290,6 +404,9 @@ export default function ProfilePage() {
             </p>
             <p>
               <strong>Email:</strong> {user.email}
+            </p>
+            <p>
+              <strong>Zona horaria:</strong> {user.timezone || 'Europe/Madrid'}
             </p>
           </div>
         )}
@@ -361,7 +478,10 @@ export default function ProfilePage() {
           </h3>
           {!isChangingPassword && (
             <button
-              onClick={() => setIsChangingPassword(true)}
+              onClick={() => {
+                setIsChangingPassword(true);
+                setPasswordMode('change');
+              }}
               className="btn btn-secondary btn-sm"
             >
               Cambiar
@@ -379,20 +499,39 @@ export default function ProfilePage() {
         )}
 
         {isChangingPassword ? (
-          <form onSubmit={handleChangePassword}>
+          <form onSubmit={passwordMode === 'change' ? handleChangePassword : handleSelfResetPassword}>
             <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-military-700 mb-1">
-                  Contraseña Actual *
-                </label>
-                <input
-                  type="password"
-                  value={currentPassword}
-                  onChange={(e) => setCurrentPassword(e.target.value)}
-                  className="input"
-                  required
-                />
+              <div className="flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  className={passwordMode === 'change' ? 'btn btn-primary btn-sm' : 'btn btn-outline btn-sm'}
+                  onClick={() => setPasswordMode('change')}
+                >
+                  Con contraseña actual
+                </button>
+                <button
+                  type="button"
+                  className={passwordMode === 'reset' ? 'btn btn-primary btn-sm' : 'btn btn-outline btn-sm'}
+                  onClick={() => setPasswordMode('reset')}
+                >
+                  Restablecer
+                </button>
               </div>
+
+              {passwordMode === 'change' && (
+                <div>
+                  <label className="block text-sm font-medium text-military-700 mb-1">
+                    Contraseña Actual *
+                  </label>
+                  <input
+                    type="password"
+                    value={currentPassword}
+                    onChange={(e) => setCurrentPassword(e.target.value)}
+                    className="input"
+                    required={passwordMode === 'change'}
+                  />
+                </div>
+              )}
 
               <div>
                 <label className="block text-sm font-medium text-military-700 mb-1">
@@ -409,6 +548,11 @@ export default function ProfilePage() {
                 <p className="text-xs text-military-500 mt-1">
                   Mínimo 8 caracteres, una mayúscula, una minúscula y un número
                 </p>
+                {passwordMode === 'reset' && (
+                  <p className="text-xs text-military-500 mt-1">
+                    Este restablecimiento funciona mientras tu sesión siga abierta.
+                  </p>
+                )}
               </div>
 
               <div>
@@ -428,18 +572,23 @@ export default function ProfilePage() {
               <div className="flex gap-2">
                 <button
                   type="submit"
-                  disabled={changePassword.isPending}
+                  disabled={changePassword.isPending || selfResetPassword.isPending}
                   className="btn btn-primary flex items-center"
                 >
                   <Save className="h-4 w-4 mr-2" />
-                  {changePassword.isPending
-                    ? 'Cambiando...'
-                    : 'Cambiar Contraseña'}
+                  {changePassword.isPending || selfResetPassword.isPending
+                    ? passwordMode === 'change'
+                      ? 'Cambiando...'
+                      : 'Restableciendo...'
+                    : passwordMode === 'change'
+                      ? 'Cambiar Contraseña'
+                      : 'Restablecer Contraseña'}
                 </button>
                 <button
                   type="button"
                   onClick={() => {
                     setIsChangingPassword(false);
+                    setPasswordMode('change');
                     setPasswordError('');
                     setCurrentPassword('');
                     setNewPassword('');
@@ -454,7 +603,7 @@ export default function ProfilePage() {
           </form>
         ) : (
           <p className="text-military-600">
-            Haz clic en "Cambiar" para actualizar tu contraseña
+            Puedes cambiarla con la actual o restablecerla directamente mientras tu sesión siga abierta
           </p>
         )}
       </Card>

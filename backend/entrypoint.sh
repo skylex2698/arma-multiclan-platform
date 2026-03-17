@@ -7,17 +7,32 @@ echo "============================================"
 echo "Environment: ${NODE_ENV:-development}"
 echo "Timestamp: $(date -u '+%Y-%m-%dT%H:%M:%SZ')"
 
-# ─────────────────────────────────────────────
-# Step 1: Wait for database connection
-# ─────────────────────────────────────────────
 echo ""
 echo "[1/4] Waiting for database connection..."
 
 MAX_RETRIES=30
 RETRY_INTERVAL=2
 RETRY_COUNT=0
+PRISMA_SCHEMA_PATH="/app/prisma/schema.prisma"
+UPLOADS_DIR="/app/public/uploads"
+PRISMA_BIN="/app/node_modules/.bin/prisma"
+APP_USER="node"
 
-until npx prisma db execute --stdin <<< "SELECT 1" > /dev/null 2>&1; do
+run_as_app() {
+  if [ "$(id -u)" -eq 0 ]; then
+    runuser -u "$APP_USER" -- sh -lc "$1"
+  else
+    sh -lc "$1"
+  fi
+}
+
+mkdir -p "$UPLOADS_DIR/clans" "$UPLOADS_DIR/events"
+if [ "$(id -u)" -eq 0 ]; then
+  chown -R "$APP_USER:$APP_USER" "$UPLOADS_DIR"
+fi
+chmod -R u+rwX,g+rwX "$UPLOADS_DIR"
+
+until run_as_app "printf 'SELECT 1;\n' | \"$PRISMA_BIN\" db execute --stdin --schema \"$PRISMA_SCHEMA_PATH\" > /dev/null 2>&1"; do
   RETRY_COUNT=$((RETRY_COUNT + 1))
   if [ "$RETRY_COUNT" -ge "$MAX_RETRIES" ]; then
     echo "ERROR: Database not reachable after ${MAX_RETRIES} attempts ($(($MAX_RETRIES * $RETRY_INTERVAL))s). Exiting."
@@ -29,13 +44,16 @@ done
 
 echo "  Database connection established."
 
-# ─────────────────────────────────────────────
-# Step 2: Run Prisma migrations
-# ─────────────────────────────────────────────
 echo ""
 echo "[2/4] Running Prisma migrations..."
 
-if npx prisma migrate deploy 2>&1; then
+if ! find /app/prisma/migrations -mindepth 1 -maxdepth 1 -type d | grep -q . 2>/dev/null; then
+  echo "ERROR: No Prisma migrations found in /app/prisma/migrations."
+  echo "Commit versioned migrations before deploying this project."
+  exit 1
+fi
+
+if run_as_app "\"$PRISMA_BIN\" migrate deploy --schema \"$PRISMA_SCHEMA_PATH\" 2>&1"; then
   echo "  Migrations completed successfully."
 else
   MIGRATE_EXIT=$?
@@ -43,22 +61,20 @@ else
   exit $MIGRATE_EXIT
 fi
 
-# ─────────────────────────────────────────────
-# Step 3: Initialize default admin user
-# ─────────────────────────────────────────────
 echo ""
 echo "[3/4] Initializing default admin user (if needed)..."
 
-node dist/scripts/init-admin.js
+run_as_app "node dist/scripts/init-admin.js"
 
 echo "  Admin initialization completed."
 
-# ─────────────────────────────────────────────
-# Step 4: Start the application
-# ─────────────────────────────────────────────
 echo ""
 echo "[4/4] Starting application..."
 echo "============================================"
 echo ""
+
+if [ "$(id -u)" -eq 0 ]; then
+  exec runuser -u "$APP_USER" -- node dist/index.js
+fi
 
 exec node dist/index.js

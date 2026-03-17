@@ -1,520 +1,79 @@
 # Changelog
 
-Todos los cambios notables en este proyecto serán documentados en este archivo.
-
-El formato está basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.0.0/),
-y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
-
----
-
-## [1.0.0] - 2025-01-19
-
-### 🎉 Lanzamiento Inicial
-
-#### ✨ Agregado
-
-**Gestión de Clanes:**
-- Sistema completo de creación, edición y eliminación de clanes
-- Subida de logos personalizados (JPG, PNG, WEBP)
-- Visualización de miembros con avatares
-- Permisos diferenciados (Admin puede editar cualquier clan, Líder solo su clan)
-
-**Sistema de Avatares:**
-- Usuarios utilizan el logo de su clan como avatar
-- Bordes de colores por rol (Rojo=Admin, Amarillo=Líder, Azul=Usuario)
-- Avatares visibles en navbar, eventos, clanes y gestión de usuarios
-- Componente UserAvatar reutilizable
-
-**Gestión de Eventos:**
-- Creación de eventos con escuadras y slots personalizables
-- Creación desde plantilla (reutilizar estructura de eventos anteriores)
-- Edición completa de eventos:
-  - Información básica (nombre, descripción, fecha, hora, briefing)
-  - Estructura dinámica de escuadras y slots
-  - Agregar/eliminar escuadras
-  - Modificar roles de slots
-- Eliminación de eventos (Admin/Creador/Líder del clan)
-- Briefing con soporte HTML
-
-**Sistema de Slots:**
-- Usuarios se apuntan y desapuntan de slots
-- Admin puede asignar cualquier usuario a cualquier slot
-- Líder de clan puede asignar usuarios de su clan
-- Mover usuarios entre slots automáticamente
-- Admin/Líder pueden desapuntar usuarios
-- Validación de un slot por usuario por evento
-- Estados de slots (LIBRE, OCUPADO, AUSENTE)
-
-**Gestión de Usuarios:**
-- Registro con validación de clan
-- Login seguro con JWT
-- Estados: Activo, Pendiente, Bloqueado, Baneado
-- Panel de administración:
-  - Validar usuarios pendientes
-  - Cambiar roles
-  - Bloquear/desbloquear cuentas
-  - Eliminar usuarios
-- Búsqueda y filtros
-
-**Seguridad:**
-- Autenticación JWT
-- Contraseñas encriptadas con bcrypt
-- Middleware de autenticación
-- Rutas protegidas por rol
-- Validación de entrada en frontend y backend
-- Sanitización de datos
-- Audit logs para acciones importantes
-
-**UI/UX:**
-- Diseño responsive (mobile-first)
-- Tema militar personalizado (Tailwind CSS)
-- Componentes reutilizables (Card, Badge, LoadingSpinner)
-- Navegación intuitiva
-- Feedback visual para acciones (loading, errores, éxitos)
-- Confirmaciones para acciones destructivas
-
-#### 🔧 Técnico
-
-**Backend:**
-- Node.js + TypeScript + Express
-- PostgreSQL con Prisma ORM
-- Arquitectura MVC
-- Upload de archivos con Multer
-- Logging con Winston
-- Validaciones robustas
-
-**Frontend:**
-- React + TypeScript + Vite
-- React Router para navegación
-- TanStack Query para estado del servidor
-- Zustand para estado global
-- Axios para HTTP
-- date-fns para manejo de fechas
-- Lucide React para iconos
-
-**Base de Datos:**
-- 9 modelos principales (User, Clan, Event, Squad, Slot, AuditLog, etc.)
-- Relaciones bien definidas
-- Cascadas para integridad referencial
-- Seed con datos de prueba
-
----
-
-## [Unreleased]
-
-### 🎯 Próximas Funcionalidades
-
-**Planificadas:**
-- Estadísticas y reportes
-- Notificaciones en tiempo real
-- Bot de Discord para gestión de roles
-- Exportar reportes (Excel/PDF)
-- Sistema de asistencia/confirmación
-- Historial de eventos por usuario
-
----
-
-## [2.5.0] - 2025-02-06
-
-### 🔧 Cambiado
-
-**Arquitectura Docker: Nginx como Reverse Proxy:**
-- Frontend nginx ahora actúa como reverse proxy hacia el backend
-- `VITE_API_URL` cambiado de URL absoluta a ruta relativa `/api`
-- Eliminados problemas de CORS al servir frontend y API desde el mismo host
-- Funciona desde cualquier IP/dominio sin recompilar el frontend
-- Añadido proxy para `/uploads/*` (archivos estáticos del backend)
-- Nginx usa `$http_host` para preservar el puerto en la cabecera Host
-
-**CORS Multi-Origen:**
-- Soporte para variable `CORS_EXTRA_ORIGINS` con múltiples orígenes separados por comas
-- Permite acceso desde IPs de LAN sin configurar cada una individualmente
-
-**Trust Proxy en Express:**
-- Añadido `app.set('trust proxy', 1)` para leer cabeceras `X-Forwarded-*` de nginx
-- Rate limiting ahora usa la IP real del cliente en vez de la IP interna de Docker
-
-### 🐛 Corregido
-
-**Build de Docker:**
-- Regenerado `frontend/package-lock.json` para sincronizar con `package.json` (npm ci fallaba)
-- Añadido `binaryTargets = ["native", "linux-musl-openssl-3.0.x"]` en Prisma para Alpine Linux
-- Corregida URL del healthcheck: `/health` en vez de `/api/health`
-- Añadido `start_period: 15s` al healthcheck del backend
-
-**Discord OAuth en producción:**
-- `getCookieOptions()` ya no fuerza `Secure=true` en producción; respeta `COOKIE_SECURE` del `.env`
-- `clearJWTCookie()` reutiliza `getCookieOptions()` para opciones consistentes
-- `clearCookie('discord_oauth_state')` ahora incluye todas las opciones coincidentes (httpOnly, secure, sameSite, path)
-- `clearCookie('discord_link_state')` corregido igual
-- Sin estas correcciones, las cookies se descartaban silenciosamente en HTTP
-
-**Configuración de producción:**
-- `COOKIE_SECURE` por defecto `false` (antes `true`, rompía cookies sin HTTPS)
-- `COOKIE_SAMESITE` por defecto `lax` (antes `strict`, rompía flujo OAuth)
-- `DISCORD_REDIRECT_URI` debe incluir el puerto si no es el estándar (80/443)
-
-### 📚 Archivos Modificados
-
-| Archivo | Cambio |
-|---------|--------|
-| `frontend/package-lock.json` | Regenerado |
-| `backend/prisma/schema.prisma` | binaryTargets para Alpine |
-| `backend/Dockerfile` | Healthcheck URL corregida |
-| `docker-compose.yml` | Healthcheck, CORS_EXTRA_ORIGINS, defaults seguros |
-| `frontend/nginx.conf` | Reverse proxy /api/ y /uploads/, $http_host |
-| `backend/src/index.ts` | Trust proxy, CORS multi-origen |
-| `backend/src/utils/jwt.ts` | Cookie Secure sin override, clearCookie consistente |
-| `backend/src/controllers/auth.controller.ts` | clearCookie con opciones completas |
-| `.env.example` | Documentación completa, defaults para multi-máquina |
-
----
-
-## [2.4.0] - 2025-01-29
-
-### ✨ Agregado
-
-**Docker y Despliegue:**
-- Dockerfile para backend (Node.js multi-stage build)
-- Dockerfile para frontend (Vite + Nginx)
-- docker-compose.yml para orquestación completa
-- docker-compose.prod.yml con configuración de producción
-- Configuración de Nginx para SPA con gzip y cache
-- Health checks para todos los servicios
-- Volúmenes persistentes para datos y uploads
-- Red interna para comunicación entre servicios
-
-**Documentación de Despliegue (DEPLOYMENT.md):**
-- Guía completa de instalación con Docker
-- Requisitos del servidor
-- Configuración de variables de entorno
-- Comandos útiles de Docker
-- Guía de actualización de la aplicación
-- Sistema de backups automáticos
-- Configuración de HTTPS con Nginx/Certbot
-- Solución de problemas comunes
-- Monitoreo y logs
-
-**Archivos de Configuración:**
-- `.env.example` con todas las variables documentadas
-- `.dockerignore` para backend y frontend
-- `nginx.conf` optimizado para producción
-
-### 📚 Archivos Creados
-
-**Raíz:**
-- `docker-compose.yml`
-- `docker-compose.prod.yml`
-- `.env.example`
-- `DEPLOYMENT.md`
-
-**Backend:**
-- `backend/Dockerfile`
-- `backend/.dockerignore`
-
-**Frontend:**
-- `frontend/Dockerfile`
-- `frontend/nginx.conf`
-- `frontend/.dockerignore`
-
----
-
-## [2.3.0] - 2025-01-29
-
-### ✨ Agregado
-
-**Calendario Visual de Eventos:**
-- Nueva vista de calendario mensual en la página de eventos
-- Toggle para cambiar entre vista lista y calendario
-- Navegación entre meses (anterior, siguiente, hoy)
-- Eventos mostrados en su día correspondiente con hora
-- Colores por estado: verde (activo), ámbar (inactivo), gris (finalizado)
-- Click en evento navega al detalle
-- Día actual destacado con fondo y borde
-- Soporte completo de modo oscuro
-- Responsive: días abreviados en móvil
-- Semana inicia en lunes (estándar europeo)
-- Muestra hasta 3 eventos por día, luego "+X más"
-
-**Nuevos Componentes:**
-- `ViewToggle` - Botones para cambiar entre vista lista/calendario
-- `EventCalendar` - Contenedor principal del calendario
-- `CalendarHeader` - Navegación de meses
-- `CalendarGrid` - Grid de 7 columnas con días
-- `CalendarDay` - Celda de día individual
-- `CalendarEventItem` - Evento en el calendario
-
-### 📚 Archivos Creados
-
-**Frontend:**
-- `src/components/events/ViewToggle.tsx`
-- `src/components/events/EventCalendar/index.ts`
-- `src/components/events/EventCalendar/EventCalendar.tsx`
-- `src/components/events/EventCalendar/CalendarHeader.tsx`
-- `src/components/events/EventCalendar/CalendarGrid.tsx`
-- `src/components/events/EventCalendar/CalendarDay.tsx`
-- `src/components/events/EventCalendar/CalendarEventItem.tsx`
-
-### 🔧 Cambiado
-
-**EventsPage:**
-- Añadido estado de vista (lista/calendario)
-- Integrado ViewToggle en el header
-- Renderizado condicional según vista seleccionada
-- En vista calendario se cargan más eventos (límite 100)
-
----
-
-## [2.2.0] - 2025-01-28
-
-### ✨ Agregado
-
-**Toggle de Estado de Eventos (ACTIVO ↔ INACTIVO):**
-- Botón para activar/desactivar eventos desde la página de detalle
-- Solo Admin o Líder del clan creador pueden cambiar el estado
-- Eventos INACTIVOS: no se puede apuntar ni asignar usuarios, pero sí editar
-- Eventos FINALIZADOS: no se puede modificar nada
-- Nuevo hook `useChangeEventStatus` en frontend
-- Nuevo endpoint PUT `/events/:id/status` en backend
-
-**Gestión de Avatar de Clan:**
-- Botón "Quitar" para eliminar el avatar del clan
-- Elimina el archivo del servidor y actualiza la base de datos
-- Nuevo endpoint DELETE `/clans/:id/avatar`
-- Nuevo hook `useDeleteClanAvatar` en frontend
-
-**Paginación en Lista de Eventos:**
-- Componente de paginación con navegación por páginas
-- 12 eventos por página
-- Muestra total de eventos disponibles
-
-**Filtros de Eventos Mejorados:**
-- Filtro de estado por defecto en "Activos" (antes era "Todos")
-- Añadida opción "Inactivos" al selector de estado
-- Eliminado checkbox "Solo próximos eventos" (redundante)
-- Filtro "Todos" ahora muestra correctamente todos los estados
-
-### 🔧 Cambiado
-
-**Validación de Subida de Avatar:**
-- Límite de tamaño de imagen reducido a 2MB (antes 5MB en frontend)
-- Ahora consistente entre frontend y backend
-
-**Manejo de FormData en Axios:**
-- Añadido interceptor de request para eliminar Content-Type en FormData
-- Axios ahora configura automáticamente el boundary correcto
-- Resuelto error 400 al subir avatares de clan
-
-### 🐛 Corregido
-
-**Dashboard:**
-- Corregido contador de "Próximos Eventos" (usaba `count` en vez de `total`)
-- Corregido contador de "Usuarios" (mismo problema)
-
-**Backend:**
-- Eliminada función duplicada `changeEventStatus` en event.controller.ts
-- Eliminada función duplicada `changeEventStatus` en event.service.ts
-- Limpieza de import `UserRole` no usado en event.service.ts
-
-### 🔒 Seguridad
-
-**Protección de Eventos Finalizados:**
-- Bloqueado `adminAssignSlot` en eventos FINISHED e INACTIVE
-- Bloqueado `adminUnassignSlot` en eventos FINISHED
-- Frontend oculta botones de asignación en eventos no activos
-- Admin y Líder ya no pueden asignar usuarios a eventos finalizados
-
-### 📚 Archivos Modificados
-
-**Backend:**
-- `src/controllers/event.controller.ts` - Eliminada función duplicada
-- `src/services/event.service.ts` - Eliminada función duplicada, limpieza imports
-- `src/services/slot.service.ts` - Añadida validación de estado en admin assign/unassign
-- `src/services/clan.service.ts` - Soporte para avatarUrl null
-- `src/controllers/clan.controller.ts` - Nuevo método deleteAvatar
-- `src/routes/clan.routes.ts` - Nueva ruta DELETE /:id/avatar
-
-**Frontend:**
-- `src/services/api.ts` - Interceptor para FormData
-- `src/services/clanService.ts` - Método deleteAvatar
-- `src/services/eventService.ts` - Método changeStatus
-- `src/hooks/useClans.ts` - Hook useDeleteClanAvatar
-- `src/hooks/useEvents.ts` - Hook useChangeEventStatus
-- `src/pages/clanes/EditClanPage.tsx` - Validación 2MB, botón quitar avatar
-- `src/pages/events/EventsPage.tsx` - Filtros mejorados, estado por defecto
-- `src/pages/events/EventDetailPage.tsx` - Botón toggle estado
-- `src/pages/dashboard/DashboardPage.tsx` - Corregido uso de `total`
-- `src/components/events/EventFilters.tsx` - Opción INACTIVE, sin checkbox
-- `src/components/events/EventCard.tsx` - Colores de badge consistentes
-- `src/components/events/SlotItem.tsx` - Validación de estado para admin actions
-
----
-
-## [2.1.0] - 2025-01-27
-
-### ✨ Agregado
-
-**Sistema de Estados de Eventos:**
-- Nuevo estado FINISHED para eventos completados
-- Auto-finalización de eventos cuando pasa la fecha programada
-- Transición automática: ACTIVE → FINISHED
-- Protección: Eventos finalizados no permiten cambios de slots ni edición
-
-**Subida de Archivos para Eventos:**
-- Subida de archivos PDF de briefing (máximo 10MB)
-- Subida de archivos HTML de modset para Arma 3 (máximo 10MB)
-- Validación de tipos de archivo por extensión y magic bytes
-- Validación de contenido HTML para prevenir scripts maliciosos
-- Botones para descargar, abrir en nueva pestaña y eliminar archivos
-- Permisos: Solo creador, admin o líder de clan pueden gestionar archivos
-
-**Backend - Archivos:**
-- Configuración de Multer para briefing (PDF) y modset (HTML)
-- Endpoints POST/DELETE para /events/:id/briefing-file
-- Endpoints POST/DELETE para /events/:id/modset-file
-- Validación de permisos por rol y estado del evento
-- Almacenamiento en /public/uploads/events/
-
-**Frontend - Archivos:**
-- Hooks useUploadBriefingFile, useUploadModsetFile
-- Hooks useDeleteBriefingFile, useDeleteModsetFile
-- UI completa en pestaña Briefing para gestión de archivos
-- Indicadores de carga durante subida
-- Mensajes de error descriptivos
-
-### 🎨 Mejoras Visuales
-
-**Layout de Escuadras en 3 Columnas:**
-- Visualización de escuadras en grid responsive
-- 1 columna en móvil, 2 en tablet, 3 en desktop
-- Mejor aprovechamiento del espacio en pantallas grandes
-- Alineación superior de cards con items-start
-
-### 🔧 Técnico
-
-**Base de Datos:**
-- Nuevo campo briefingFileUrl en modelo Event
-- Nuevo campo modsetFileUrl en modelo Event
-- Valor FINISHED añadido al enum EventStatus
-- Migraciones: add_finished_status, add_event_files
-
-**Dependencias:**
-- file-type: Validación de tipos de archivo por magic bytes
-
----
-
-## Tipos de Cambios
-
-- **Agregado** - Para nuevas características
-- **Cambiado** - Para cambios en funcionalidades existentes
-- **Obsoleto** - Para funcionalidades que serán eliminadas
-- **Eliminado** - Para funcionalidades eliminadas
-- **Corregido** - Para correcciones de bugs
-- **Seguridad** - Para vulnerabilidades corregidas
-
----
-
-## [1.1.0] - 2025-01-20
-
-### ✨ Agregado
-
-**Perfil de Usuario:**
-- Página de perfil completa con avatar, rol y badges
-- Edición de información personal (nickname y email)
-- Cambio de contraseña con validaciones robustas
-- Visualización de fecha de registro
-- Enlace "Mi Perfil" en menú de usuario (navbar)
-
-**Backend:**
-- Endpoints PUT /users/profile y /users/change-password
-- Middleware requireAdmin para rutas de administración
-- Validación de email único en actualización
-- Logging de cambios de perfil y contraseña
-
-**Frontend:**
-- Componente ProfilePage con secciones editables
-- Mensajes de éxito/error en tiempo real
-- Validaciones de formulario
-- UI consistente con el resto de la app
-
-### 🔧 Cambiado
-
-- Router simplificado sin AuthLayout
-- Layout de login mejorado y corregido
-- MainLayout con dropdown de usuario mejorado
-
-### 🐛 Corregido
-
-- Manejo de fechas undefined en ProfilePage
-- Imports de módulos en backend
-- Router con rutas anidadas correctas
-- Tipos TypeScript en hooks
-
----
-
-## [2.0.0] - 2025-01-21
-
-### ✨ Cambios Mayores
-
-**Rediseño Completo - CCT (Centro de Coordinación Táctica):**
-- Nueva identidad de marca orientada a simuladores militares
-- Nombre actualizado de "Arma Platform" a "Centro de Coordinación Táctica"
-- Logo militar profesional con escudo
-- Paleta de colores táctica (verde militar, naranja arena)
-
-**Sistema de Modo Claro/Oscuro:**
-- Toggle interactivo en navbar (sol/luna)
-- Modo Claro: Comando Diurno - tonos verde militar claro
-- Modo Oscuro: Operaciones Nocturnas - gris oscuro + verde táctico
-- Persistencia de preferencia en localStorage
-- Transiciones suaves entre modos
-
-**Footer Profesional:**
-- Copyright 2025
-- Créditos a Skylex (desarrollador)
-- Referencia a Arma 3 y Arma Reforger
-- Diseño responsive
-
-### 🎨 Mejoras Visuales
-
-**Sistema de Slots Mejorado:**
-- Slots ocupados con gradientes verdes destacados
-- Slots libres con colores discretos
-- Slots del usuario con borde azul brillante y shadow
-- Mejor diferenciación visual entre estados
-
-**Modo Oscuro Refinado:**
-- Contraste mejorado en todos los textos
-- Cards con fondos apropiados (gray-800)
-- Borders visibles (gray-700)
-- Inputs y selects con colores consistentes
-- Scrollbar personalizada
-
-**Efectos Tácticos:**
-- Grid de fondo sutil estilo mapa táctico
-- Animación tactical-pulse para elementos importantes
-- Scrollbar militar personalizada
-
-### 🔧 Correcciones
-
-- Tags de clan sin dobles corchetes ([[TAG]] → [TAG])
-- Imports TypeScript corregidos
-- Exports named vs default corregidos
-- Warnings de non-null assertions eliminados
-
-### 📚 Nuevos Archivos
-
-- `src/config/app.config.ts` - Configuración centralizada
-- `src/hooks/useTheme.ts` - Hook de tema con Zustand
-- `src/components/ui/ThemeToggle.tsx` - Toggle de tema
-- `src/components/layout/Footer.tsx` - Footer profesional
-
-### 🔄 Archivos Actualizados
-
-Frontend:
-- MainLayout, EventCard, SlotItem, MembersList
-- LoginPage, UsersPage, ClanDetailPage
-- useUsers, userService
-- index.css, tailwind.config.js, index.html
-
----
+Resumen del estado actual entregado del proyecto.
+
+## 2026-03-15
+
+### Plataforma base
+
+- despliegue completo con Docker Compose;
+- backend con migraciones automáticas y admin bootstrap;
+- frontend servido por Nginx;
+- persistencia en volúmenes Docker;
+- script de primer arranque `scripts/first-up.sh`.
+
+### Usuarios y permisos
+
+- autenticación local;
+- recuperación y reseteo de contraseña;
+- login y vinculación con Discord;
+- roles `ADMIN`, `CLAN_LEADER`, `USER`;
+- permisos por RBAC y overrides por usuario;
+- soft-delete de usuarios;
+- validación y administración de usuarios;
+- fiabilidad y asistencia.
+
+### Clanes
+
+- creación, edición, avatar y restauración;
+- listados y miembros;
+- solicitudes de cambio de clan;
+- cards y vistas ajustadas a UI actual.
+
+### Registro con nuevo clan
+
+- registro con clan existente;
+- registro solicitando nuevo clan;
+- revisión administrativa de solicitudes;
+- aprobación que crea automáticamente el clan;
+- promoción automática del solicitante a `CLAN_LEADER`;
+- relación completa entre solicitud cumplida y clan creado.
+
+### Juegos
+
+- catálogo de juegos;
+- alta, edición y borrado administrado;
+- soporte para Arma 3 y Arma Reforger;
+- identidades de juego por usuario.
+
+### Eventos
+
+- eventos públicos y privados;
+- invitaciones a clanes;
+- share público por token;
+- briefing HTML;
+- briefing PDF y modset HTML;
+- soft-delete y restauración;
+- descarga de slotlist y whitelist;
+- vista detalle, operaciones y dashboard ajustados a zona horaria del usuario.
+
+### Escuadras y slots
+
+- creación y edición robusta de escuadras;
+- corrección del bug de reaparición de escuadras y slots soft-deleted;
+- duplicado de escuadras;
+- plantillas por tipo;
+- una sola escuadra de mando por evento;
+- reserva de escuadras por clan;
+- selector de reserva abierto a cualquier clan al crear o editar;
+- nombres/frecuencias automáticos para nuevas escuadras;
+- UI simplificada de plantillas.
+
+### QA
+
+Backend con tests para:
+- registro y solicitud de nuevo clan;
+- revisión administrativa de solicitud de clan;
+- acceso a eventos privados;
+- subida de archivos;
+- edición de escuadras y filtrado de soft-delete.

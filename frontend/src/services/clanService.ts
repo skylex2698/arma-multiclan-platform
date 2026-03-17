@@ -1,5 +1,13 @@
 import { api } from './api';
-import type { ApiResponse, Clan, User } from '../types';
+import type { ApiResponse, Clan, ClanNotionIntegration, NotionSyncMode, User } from '../types';
+
+export const sanitizeClanTag = (tag?: string | null) => {
+  if (!tag) {
+    return '';
+  }
+
+  return tag.replace(/[\[\]\(\)\{\}]/g, '').trim().toUpperCase();
+};
 
 export const clanService = {
   // Obtener todos los clanes
@@ -31,9 +39,13 @@ export const clanService = {
     name: string;
     tag?: string;
     description?: string;
-    avatarUrl?: string;  // <-- AGREGAR
+    avatarUrl?: string;
+    primaryGameId: string;
   }): Promise<{ clan: Clan }> => {
-    const response = await api.post<ApiResponse<{ clan: Clan }>>('/clans', data);
+    const response = await api.post<ApiResponse<{ clan: Clan }>>('/clans', {
+      ...data,
+      tag: sanitizeClanTag(data.tag) || undefined,
+    });
     return response.data.data;
   },
 
@@ -44,12 +56,16 @@ export const clanService = {
       name?: string;
       tag?: string;
       description?: string;
-      avatarUrl?: string;  // <-- AGREGAR
+      avatarUrl?: string;
+      primaryGameId?: string;
     }
   ): Promise<{ clan: Clan }> => {
     const response = await api.put<ApiResponse<{ clan: Clan }>>(
       `/clans/${id}`,
-      data
+      {
+        ...data,
+        ...(data.tag !== undefined ? { tag: sanitizeClanTag(data.tag) || undefined } : {}),
+      }
     );
     return response.data.data;
   },
@@ -82,6 +98,51 @@ export const clanService = {
     const response = await api.delete<ApiResponse<{ clan: Clan }>>(
       `/clans/${id}/avatar`
     );
+    return response.data.data;
+  },
+
+  getNotionIntegration: async (id: string): Promise<{ integration: ClanNotionIntegration }> => {
+    const response = await api.get<ApiResponse<{ integration: ClanNotionIntegration }>>(
+      `/clans/${id}/notion`
+    );
+    return response.data.data;
+  },
+
+  saveNotionIntegration: async (
+    id: string,
+    data: {
+      enabled: boolean;
+      token?: string;
+      parentPageId?: string;
+      syncMode: NotionSyncMode;
+    }
+  ): Promise<{ integration: ClanNotionIntegration }> => {
+    const response = await api.put<ApiResponse<{ integration: ClanNotionIntegration }>>(
+      `/clans/${id}/notion`,
+      data
+    );
+    return response.data.data;
+  },
+
+  testNotionConnection: async (
+    id: string,
+    payload?: { token?: string; parentPageId?: string }
+  ): Promise<{
+    ok: boolean;
+    botName: string;
+    botId: string | null;
+    workspaceName: string | null;
+    parentPageValidated: boolean;
+  }> => {
+    const response = await api.post<
+      ApiResponse<{
+        ok: boolean;
+        botName: string;
+        botId: string | null;
+        workspaceName: string | null;
+        parentPageValidated: boolean;
+      }>
+    >(`/clans/${id}/notion/test`, payload || {});
     return response.data.data;
   },
 };

@@ -6,7 +6,10 @@ export interface AuthUser {
   id: string;
   email: string | null;
   nickname: string;
+  timezone: string;
+  mustCreateClanOnboarding: boolean;
   role: UserRole;
+  permissions: string[];
   status: UserStatus;
   clanId: string | null;
   discordId: string | null;
@@ -65,7 +68,7 @@ export interface CreateEventDTO {
   name: string;
   description?: string;
   briefing?: string;
-  gameType: 'ARMA_3' | 'ARMA_REFORGER';
+  gameId: string;
   scheduledDate: Date;
   squads: CreateSquadDTO[];
 }
@@ -74,7 +77,7 @@ export interface UpdateEventDTO {
   name?: string;
   description?: string;
   briefing?: string;
-  gameType?: 'ARMA_3' | 'ARMA_REFORGER';
+  gameId?: string;
   scheduledDate?: Date;
   squads?: UpdateSquadDto[];
 }

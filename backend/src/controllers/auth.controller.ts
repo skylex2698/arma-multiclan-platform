@@ -2,26 +2,58 @@ import { Request, Response } from 'express';
 import { authService } from '../services/auth.service';
 import { discordService } from '../services/discord.service';
 import { successResponse, errorResponse } from '../utils/responses';
-import { isValidEmail, isStrongPassword, sanitizeNickname } from '../utils/validators';
+import { isValidEmail, isStrongPassword, normalizeEmail, sanitizeNickname } from '../utils/validators';
 import { logger } from '../utils/logger';
 import { prisma } from '../index';
 import { generateState, validateState } from '../utils/crypto';
 import { setJWTCookie, clearJWTCookie, getCookieOptions } from '../utils/jwt';
+import { getEffectivePermissions } from '../auth/rbac';
+
+const getFrontendBaseUrl = (): string => {
+  const fallbackUrl = 'http://localhost:5173';
+  const rawUrl = process.env.FRONTEND_URL || fallbackUrl;
+  const frontendPort = process.env.FRONTEND_PORT;
+
+  try {
+    const url = new URL(rawUrl);
+    const defaultPort = url.protocol === 'https:' ? '443' : '80';
+
+    if (frontendPort && !url.port && frontendPort !== defaultPort) {
+      url.port = frontendPort;
+    }
+
+    return url.origin;
+  } catch {
+    return fallbackUrl;
+  }
+};
 
 export class AuthController {
   // POST /api/auth/register/local
   async registerLocal(req: Request, res: Response) {
     try {
-      const { email, password, nickname, clanId } = req.body;
+      const {
+        email,
+        password,
+        nickname,
+        clanId,
+        requestNewClan,
+        newClanName,
+        newClanTag,
+        newClanDescription,
+        newClanPrimaryGameId,
+      } = req.body;
 
       // Validaciones
-      if (!email || !password || !nickname || !clanId) {
-        return errorResponse(res, 'Todos los campos son obligatorios', 400);
+      if (!email || !password || !nickname) {
+        return errorResponse(res, 'Email, contraseña y nickname son obligatorios', 400);
       }
 
       if (!isValidEmail(email)) {
         return errorResponse(res, 'Email inválido', 400);
       }
+
+      const normalizedEmail = normalizeEmail(String(email));
 
       if (!isStrongPassword(password)) {
         return errorResponse(
@@ -36,18 +68,50 @@ export class AuthController {
         return errorResponse(res, 'El nickname debe tener al menos 3 caracteres', 400);
       }
 
+      const wantsNewClan = requestNewClan === true || requestNewClan === 'true';
+
+      if (!wantsNewClan && !clanId) {
+        return errorResponse(res, 'Debes seleccionar un clan o solicitar uno nuevo', 400);
+      }
+
+      if (wantsNewClan) {
+        if (!newClanName || !newClanPrimaryGameId) {
+          return errorResponse(
+            res,
+            'Para solicitar un nuevo clan debes indicar nombre y juego principal',
+            400
+          );
+        }
+
+        if (String(newClanName).trim().length < 3) {
+          return errorResponse(res, 'El nombre del nuevo clan debe tener al menos 3 caracteres', 400);
+        }
+      }
+
       // Registrar usuario
       const user = await authService.registerLocal({
-        email,
+        email: normalizedEmail,
         password,
         nickname: cleanNickname,
-        clanId
+        clanId: wantsNewClan ? undefined : clanId,
+        clanCreationRequest: wantsNewClan
+          ? {
+              requestedName: String(newClanName).trim(),
+              requestedTag: newClanTag ? String(newClanTag).trim() : undefined,
+              requestedDescription: newClanDescription
+                ? String(newClanDescription).trim()
+                : undefined,
+              primaryGameId: String(newClanPrimaryGameId),
+            }
+          : undefined,
       });
 
       return successResponse(
         res,
         { user },
-        'Usuario registrado correctamente. Pendiente de validación por administrador o líder de clan.',
+        wantsNewClan
+          ? 'Solicitud enviada. Un administrador debe aprobar la creación del nuevo clan antes de que puedas iniciar sesión.'
+          : 'Usuario registrado correctamente. Pendiente de validación por administrador o líder de clan.',
         201
       );
     } catch (error: any) {
@@ -65,7 +129,7 @@ export class AuthController {
         return errorResponse(res, 'Email y contraseña son obligatorios', 400);
       }
 
-      const result = await authService.loginLocal(email, password);
+      const result = await authService.loginLocal(normalizeEmail(String(email)), password);
 
       // Establecer JWT en cookie httpOnly (además de devolverlo en el body por compatibilidad)
       setJWTCookie(res, {
@@ -80,6 +144,62 @@ export class AuthController {
     } catch (error: any) {
       logger.error('Error in loginLocal', error);
       return errorResponse(res, error.message || 'Error al iniciar sesión', 401);
+    }
+  }
+
+  // POST /api/auth/forgot-password
+  async forgotPassword(req: Request, res: Response) {
+    try {
+      const { email } = req.body;
+
+      if (!email || !isValidEmail(String(email))) {
+        return errorResponse(res, 'Email inválido', 400);
+      }
+
+      await authService.requestPasswordReset(String(email));
+
+      return successResponse(
+        res,
+        {},
+        'Si el email existe, recibirás instrucciones para restablecer la contraseña'
+      );
+    } catch (error: any) {
+      logger.error('Error in forgotPassword', error);
+      return errorResponse(
+        res,
+        'No se pudo procesar la solicitud de restablecimiento',
+        500
+      );
+    }
+  }
+
+  // POST /api/auth/reset-password
+  async resetPassword(req: Request, res: Response) {
+    try {
+      const { token, newPassword } = req.body;
+
+      if (!token || typeof token !== 'string') {
+        return errorResponse(res, 'Token inválido', 400);
+      }
+
+      if (!newPassword || !isStrongPassword(String(newPassword))) {
+        return errorResponse(
+          res,
+          'La contraseña debe tener mínimo 8 caracteres, una mayúscula, una minúscula y un número',
+          400
+        );
+      }
+
+      await authService.resetPasswordWithToken(token, String(newPassword));
+
+      return successResponse(res, {}, 'Contraseña restablecida correctamente');
+    } catch (error: any) {
+      logger.error('Error in resetPassword', error);
+      return errorResponse(
+        res,
+        error.message || 'No se pudo restablecer la contraseña',
+        400
+      );
     }
   }
 
@@ -130,6 +250,8 @@ export class AuthController {
           id: true,
           email: true,
           nickname: true,
+          timezone: true,
+          mustCreateClanOnboarding: true,
           role: true,
           status: true,
           clanId: true,
@@ -145,6 +267,22 @@ export class AuthController {
               tag: true,
               description: true,
               avatarUrl: true,
+              primaryGameId: true,
+              primaryGame: true,
+            },
+          },
+          gameIdentities: {
+            include: {
+              game: true,
+            },
+            orderBy: {
+              createdAt: 'asc',
+            },
+          },
+          permissionOverrides: {
+            select: {
+              permission: true,
+              enabled: true,
             },
           },
         },
@@ -154,7 +292,18 @@ export class AuthController {
         return errorResponse(res, 'Usuario no encontrado', 404);
       }
 
-      return successResponse(res, { user }, 'Usuario obtenido exitosamente');
+      const { permissionOverrides, ...userWithoutOverrides } = user;
+
+      return successResponse(
+        res,
+        {
+          user: {
+            ...userWithoutOverrides,
+            permissions: getEffectivePermissions(user.role, permissionOverrides),
+          },
+        },
+        'Usuario obtenido exitosamente'
+      );
     } catch (error: any) {
       logger.error('Error in getMe', error);
       return errorResponse(res, error.message || 'Error al obtener usuario', 500);
@@ -195,7 +344,7 @@ export class AuthController {
       // Validar state anti-CSRF
       if (!validateState(state as string, savedState)) {
         logger.warn('Discord OAuth2 state mismatch');
-        return res.redirect(`${process.env.FRONTEND_URL}/login?error=invalid_state`);
+        return res.redirect(`${getFrontendBaseUrl()}/login?error=invalid_state`);
       }
 
       // Limpiar cookie de state (con las mismas opciones para que el navegador la elimine)
@@ -209,7 +358,7 @@ export class AuthController {
 
       if (!code || typeof code !== 'string') {
         logger.warn('Discord OAuth2 missing code');
-        return res.redirect(`${process.env.FRONTEND_URL}/login?error=missing_code`);
+        return res.redirect(`${getFrontendBaseUrl()}/login?error=missing_code`);
       }
 
       // Intercambiar code por tokens
@@ -229,20 +378,32 @@ export class AuthController {
         scope: tokenResponse.scope,
       });
 
-      const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+      const frontendUrl = getFrontendBaseUrl();
 
-      // Si es nuevo usuario, redirigir a página de registro pendiente (sin establecer sesión)
-      if (isNewUser) {
-        logger.info('New Discord user pending approval', { userId: user.id });
-        const emailParam = user.email ? encodeURIComponent(user.email) : '';
-        return res.redirect(`${frontendUrl}/auth/pending?email=${emailParam}`);
+      const buildDiscordCompletionUrl = () => {
+        const url = new URL('/auth/discord/complete', frontendUrl);
+        url.searchParams.set('discordId', user.discordId || discordUser.id);
+        url.searchParams.set('discordUsername', user.discordUsername || discordUser.username);
+        if (user.email) {
+          url.searchParams.set('email', user.email);
+        }
+        return url.toString();
+      };
+
+      // Usuario nuevo o pendiente sin clan: completar datos mínimos antes de enviarlo a validación.
+      if (isNewUser || (user.status === 'PENDING' && !user.clanId)) {
+        logger.info('Discord user requires registration completion', {
+          userId: user.id,
+          isNewUser,
+          hasClan: Boolean(user.clanId),
+        });
+        return res.redirect(buildDiscordCompletionUrl());
       }
 
       // Usuario existente: verificar estado antes de establecer sesión
       if (user.status === 'PENDING') {
         logger.info('Existing Discord user still pending approval', { userId: user.id });
-        const emailParam = user.email ? encodeURIComponent(user.email) : '';
-        return res.redirect(`${frontendUrl}/auth/pending?email=${emailParam}`);
+        return res.redirect(`${frontendUrl}/auth/pending`);
       }
 
       if (user.status === 'BANNED') {
@@ -261,7 +422,7 @@ export class AuthController {
       return res.redirect(`${frontendUrl}/auth/discord/success`);
     } catch (error: any) {
       logger.error('Error in discordCallback', error);
-      const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+      const frontendUrl = getFrontendBaseUrl();
       return res.redirect(`${frontendUrl}/login?error=discord_auth_failed`);
     }
   }
@@ -318,7 +479,7 @@ export class AuthController {
     try {
       if (!req.user) {
         logger.warn('Discord link callback without authenticated user');
-        return res.redirect(`${process.env.FRONTEND_URL}/login?error=not_authenticated`);
+        return res.redirect(`${getFrontendBaseUrl()}/login?error=not_authenticated`);
       }
 
       const { code, state } = req.query;
@@ -327,7 +488,7 @@ export class AuthController {
       // Validar state anti-CSRF
       if (!validateState(state as string, savedState)) {
         logger.warn('Discord link state mismatch');
-        return res.redirect(`${process.env.FRONTEND_URL}/profile?error=invalid_state`);
+        return res.redirect(`${getFrontendBaseUrl()}/profile?error=invalid_state`);
       }
 
       // Limpiar cookie de state (con las mismas opciones para que el navegador la elimine)
@@ -341,7 +502,7 @@ export class AuthController {
 
       if (!code || typeof code !== 'string') {
         logger.warn('Discord link missing code');
-        return res.redirect(`${process.env.FRONTEND_URL}/profile?error=missing_code`);
+        return res.redirect(`${getFrontendBaseUrl()}/profile?error=missing_code`);
       }
 
       // Intercambiar code por tokens
@@ -370,11 +531,11 @@ export class AuthController {
       });
 
       // Redirigir al perfil con mensaje de éxito
-      const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+      const frontendUrl = getFrontendBaseUrl();
       return res.redirect(`${frontendUrl}/profile?discord_linked=true`);
     } catch (error: any) {
       logger.error('Error in discordLinkCallback', error);
-      const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+      const frontendUrl = getFrontendBaseUrl();
       return res.redirect(`${frontendUrl}/profile?error=discord_link_failed&message=${encodeURIComponent(error.message)}`);
     }
   }

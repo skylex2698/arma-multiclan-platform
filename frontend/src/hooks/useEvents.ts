@@ -1,11 +1,10 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { eventService } from '../services/eventService';
 import type { CreateEventForm } from '../types';
-import type { GameType } from '../types';
 
 export function useEvents(filters?: {
   status?: string;
-  gameType?: string;
+  gameId?: string;
   upcoming?: boolean;
   includeAll?: boolean;
   deleted?: boolean;
@@ -19,10 +18,10 @@ export function useEvents(filters?: {
   });
 }
 
-export function useEvent(id: string) {
+export function useEvent(id: string, filters?: { deleted?: boolean }) {
   return useQuery({
-    queryKey: ['event', id],
-    queryFn: () => eventService.getById(id),
+    queryKey: ['event', id, filters],
+    queryFn: () => eventService.getById(id, filters),
     enabled: !!id,
   });
 }
@@ -46,8 +45,11 @@ export function useUpdateEvent(id: string) {
       name?: string;
       description?: string;
       briefing?: string;
-      gameType?: GameType;
+      gameId?: string;
       scheduledDate?: Date;
+      timezone?: string;
+      visibility?: 'PUBLIC' | 'PRIVATE';
+      invitedClanIds?: string[];
       serverName?: string;
       serverIp?: string;
       serverPort?: string;
@@ -56,6 +58,11 @@ export function useUpdateEvent(id: string) {
         id?: string;
         name: string;
         order: number;
+        frequency?: string;
+        isCommand?: boolean;
+        parentSquadId?: string;
+        parentFrequency?: string;
+        reservedForClanId?: string | null;
         slots: Array<{
           id?: string;
           role: string;
@@ -114,6 +121,7 @@ export function useCreateEventFromTemplate() {
       description?: string;
       briefing?: string;
       scheduledDate: Date;
+      timezone?: string;
     }) => eventService.createFromTemplate(data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['events'] });
@@ -186,5 +194,17 @@ export function usePublicEvent(token: string) {
 export function useGenerateShareToken() {
   return useMutation({
     mutationFn: (eventId: string) => eventService.generateShareToken(eventId),
+  });
+}
+
+export function useDownloadEventSlotlist() {
+  return useMutation({
+    mutationFn: (eventId: string) => eventService.getSlotlist(eventId),
+  });
+}
+
+export function useDownloadEventWhitelist() {
+  return useMutation({
+    mutationFn: (eventId: string) => eventService.getWhitelistTxt(eventId),
   });
 }

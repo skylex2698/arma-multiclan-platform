@@ -6,6 +6,7 @@
 FROM node:20-alpine AS builder
 
 WORKDIR /app
+ENV npm_config_cache=/tmp/.npm
 
 # Argumento para la URL del API (se pasa en build time)
 ARG VITE_API_URL=http://localhost:3000/api
@@ -16,8 +17,8 @@ ENV VITE_API_URL=$VITE_API_URL
 # Copiar archivos de dependencias
 COPY package*.json ./
 
-# Instalar dependencias
-RUN npm ci
+# Instalar dependencias de forma reproducible
+RUN npm ci --no-audit --no-fund
 
 # Copiar código fuente
 COPY . .
@@ -29,8 +30,8 @@ RUN npm run build
 # Etapa 2: Servidor Nginx
 FROM nginx:alpine AS production
 
-# Copiar configuración personalizada de nginx
-COPY nginx.conf /etc/nginx/conf.d/default.conf
+# Copiar plantilla de configuración de nginx para interpolar variables
+COPY nginx.conf /etc/nginx/templates/default.conf.template
 
 # Copiar archivos compilados desde la etapa de construcción
 COPY --from=builder /app/dist /usr/share/nginx/html
@@ -39,12 +40,12 @@ COPY --from=builder /app/dist /usr/share/nginx/html
 RUN chown -R nginx:nginx /usr/share/nginx/html && \
     chmod -R 755 /usr/share/nginx/html
 
-# Exponer puerto
-EXPOSE 80
+# Exponer puertos HTTP y HTTPS
+EXPOSE 80 443
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-    CMD wget --no-verbose --tries=1 --spider http://localhost:80 || exit 1
+    CMD wget --no-check-certificate --no-verbose --tries=1 --spider https://127.0.0.1:443 || exit 1
 
 # Comando de inicio
 CMD ["nginx", "-g", "daemon off;"]

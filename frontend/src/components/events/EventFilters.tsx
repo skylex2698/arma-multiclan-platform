@@ -1,70 +1,71 @@
-import { Search, Filter } from 'lucide-react';
+import { Search } from 'lucide-react';
+import type { Game } from '../../types';
 
 interface EventFiltersProps {
   searchQuery: string;
   onSearchChange: (query: string) => void;
-  gameTypeFilter: string;
-  onGameTypeChange: (type: string) => void;
+  gameIdFilter: string;
+  onGameIdChange: (type: string) => void;
   statusFilter: string;
   onStatusChange: (status: string) => void;
   isAdmin?: boolean;
+  games: Game[];
 }
 
 export function EventFilters({
   searchQuery,
   onSearchChange,
-  gameTypeFilter,
-  onGameTypeChange,
+  gameIdFilter,
+  onGameIdChange,
   statusFilter,
   onStatusChange,
   isAdmin,
+  games,
 }: EventFiltersProps) {
   return (
-    <div className="card mb-6">
-      <div className="flex items-center gap-2 mb-4">
-        <Filter className="h-5 w-5 text-military-600 dark:text-gray-400" />
-        <h2 className="text-lg font-semibold text-military-900 dark:text-gray-100">Filtros</h2>
+    <section className="panel mb-6">
+      <div className="panel-header">
+        <div>
+          <h2 className="section-title">Filtros</h2>
+          <p className="section-caption">
+            Refina la lista sin alargar el layout ni duplicar controles.
+          </p>
+        </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        {/* Búsqueda */}
+      <div className="form-grid-3">
         <div>
-          <label className="block text-sm font-medium text-military-700 dark:text-gray-300 mb-1">
-            Buscar
-          </label>
+          <label className="field-label">Buscar</label>
           <div className="relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-military-400 dark:text-gray-500" />
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-military-400 dark:text-gray-500" />
             <input
               type="text"
               value={searchQuery}
               onChange={(e) => onSearchChange(e.target.value)}
-              placeholder="Nombre del evento..."
-              className="input pl-10"
+              placeholder="Nombre del evento"
+              className="input pl-9"
             />
           </div>
         </div>
 
-        {/* Tipo de juego */}
         <div>
-          <label className="block text-sm font-medium text-military-700 dark:text-gray-300 mb-1">
-            Juego
-          </label>
+          <label className="field-label">Juego</label>
           <select
-            value={gameTypeFilter}
-            onChange={(e) => onGameTypeChange(e.target.value)}
+            value={gameIdFilter}
+            onChange={(e) => onGameIdChange(e.target.value)}
             className="input"
           >
             <option value="">Todos</option>
-            <option value="ARMA_3">Arma 3</option>
-            <option value="ARMA_REFORGER">Arma Reforger</option>
+            {games.map((game) => (
+              <option key={game.id} value={game.id}>
+                {game.name}
+              </option>
+            ))}
           </select>
         </div>
 
-        {/* Estado */}
         <div>
-          <label className="block text-sm font-medium text-military-700 dark:text-gray-300 mb-1">
-            Estado
-          </label>
+          <label className="field-label">Estado</label>
           <select
             value={statusFilter}
             onChange={(e) => onStatusChange(e.target.value)}
@@ -78,6 +79,6 @@ export function EventFilters({
           </select>
         </div>
       </div>
-    </div>
+    </section>
   );
 }

@@ -3,9 +3,124 @@
 import { prisma } from '../index';
 import { logger } from '../utils/logger';
 import { sanitizeHTML } from '../utils/sanitizer';
-import { EventStatus, GameType, SlotStatus } from '@prisma/client';
+import {
+  EventStatus,
+  EventVisibility,
+  GameIdentityMode,
+  GameIdentityStatus,
+  SlotStatus,
+  UserRole,
+} from '@prisma/client';
 
 export class EventService {
+  private buildDeletedAtFilter(includeDeleted = false) {
+    return includeDeleted ? { not: null } : null;
+  }
+
+  private assertScheduledDateNotInPast(scheduledDate: Date) {
+    if (scheduledDate.getTime() < Date.now()) {
+      throw new Error('No se puede programar un evento en una fecha pasada');
+    }
+  }
+
+  private validateSquadStructure(
+    squads: Array<{
+      id?: string;
+      name: string;
+      isCommand?: boolean;
+      parentSquadId?: string;
+      reservedForClanId?: string | null;
+      slots: Array<{ role: string; order: number }>;
+    }>
+  ) {
+    if (squads.length === 0) {
+      throw new Error('Debes crear al menos una escuadra');
+    }
+
+    const commandSquads = squads.filter((squad) => squad.isCommand);
+    if (commandSquads.length > 1) {
+      throw new Error('Solo puede existir una escuadra marcada como mando de misión');
+    }
+
+    for (const squad of squads) {
+      if (!squad.name.trim()) {
+        throw new Error('Todas las escuadras deben tener un nombre');
+      }
+
+      if (!squad.slots.length) {
+        throw new Error(`La escuadra "${squad.name}" debe tener al menos un slot`);
+      }
+
+      if (squad.isCommand && squad.parentSquadId) {
+        throw new Error(`La escuadra "${squad.name}" no puede ser mando y tener enlace externo`);
+      }
+    }
+  }
+
+  private async validateClanIds(clanIds: string[]) {
+    if (!clanIds.length) {
+      return;
+    }
+
+    const uniqueClanIds = Array.from(new Set(clanIds));
+    const clans = await prisma.clan.findMany({
+      where: {
+        id: { in: uniqueClanIds },
+      },
+      select: { id: true },
+    });
+
+    if (clans.length !== uniqueClanIds.length) {
+      throw new Error('Hay clanes seleccionados que no existen');
+    }
+  }
+
+  private validateReservedSquadClans(
+    visibility: EventVisibility,
+    invitedClanIds: string[],
+    creatorClanId: string | null | undefined,
+    squads: Array<{ name: string; reservedForClanId?: string | null }>
+  ) {
+    if (visibility !== EventVisibility.PRIVATE) {
+      const reservedSquad = squads.find((squad) => Boolean(squad.reservedForClanId));
+      if (reservedSquad) {
+        throw new Error(
+          `La escuadra "${reservedSquad.name}" no puede reservarse para un clan en eventos públicos`
+        );
+      }
+      return;
+    }
+
+    const allowedClanIds = new Set(invitedClanIds);
+    if (creatorClanId) {
+      allowedClanIds.add(creatorClanId);
+    }
+    const invalidReservedSquad = squads.find(
+      (squad) => squad.reservedForClanId && !allowedClanIds.has(squad.reservedForClanId)
+    );
+
+    if (invalidReservedSquad) {
+      throw new Error(
+        `La escuadra "${invalidReservedSquad.name}" solo puede reservarse para un clan invitado o para el clan organizador`
+      );
+    }
+  }
+
+  private isClanAllowedInPrivateEvent(event: {
+    creator: { clanId: string | null } | null;
+    invitedClans?: Array<{ clanId: string }>;
+  }, clanId: string | null) {
+    if (!clanId) {
+      return false;
+    }
+
+    if (event.creator?.clanId === clanId) {
+      return true;
+    }
+
+    return (event.invitedClans || []).some((invitation) => invitation.clanId === clanId);
+  }
+
   // ============================================
   // MÉTODOS DE VERIFICACIÓN DE ESTADO
   // ============================================
@@ -49,6 +164,40 @@ export class EventService {
     return event.status === EventStatus.ACTIVE;
   }
 
+  private buildVisibilityFilter(
+    requesterRole?: UserRole,
+    requesterClanId?: string | null
+  ) {
+    if (requesterRole === UserRole.ADMIN) {
+      return undefined;
+    }
+
+    if (!requesterClanId) {
+      return { visibility: EventVisibility.PUBLIC };
+    }
+
+    return {
+      OR: [
+        { visibility: EventVisibility.PUBLIC },
+        { creator: { clanId: requesterClanId } },
+        {
+          invitedClans: {
+            some: {
+              clanId: requesterClanId,
+            },
+          },
+        },
+        {
+          squads: {
+            some: {
+              reservedForClanId: requesterClanId,
+            },
+          },
+        },
+      ],
+    };
+  }
+
   // ============================================
   // MÉTODOS DE LISTADO
   // ============================================
@@ -56,16 +205,19 @@ export class EventService {
   // Listar eventos con filtros y paginación
   async getAllEvents(filters?: {
     status?: EventStatus;
-    gameType?: GameType;
+    gameId?: string;
     upcoming?: boolean;
     includeAll?: boolean; // Si true, muestra todos los estados
     deleted?: boolean; // Si true, muestra solo eventos soft-deleted (admin)
     search?: string;
     page?: number;
     limit?: number;
-  }) {
+    requesterRole?: UserRole;
+    requesterClanId?: string | null;
+    }) {
     // Primero verificar y finalizar eventos expirados
     await this.checkAndFinishExpiredEvents();
+    const includeDeletedChildren = Boolean(filters?.deleted);
 
     const now = new Date();
     const page = filters?.page || 1;
@@ -92,8 +244,8 @@ export class EventService {
       whereClause.status = EventStatus.ACTIVE;
     }
 
-    if (filters?.gameType) {
-      whereClause.gameType = filters.gameType;
+    if (filters?.gameId) {
+      whereClause.gameId = filters.gameId;
     }
 
     if (filters?.upcoming) {
@@ -106,12 +258,22 @@ export class EventService {
       whereClause.name = { contains: filters.search, mode: 'insensitive' };
     }
 
+    const visibilityFilter = this.buildVisibilityFilter(
+      filters?.requesterRole,
+      filters?.requesterClanId
+    );
+
+    if (visibilityFilter) {
+      Object.assign(whereClause, visibilityFilter);
+    }
+
     // Obtener total y eventos en paralelo
     const [total, events] = await Promise.all([
       prisma.event.count({ where: whereClause }),
       prisma.event.findMany({
         where: whereClause,
         include: {
+          game: true,
           creator: {
             select: {
               id: true,
@@ -127,6 +289,9 @@ export class EventService {
             }
           },
           squads: {
+            where: {
+              deletedAt: this.buildDeletedAtFilter(includeDeletedChildren),
+            },
             include: {
               reservedForClan: {
                 select: {
@@ -137,6 +302,9 @@ export class EventService {
                 },
               },
               slots: {
+                where: {
+                  deletedAt: this.buildDeletedAtFilter(includeDeletedChildren),
+                },
                 include: {
                   user: {
                     select: {
@@ -160,7 +328,18 @@ export class EventService {
             select: {
               squads: true
             }
-          }
+          },
+          invitedClans: {
+            select: {
+              clan: {
+                select: {
+                  id: true,
+                  name: true,
+                  tag: true,
+                },
+              },
+            },
+          },
         },
         // Ordenar por fecha más próxima primero
         orderBy: { scheduledDate: 'asc' },
@@ -188,10 +367,28 @@ export class EventService {
   }
 
   // Obtener evento por ID
-  async getEventById(id: string) {
-    const event = await prisma.event.findUnique({
-      where: { id },
+  async getEventById(
+    id: string,
+    options?: {
+      deleted?: boolean;
+      requesterRole?: UserRole;
+      requesterClanId?: string | null;
+    }
+  ) {
+    const includeDeletedChildren = Boolean(options?.deleted);
+    const visibilityFilter = this.buildVisibilityFilter(
+      options?.requesterRole,
+      options?.requesterClanId
+    );
+
+    const event = await prisma.event.findFirst({
+      where: {
+        id,
+        ...(options?.deleted ? { deletedAt: { not: null } } : {}),
+        ...(visibilityFilter || {}),
+      },
       include: {
+        game: true,
         creator: {
           select: {
             id: true,
@@ -212,7 +409,16 @@ export class EventService {
           },
         },
         squads: {
+          where: {
+            deletedAt: this.buildDeletedAtFilter(includeDeletedChildren),
+          },
           include: {
+            parentSquad: {
+              select: {
+                id: true,
+                name: true,
+              },
+            },
             reservedForClan: {
               select: {
                 id: true,
@@ -222,6 +428,9 @@ export class EventService {
               },
             },
             slots: {
+              where: {
+                deletedAt: this.buildDeletedAtFilter(includeDeletedChildren),
+              },
               include: {
                 user: {
                   select: {
@@ -252,6 +461,18 @@ export class EventService {
             order: 'asc',
           },
         },
+        invitedClans: {
+          select: {
+            clan: {
+              select: {
+                id: true,
+                name: true,
+                tag: true,
+                avatarUrl: true,
+              },
+            },
+          },
+        },
       },
     });
 
@@ -278,9 +499,12 @@ export class EventService {
     name: string;
     description?: string;
     briefing?: string;
-    gameType: GameType;
+    gameId: string;
     scheduledDate: Date;
+    timezone?: string;
     creatorId: string;
+    visibility?: EventVisibility;
+    invitedClanIds?: string[];
     serverName?: string;
     serverIp?: string;
     serverPort?: string;
@@ -293,12 +517,37 @@ export class EventService {
       isCommand?: boolean;
       parentSquadId?: string;
       parentFrequency?: string;
+      reservedForClanId?: string | null;
       slots: Array<{
         role: string;
         order: number;
       }>;
     }>;
   }) {
+    this.assertScheduledDateNotInPast(data.scheduledDate);
+    this.validateSquadStructure(data.squads);
+
+    const creator = await prisma.user.findUnique({
+      where: { id: data.creatorId },
+      select: {
+        role: true,
+        clanId: true,
+      },
+    });
+
+    if (!creator) {
+      throw new Error('Usuario creador no encontrado');
+    }
+
+    const visibility = data.visibility || EventVisibility.PRIVATE;
+    const invitedClanIds = Array.from(new Set(data.invitedClanIds || []));
+    const reservedClanIds = data.squads
+      .map((squad) => squad.reservedForClanId)
+      .filter((clanId): clanId is string => Boolean(clanId));
+
+    this.validateReservedSquadClans(visibility, invitedClanIds, creator.clanId, data.squads);
+    await this.validateClanIds([...invitedClanIds, ...reservedClanIds]);
+
     // Guardar referencias de jerarquía para procesarlas después
     // El frontend envía IDs temporales (ej: "1672531200000") que no existen en la BD
     const squadHierarchy = data.squads.map(squad => ({
@@ -316,14 +565,24 @@ export class EventService {
           description: data.description,
           // SEGURIDAD: Sanitizar HTML del briefing para prevenir XSS
           briefing: data.briefing ? sanitizeHTML(data.briefing) : undefined,
-          gameType: data.gameType,
+          gameId: data.gameId,
           scheduledDate: data.scheduledDate,
+          timezone: data.timezone || 'UTC',
           creatorId: data.creatorId,
           status: EventStatus.ACTIVE,
+          visibility,
           serverName: data.serverName || null,
           serverIp: data.serverIp || null,
           serverPort: data.serverPort || null,
           serverPassword: data.serverPassword || null,
+          invitedClans: invitedClanIds.length > 0
+            ? {
+                create: invitedClanIds.map((clanId) => ({
+                  clanId,
+                  invitedBy: data.creatorId,
+                })),
+              }
+            : undefined,
           squads: {
             create: data.squads.map(squad => ({
               name: squad.name,
@@ -334,6 +593,7 @@ export class EventService {
               // NO asignamos parentSquadId aquí - lo hacemos después
               parentSquadId: null,
               parentFrequency: null,
+              reservedForClanId: squad.reservedForClanId || null,
               // ============================================
               slots: {
                 create: squad.slots.map(slot => ({
@@ -351,12 +611,40 @@ export class EventService {
               nickname: true
             }
           },
+          game: true,
           squads: {
+            where: {
+              deletedAt: null,
+            },
             include: {
-              slots: true
+              reservedForClan: {
+                select: {
+                  id: true,
+                  name: true,
+                  tag: true,
+                  avatarUrl: true,
+                },
+              },
+              slots: {
+                where: {
+                  deletedAt: null,
+                },
+              }
             },
             orderBy: { order: 'asc' }
-          }
+          },
+          invitedClans: {
+            select: {
+              clan: {
+                select: {
+                  id: true,
+                  name: true,
+                  tag: true,
+                  avatarUrl: true,
+                },
+              },
+            },
+          },
         }
       });
 
@@ -403,12 +691,40 @@ export class EventService {
               nickname: true
             }
           },
+          game: true,
           squads: {
+            where: {
+              deletedAt: null,
+            },
             include: {
-              slots: true
+              reservedForClan: {
+                select: {
+                  id: true,
+                  name: true,
+                  tag: true,
+                  avatarUrl: true,
+                },
+              },
+              slots: {
+                where: {
+                  deletedAt: null,
+                },
+              }
             },
             orderBy: { order: 'asc' }
-          }
+          },
+          invitedClans: {
+            select: {
+              clan: {
+                select: {
+                  id: true,
+                  name: true,
+                  tag: true,
+                  avatarUrl: true,
+                },
+              },
+            },
+          },
         }
       });
 
@@ -422,7 +738,7 @@ export class EventService {
           eventId: event.id,
           details: JSON.stringify({
             name: event.name,
-            gameType: event.gameType,
+            gameId: event.gameId,
             squadCount: event.squads.length,
             totalSlots: event.squads.reduce((acc, s) => acc + s.slots.length, 0)
           })
@@ -444,15 +760,24 @@ export class EventService {
     description?: string;
     briefing?: string;
     scheduledDate: Date;
+    timezone?: string;
     creatorId: string;
   }) {
+    this.assertScheduledDateNotInPast(data.scheduledDate);
+
     // Obtener el evento plantilla
     const templateEvent = await prisma.event.findUnique({
       where: { id: data.templateEventId },
       include: {
         squads: {
+          where: {
+            deletedAt: null,
+          },
           include: {
             slots: {
+              where: {
+                deletedAt: null,
+              },
               orderBy: { order: 'asc' },
             },
           },
@@ -472,8 +797,9 @@ export class EventService {
         description: data.description,
         // SEGURIDAD: Sanitizar HTML del briefing para prevenir XSS
         briefing: data.briefing ? sanitizeHTML(data.briefing) : undefined,
-        gameType: templateEvent.gameType,
+        gameId: templateEvent.gameId,
         scheduledDate: data.scheduledDate,
+        timezone: data.timezone || templateEvent.timezone,
         creatorId: data.creatorId,
         status: 'ACTIVE',
         squads: {
@@ -509,9 +835,16 @@ export class EventService {
             },
           },
         },
+        game: true,
         squads: {
+          where: {
+            deletedAt: null,
+          },
           include: {
             slots: {
+              where: {
+                deletedAt: null,
+              },
               orderBy: { order: 'asc' },
             },
           },
@@ -546,8 +879,11 @@ export class EventService {
       name?: string;
       description?: string;
       briefing?: string;
-      gameType?: GameType;
+      gameId?: string;
       scheduledDate?: Date;
+      timezone?: string;
+      visibility?: EventVisibility;
+      invitedClanIds?: string[];
       serverName?: string;
       serverIp?: string;
       serverPort?: string;
@@ -560,6 +896,7 @@ export class EventService {
         isCommand?: boolean;
         parentSquadId?: string;
         parentFrequency?: string;
+        reservedForClanId?: string | null;
         slots: Array<{
           id?: string;
           role: string;
@@ -569,12 +906,45 @@ export class EventService {
     },
     userId: string
   ) {
+    if (data.scheduledDate) {
+      this.assertScheduledDateNotInPast(data.scheduledDate);
+    }
+
+    const actor = await prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        role: true,
+        clanId: true,
+      },
+    });
+
+    if (!actor) {
+      throw new Error('Usuario no encontrado');
+    }
+
     const event = await prisma.event.findUnique({
       where: { id },
       include: {
+        creator: {
+          select: {
+            clanId: true,
+          },
+        },
+        invitedClans: {
+          select: {
+            clanId: true,
+          },
+        },
         squads: {
+          where: {
+            deletedAt: null,
+          },
           include: {
-            slots: true,
+            slots: {
+              where: {
+                deletedAt: null,
+              },
+            },
           },
         },
       },
@@ -589,9 +959,34 @@ export class EventService {
       throw new Error('No se puede modificar un evento finalizado');
     }
 
+    const visibility = data.visibility ?? event.visibility;
+    const invitedClanIds = Array.from(
+      new Set(
+        data.invitedClanIds ??
+          event.invitedClans?.map((invitation) => invitation.clanId) ??
+          []
+      )
+    );
+    const reservedClanIds = (data.squads || [])
+      .map((squad) => squad.reservedForClanId)
+      .filter((clanId): clanId is string => Boolean(clanId));
+
+    if (data.squads) {
+      this.validateReservedSquadClans(
+        visibility,
+        invitedClanIds,
+        event.creator?.clanId,
+        data.squads
+      );
+    }
+
+    await this.validateClanIds([...invitedClanIds, ...reservedClanIds]);
+
     const updatedEvent = await prisma.$transaction(async (tx) => {
       // Si se envían escuadras, actualizar estructura completa
       if (data.squads) {
+        this.validateSquadStructure(data.squads);
+
         // Helper para verificar si un ID es un UUID válido (real de la BD)
         const isRealUUID = (sqId: string | undefined): boolean => {
           if (!sqId) return false;
@@ -647,6 +1042,9 @@ export class EventService {
                   order: squadData.order,
                   frequency: squadData.frequency || null,
                   isCommand: squadData.isCommand || false,
+                  parentSquadId: null,
+                  parentFrequency: null,
+                  reservedForClanId: squadData.reservedForClanId || null,
                 },
               });
 
@@ -698,6 +1096,7 @@ export class EventService {
                 isCommand: squadData.isCommand || false,
                 parentSquadId: null,
                 parentFrequency: null,
+                reservedForClanId: squadData.reservedForClanId || null,
                 slots: {
                   create: squadData.slots.map((slot) => ({
                     role: slot.role,
@@ -716,11 +1115,15 @@ export class EventService {
 
         // 4. Actualizar parentSquadId para todos los squads que tienen jerarquía
         for (const hierarchy of squadHierarchyInfo) {
-          if (hierarchy.parentInputId) {
-            const currentSquadRealId = hierarchy.inputId
-              ? inputIdToRealId.get(hierarchy.inputId)
-              : null;
+          const currentSquadRealId = hierarchy.inputId
+            ? inputIdToRealId.get(hierarchy.inputId)
+            : null;
 
+          if (!currentSquadRealId) {
+            continue;
+          }
+
+          if (hierarchy.parentInputId) {
             let parentRealId: string | null = null;
             if (isRealUUID(hierarchy.parentInputId)) {
               parentRealId = hierarchy.parentInputId;
@@ -728,7 +1131,11 @@ export class EventService {
               parentRealId = inputIdToRealId.get(hierarchy.parentInputId) || null;
             }
 
-            if (currentSquadRealId && parentRealId) {
+            if (parentRealId === currentSquadRealId) {
+              throw new Error('Una escuadra no puede enlazarse consigo misma');
+            }
+
+            if (parentRealId) {
               await tx.squad.update({
                 where: { id: currentSquadRealId },
                 data: {
@@ -737,7 +1144,32 @@ export class EventService {
                 },
               });
             }
+          } else {
+            await tx.squad.update({
+              where: { id: currentSquadRealId },
+              data: {
+                parentSquadId: null,
+                parentFrequency: null,
+              },
+            });
           }
+        }
+
+      }
+
+      if (data.invitedClanIds !== undefined) {
+        await tx.eventInvitation.deleteMany({
+          where: { eventId: id },
+        });
+
+        if (invitedClanIds.length > 0) {
+          await tx.eventInvitation.createMany({
+            data: invitedClanIds.map((clanId) => ({
+              eventId: id,
+              clanId,
+              invitedBy: userId,
+            })),
+          });
         }
       }
 
@@ -749,14 +1181,17 @@ export class EventService {
           description: data.description,
           // SEGURIDAD: Sanitizar HTML del briefing para prevenir XSS
           briefing: data.briefing ? sanitizeHTML(data.briefing) : undefined,
-          gameType: data.gameType,
+          gameId: data.gameId,
           scheduledDate: data.scheduledDate,
+          ...(data.timezone !== undefined && { timezone: data.timezone || 'UTC' }),
+          ...(data.visibility !== undefined && { visibility: data.visibility }),
           ...(data.serverName !== undefined && { serverName: data.serverName || null }),
           ...(data.serverIp !== undefined && { serverIp: data.serverIp || null }),
           ...(data.serverPort !== undefined && { serverPort: data.serverPort || null }),
           ...(data.serverPassword !== undefined && { serverPassword: data.serverPassword || null }),
         },
         include: {
+          game: true,
           creator: {
             select: {
               id: true,
@@ -770,8 +1205,22 @@ export class EventService {
             },
           },
           squads: {
+            where: {
+              deletedAt: null,
+            },
             include: {
+              reservedForClan: {
+                select: {
+                  id: true,
+                  name: true,
+                  tag: true,
+                  avatarUrl: true,
+                },
+              },
               slots: {
+                where: {
+                  deletedAt: null,
+                },
                 include: {
                   user: {
                     select: {
@@ -797,6 +1246,18 @@ export class EventService {
               },
             },
             orderBy: { order: 'asc' },
+          },
+          invitedClans: {
+            select: {
+              clan: {
+                select: {
+                  id: true,
+                  name: true,
+                  tag: true,
+                  avatarUrl: true,
+                },
+              },
+            },
           },
         },
       });
@@ -840,22 +1301,17 @@ export class EventService {
     // Cascade manual atómico: soft-delete hijos antes que el padre.
     // El middleware convierte delete/deleteMany en update/updateMany con deletedAt.
     await prisma.$transaction(async (tx) => {
-      // 1. Hard-delete communication nodes (no tienen soft delete, son regenerables)
-      await tx.communicationNode.deleteMany({
-        where: { eventId: id },
-      });
-
-      // 2. Soft-delete todos los slots de las escuadras del evento
+      // 1. Soft-delete todos los slots de las escuadras del evento
       await tx.slot.deleteMany({
         where: { squad: { eventId: id } },
       });
 
-      // 3. Soft-delete todas las escuadras del evento
+      // 2. Soft-delete todas las escuadras del evento
       await tx.squad.deleteMany({
         where: { eventId: id },
       });
 
-      // 4. Soft-delete el evento
+      // 3. Soft-delete el evento
       await tx.event.delete({
         where: { id },
       });
@@ -894,6 +1350,7 @@ export class EventService {
       return tx.event.findUnique({
         where: { id },
         include: {
+          game: true,
           creator: {
             select: {
               id: true,
@@ -909,8 +1366,14 @@ export class EventService {
             },
           },
           squads: {
+            where: {
+              deletedAt: null,
+            },
             include: {
               slots: {
+                where: {
+                  deletedAt: null,
+                },
                 include: {
                   user: {
                     select: {
@@ -961,6 +1424,7 @@ export class EventService {
       where: { id },
       data: { status },
       include: {
+        game: true,
         creator: {
           select: {
             id: true,
@@ -979,6 +1443,144 @@ export class EventService {
     });
 
     return updatedEvent;
+  }
+
+  async getEventSlotlist(eventId: string) {
+    const event = await prisma.event.findUnique({
+      where: { id: eventId },
+      select: {
+        gameId: true,
+      },
+    });
+
+    if (!event) {
+      throw new Error('Evento no encontrado');
+    }
+
+    const slotlist = await prisma.event.findUnique({
+      where: { id: eventId },
+      include: {
+        game: true,
+        squads: {
+          where: {
+            deletedAt: null,
+          },
+          include: {
+            reservedForClan: {
+              select: {
+                id: true,
+                name: true,
+                tag: true,
+              },
+            },
+            slots: {
+              where: {
+                deletedAt: null,
+              },
+              include: {
+                user: {
+                  select: {
+                    id: true,
+                    nickname: true,
+                    email: true,
+                    clanId: true,
+                    clan: {
+                      select: {
+                        id: true,
+                        name: true,
+                        tag: true,
+                      },
+                    },
+                    gameIdentities: {
+                      where: {
+                        gameId: event.gameId,
+                      },
+                      select: {
+                        providerKind: true,
+                        value: true,
+                        normalizedValue: true,
+                        status: true,
+                        verifiedAt: true,
+                      },
+                      take: 1,
+                    },
+                  },
+                },
+              },
+              orderBy: { order: 'asc' },
+            },
+          },
+          orderBy: { order: 'asc' },
+        },
+      },
+    });
+
+    if (!slotlist) {
+      throw new Error('Evento no encontrado');
+    }
+
+    return {
+      event: {
+        id: slotlist.id,
+        name: slotlist.name,
+        scheduledDate: slotlist.scheduledDate,
+        timezone: slotlist.timezone,
+        game: slotlist.game,
+      },
+      squads: slotlist.squads.map((squad) => ({
+        id: squad.id,
+        name: squad.name,
+        order: squad.order,
+        reservedForClan: squad.reservedForClan,
+        slots: squad.slots.map((slot) => {
+          const identity = slot.user?.gameIdentities[0] || null;
+
+          return {
+            id: slot.id,
+            role: slot.role,
+            order: slot.order,
+            status: slot.status,
+            user: slot.user
+              ? {
+                  id: slot.user.id,
+                  nickname: slot.user.nickname,
+                  email: slot.user.email,
+                  clan: slot.user.clan,
+                  identity: identity
+                    ? {
+                        providerKind: identity.providerKind,
+                        value: identity.value,
+                        normalizedValue: identity.normalizedValue,
+                        status: identity.status,
+                        verifiedAt: identity.verifiedAt,
+                      }
+                    : null,
+                }
+              : null,
+          };
+        }),
+      })),
+    };
+  }
+
+  async getEventWhitelist(eventId: string) {
+    const slotlist = await this.getEventSlotlist(eventId);
+
+    if (slotlist.event.game.identityMode === GameIdentityMode.NONE) {
+      throw new Error('Este juego no usa whitelist basada en identidad');
+    }
+
+    const identifiers = Array.from(new Set(slotlist.squads
+      .flatMap((squad) => squad.slots)
+      .map((slot) => slot.user?.identity)
+      .filter((identity) => Boolean(identity && identity.status === GameIdentityStatus.VERIFIED && identity.normalizedValue))
+      .map((identity) => identity!.normalizedValue as string)));
+
+    return {
+      event: slotlist.event,
+      identifiers,
+      content: identifiers.join('\n'),
+    };
   }
 
   // Generar token de compartir público
@@ -1006,6 +1608,7 @@ export class EventService {
     const event = await prisma.event.findUnique({
       where: { publicShareToken: token },
       include: {
+        game: true,
         creator: {
           select: {
             id: true,
@@ -1022,6 +1625,9 @@ export class EventService {
           },
         },
         squads: {
+          where: {
+            deletedAt: null,
+          },
           include: {
             reservedForClan: {
               select: {
@@ -1032,6 +1638,9 @@ export class EventService {
               },
             },
             slots: {
+              where: {
+                deletedAt: null,
+              },
               include: {
                 user: {
                   select: {

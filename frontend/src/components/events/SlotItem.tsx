@@ -1,9 +1,10 @@
-import { UserPlus, UserMinus, UserCog, Shield } from 'lucide-react';
+import { useState } from 'react';
+import { UserCog, UserMinus, UserPlus } from 'lucide-react';
 import { Badge } from '../ui/Badge';
 import { UserAvatar } from '../ui/UserAvatar';
 import type { Slot, User } from '../../types';
 import { useAuthStore } from '../../store/authStore';
-import { useState } from 'react';
+import { hasPermission, PERMISSIONS } from '../../utils/permissions';
 
 interface SlotItemProps {
   slot: Slot;
@@ -21,7 +22,6 @@ interface SlotItemProps {
     slotRole?: string;
   };
   squadReservedForClanId?: string | null;
-  currentUserClanId?: string | null;
 }
 
 export function SlotItem({
@@ -36,7 +36,6 @@ export function SlotItem({
   availableUsers = [],
   getUserSlotInfo,
   squadReservedForClanId,
-  currentUserClanId,
 }: SlotItemProps) {
   const user = useAuthStore((state) => state.user);
   const [showUserSelector, setShowUserSelector] = useState(false);
@@ -46,205 +45,180 @@ export function SlotItem({
   const isOccupiedByMe = slot.userId === user?.id;
   const isFinished = eventStatus === 'FINISHED';
   const isAdmin = user?.role === 'ADMIN';
+  const canManageSlots = hasPermission(user, PERMISSIONS.SLOT_MANAGE);
+  const canCreateExternalUsers = hasPermission(user, PERMISSIONS.USER_EXTERNAL_CREATE);
+  const currentUserClanId = user?.clan?.id ?? null;
 
-  // Verificar si la escuadra esta reservada para otro clan
   const isReservedForOtherClan =
     !!squadReservedForClanId &&
-    currentUserClanId !== squadReservedForClanId &&
+    squadReservedForClanId !== currentUserClanId &&
     !isAdmin;
 
-  const canInteract = eventStatus === 'ACTIVE' && user && !isReservedForOtherClan;
+  const canInteract = eventStatus === 'ACTIVE' && !!user && !isReservedForOtherClan;
 
-  // Admin/líder solo puede asignar en eventos activos (no finalizados ni inactivos)
   const canAdminAssign =
     eventStatus === 'ACTIVE' &&
-    (user?.role === 'ADMIN' || user?.role === 'CLAN_LEADER') &&
-    (onAdminAssign || onCreateExternal) &&
-    (availableUsers.length > 0 || !!onCreateExternal);
+    !isReservedForOtherClan &&
+    canManageSlots &&
+    (Boolean(onAdminAssign) || (canCreateExternalUsers && Boolean(onCreateExternal)));
 
-  // Admin/líder puede desapuntar solo si el evento no está finalizado
   const canAdminUnassign =
     !isFinished &&
     slot.status === 'OCCUPIED' &&
     !isOccupiedByMe &&
-    onAdminUnassign &&
-    (user?.role === 'ADMIN' ||
-      (user?.role === 'CLAN_LEADER' && slot.user?.clan?.id === user?.clan?.id));
-
-  const handleClick = () => {
-    if (!canInteract || isLoading || showUserSelector) return;
-
-    if (isFree) {
-      onAssign(slot.id);
-    } else if (isOccupiedByMe) {
-      onUnassign(slot.id);
-    }
-  };
-
-  const handleAdminAssign = (userId: string) => {
-    if (onAdminAssign) {
-      onAdminAssign(slot.id, userId);
-      setShowUserSelector(false);
-    }
-  };
+    !!onAdminUnassign &&
+    (user?.role === 'ADMIN' || (canManageSlots && slot.user?.clan?.id === user?.clan?.id));
 
   return (
-    <div className="relative">
+    <div>
       <div
-        className={`
-          flex items-center justify-between p-3 rounded-lg border-2 transition-all
-          ${isFree && !isReservedForOtherClan ? 'slot-free' : ''}
-          ${isFree && isReservedForOtherClan ? 'border-amber-200 dark:border-amber-800 bg-amber-50/50 dark:bg-amber-900/10' : ''}
-          ${isOccupiedByMe ? 'slot-mine' : ''}
-          ${slot.status === 'OCCUPIED' && !isOccupiedByMe ? 'slot-occupied' : ''}
-          ${canInteract && (isFree || isOccupiedByMe) && !showUserSelector ? 'cursor-pointer hover:shadow-md' : 'cursor-default'}
-        `}
-        onClick={handleClick}
+        className={`rounded-md border px-3 py-2 transition-colors ${
+          isOccupiedByMe
+            ? 'border-green-300 bg-green-50/70 dark:border-green-700 dark:bg-green-900/20'
+            : slot.status === 'OCCUPIED'
+              ? 'border-military-200 bg-military-50/50 dark:border-gray-700 dark:bg-gray-900/40'
+              : isReservedForOtherClan
+                ? 'border-amber-300 bg-amber-50/70 dark:border-amber-700 dark:bg-amber-900/20'
+                : 'border-military-200 bg-white dark:border-gray-700 dark:bg-gray-800'
+        }`}
       >
-        <div className="flex items-center gap-3 flex-1">
-          {slot.user ? (
-            <UserAvatar user={slot.user} size="md" showBorder={true} />
-          ) : (
-            <div className={`w-10 h-10 rounded-full flex items-center justify-center border-2 ${
-              isReservedForOtherClan
-                ? 'bg-amber-100 dark:bg-amber-900/30 border-amber-200 dark:border-amber-800'
-                : 'bg-military-100 dark:bg-gray-600 border-military-200 dark:border-gray-500'
-            }`}>
-              {isReservedForOtherClan ? (
-                <Shield className="h-5 w-5 text-amber-400 dark:text-amber-600" />
-              ) : (
-                <UserPlus className="h-5 w-5 text-military-400 dark:text-gray-400" />
+        <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+          <div className="min-w-0 flex-1">
+            <div className="flex flex-wrap items-center gap-2">
+              <p className="break-words text-sm font-medium text-military-900 dark:text-gray-100">
+                {slot.role}
+              </p>
+              {isOccupiedByMe && <Badge variant="success">Tu slot</Badge>}
+              {slot.status === 'OCCUPIED' && !isOccupiedByMe && !canAdminUnassign && (
+                <span className="section-caption">Ocupado</span>
               )}
             </div>
-          )}
 
-          <div className="flex-1">
-            <p className="font-medium text-military-900 dark:text-gray-100">{slot.role}</p>
-            {slot.user && (
-              <p className="text-sm text-military-600 dark:text-gray-400">
-                {slot.user.clan?.tag && `${slot.user.clan.tag} `}
-                {slot.user.nickname}
-                {slot.user.status === 'EXTERNAL' && (
-                  <span className="ml-1 inline-flex items-center px-1 py-0.5 rounded text-[9px] font-semibold bg-purple-100 text-purple-700 dark:bg-purple-600/30 dark:text-purple-300">
-                    EXT
+            <div className="meta-inline mt-1">
+              {slot.user ? (
+                <>
+                  <span className="inline-flex items-center gap-2">
+                    <UserAvatar user={slot.user} size="sm" showBorder={true} />
+                    <strong>
+                      {slot.user.clan?.tag ? `${slot.user.clan.tag} ` : ''}
+                      {slot.user.nickname}
+                    </strong>
                   </span>
-                )}
-              </p>
+                  {slot.user.status === 'EXTERNAL' && (
+                    <>
+                      <span aria-hidden="true">·</span>
+                      <span>Miembro externo</span>
+                    </>
+                  )}
+                </>
+              ) : isReservedForOtherClan ? (
+                <span>Disponible solo para el clan reservado</span>
+              ) : (
+                <span>Slot libre</span>
+              )}
+            </div>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2">
+            {isFree && canInteract && (
+              <button
+                type="button"
+                className="btn btn-primary btn-sm"
+                disabled={isLoading}
+                onClick={() => onAssign(slot.id)}
+              >
+                <UserPlus className="h-4 w-4" />
+                Apuntarme
+              </button>
             )}
-            {isFree && !isReservedForOtherClan && (
-              <p className="text-sm text-military-500 dark:text-gray-500">Slot disponible</p>
+
+            {isOccupiedByMe && eventStatus === 'ACTIVE' && (
+              <button
+                type="button"
+                className="btn btn-outline btn-sm"
+                disabled={isLoading}
+                onClick={() => onUnassign(slot.id)}
+              >
+                <UserMinus className="h-4 w-4" />
+                Salir
+              </button>
             )}
-            {isFree && isReservedForOtherClan && (
-              <p className="text-sm text-amber-500 dark:text-amber-400">Reservado</p>
+
+            {isFree && canAdminAssign && (
+              <button
+                type="button"
+                className="btn btn-outline btn-sm"
+                disabled={isLoading}
+                onClick={() => setShowUserSelector((current) => !current)}
+              >
+                <UserCog className="h-4 w-4" />
+                Gestionar
+              </button>
+            )}
+
+            {canAdminUnassign && (
+              <button
+                type="button"
+                className="btn btn-outline btn-sm"
+                disabled={isLoading}
+                onClick={() => onAdminUnassign?.(slot.id)}
+              >
+                Quitar
+              </button>
             )}
           </div>
-        </div>
-
-        <div className="flex items-center gap-2">
-          {isOccupiedByMe && (
-            <>
-              <Badge variant="success">Tú</Badge>
-              {eventStatus === 'ACTIVE' && user && (
-                <button
-                  className="btn btn-danger btn-sm"
-                  disabled={isLoading}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onUnassign(slot.id);
-                  }}
-                  title="Desapuntarme"
-                >
-                  <UserMinus className="h-4 w-4" />
-                </button>
-              )}
-            </>
-          )}
-
-          {isFree && canInteract && !showUserSelector && (
-            <button
-              className="btn btn-primary btn-sm"
-              disabled={isLoading}
-              onClick={(e) => {
-                e.stopPropagation();
-                onAssign(slot.id);
-              }}
-              title="Apuntarme"
-            >
-              <UserPlus className="h-4 w-4" />
-            </button>
-          )}
-
-          {/* Botón de asignación por admin/líder */}
-          {isFree && canAdminAssign && !showUserSelector && (
-            <button
-              className="btn btn-secondary btn-sm"
-              disabled={isLoading}
-              onClick={(e) => {
-                e.stopPropagation();
-                setShowUserSelector(true);
-              }}
-              title="Asignar usuario"
-            >
-              <UserCog className="h-4 w-4" />
-            </button>
-          )}
-
-          {/* Botón de desasignar por admin/líder */}
-          {canAdminUnassign && (
-            <button
-              className="btn btn-danger btn-sm"
-              disabled={isLoading}
-              onClick={(e) => {
-                e.stopPropagation();
-                if (onAdminUnassign) {
-                  onAdminUnassign(slot.id);
-                }
-              }}
-              title="Desapuntar usuario"
-            >
-              <UserMinus className="h-4 w-4" />
-            </button>
-          )}
-
-          {slot.status === 'OCCUPIED' && !isOccupiedByMe && !canAdminUnassign && (
-            <Badge variant="info">Ocupado</Badge>
-          )}
         </div>
       </div>
 
-      {/* Selector de usuario */}
       {showUserSelector && (
-        <div className="absolute right-0 top-full mt-1 z-20 bg-white dark:bg-gray-800 border border-military-300 dark:border-gray-700 rounded-lg shadow-lg w-64 max-h-64 overflow-y-auto">
-          <div className="p-2 border-b border-military-200 dark:border-gray-700 bg-military-50 dark:bg-gray-700">
-            <p className="text-xs font-medium text-military-700 dark:text-gray-300">
-              Asignar usuario a este slot:
+        <div className="mt-2 rounded-md border border-military-200 bg-military-50/70 p-3 dark:border-gray-700 dark:bg-gray-900/40">
+          <div className="flex items-center justify-between gap-2">
+            <p className="text-sm font-medium text-military-800 dark:text-gray-200">
+              Asignacion manual
             </p>
+            <button
+              type="button"
+              onClick={() => {
+                setShowUserSelector(false);
+                setExternalName('');
+              }}
+              className="toolbar-link text-xs"
+            >
+              Cerrar
+            </button>
           </div>
-          <div className="p-1">
+
+          <div className="mt-3 max-h-56 space-y-1 overflow-y-auto">
             {availableUsers.length === 0 ? (
-              <p className="text-sm text-military-500 dark:text-gray-400 p-2">
-                No hay usuarios disponibles
+              <p className="text-sm text-military-500 dark:text-gray-400">
+                No hay usuarios disponibles.
               </p>
             ) : (
               availableUsers.map((availableUser) => {
-                const slotInfo = getUserSlotInfo?.(availableUser.id) || { hasSlot: false };
+                const slotInfo = getUserSlotInfo?.(availableUser.id) || {
+                  hasSlot: false,
+                };
 
                 return (
                   <button
                     key={availableUser.id}
-                    onClick={() => handleAdminAssign(availableUser.id)}
-                    className="w-full text-left px-3 py-2 hover:bg-military-50 dark:hover:bg-gray-700 rounded text-sm flex items-center gap-2"
+                    type="button"
+                    onClick={() => {
+                      onAdminAssign?.(slot.id, availableUser.id);
+                      setShowUserSelector(false);
+                    }}
+                    className="flex w-full items-start gap-3 rounded-md px-2 py-2 text-left transition-colors hover:bg-white dark:hover:bg-gray-800"
                     disabled={isLoading}
                   >
                     <UserAvatar user={availableUser} size="sm" showBorder={true} />
-                    <div className="flex-1">
-                      <p className="font-medium text-military-900 dark:text-gray-100">
-                        {availableUser.clan?.tag && `${availableUser.clan.tag} `}
+                    <div className="min-w-0 flex-1">
+                      <p className="break-words text-sm font-medium text-military-900 dark:text-gray-100">
+                        {availableUser.clan?.tag ? `${availableUser.clan.tag} ` : ''}
                         {availableUser.nickname}
                       </p>
                       {slotInfo.hasSlot && (
-                        <p className="text-xs text-amber-600 dark:text-amber-400">
-                          Ya en: {slotInfo.squadName} - {slotInfo.slotRole}
+                        <p className="text-[12px] text-amber-700 dark:text-amber-400">
+                          Ya ocupa {slotInfo.slotRole} en {slotInfo.squadName}
                         </p>
                       )}
                     </div>
@@ -253,53 +227,39 @@ export function SlotItem({
               })
             )}
           </div>
-          {/* Registrar miembro externo */}
-          {onCreateExternal && (
-            <div className="p-2 border-t border-military-200 dark:border-gray-700">
-              <p className="text-[10px] font-semibold text-military-500 dark:text-gray-400 uppercase mb-1">
-                Registrar miembro externo
-              </p>
-              <form
-                onSubmit={(e) => {
-                  e.preventDefault();
-                  const trimmed = externalName.trim();
-                  if (trimmed.length >= 2) {
-                    onCreateExternal(slot.id, trimmed);
-                    setExternalName('');
-                    setShowUserSelector(false);
-                  }
-                }}
-                className="flex gap-1"
-              >
+
+          {canCreateExternalUsers && onCreateExternal && (
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                const trimmed = externalName.trim();
+                if (trimmed.length < 2) return;
+                onCreateExternal(slot.id, trimmed);
+                setExternalName('');
+                setShowUserSelector(false);
+              }}
+              className="subtle-divider mt-3 grid gap-2 pt-3 md:grid-cols-[minmax(0,1fr)_auto]"
+            >
+              <div>
+                <label className="field-label">Registrar miembro externo</label>
                 <input
                   type="text"
                   value={externalName}
                   onChange={(e) => setExternalName(e.target.value)}
-                  placeholder="Nombre..."
-                  className="input text-xs py-1 px-2 flex-1 min-w-0"
+                  placeholder="Nombre o nick"
+                  className="input"
                   minLength={2}
-                  onClick={(e) => e.stopPropagation()}
                 />
-                <button
-                  type="submit"
-                  disabled={isLoading || externalName.trim().length < 2}
-                  className="btn btn-primary btn-sm text-xs whitespace-nowrap"
-                  onClick={(e) => e.stopPropagation()}
-                >
-                  <UserPlus className="h-3 w-3" />
-                </button>
-              </form>
-            </div>
+              </div>
+              <button
+                type="submit"
+                disabled={isLoading || externalName.trim().length < 2}
+                className="btn btn-primary md:self-end"
+              >
+                Guardar
+              </button>
+            </form>
           )}
-
-          <div className="p-2 border-t border-military-200 dark:border-gray-700">
-            <button
-              onClick={() => { setShowUserSelector(false); setExternalName(''); }}
-              className="w-full px-2 py-1 text-xs text-military-600 dark:text-gray-400 hover:text-military-900 dark:hover:text-gray-100 hover:bg-military-50 dark:hover:bg-gray-700 rounded"
-            >
-              Cancelar
-            </button>
-          </div>
         </div>
       )}
     </div>

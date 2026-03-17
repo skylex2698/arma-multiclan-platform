@@ -2,9 +2,19 @@ import { Request, Response } from 'express';
 import { userService } from '../services/user.service';
 import { successResponse, errorResponse } from '../utils/responses';
 import { logger } from '../utils/logger';
-import { UserRole, UserStatus } from '@prisma/client';
-import { isValidEmail, sanitizeNickname, isStrongPassword } from '../utils/validators';
+import { ClanCreationRequestStatus, GameIdentityProviderKind, GameIdentityStatus, UserRole, UserStatus } from '@prisma/client';
+import { isValidEmail, normalizeEmail, sanitizeNickname, isStrongPassword } from '../utils/validators';
 import { prisma } from '../index';
+import { gameIdentityService } from '../services/gameIdentity.service';
+
+const isValidTimezone = (value: string) => {
+  try {
+    Intl.DateTimeFormat(undefined, { timeZone: value });
+    return true;
+  } catch {
+    return false;
+  }
+};
 
 export class UserController {
   // GET /api/users
@@ -21,8 +31,8 @@ export class UserController {
         limit: limit ? parseInt(limit as string, 10) : 20,
       };
 
-      if (req.user?.role === UserRole.CLAN_LEADER) {
-        // Forzar filtro por clan del líder
+      if (req.user?.role !== UserRole.ADMIN && req.user?.clanId) {
+        // Cualquier rol de gestión de clan ve únicamente a su propio clan.
         filters.clanId = req.user.clanId;
       } else if (clanId) {
         // Admin puede filtrar por cualquier clan
@@ -59,7 +69,7 @@ export class UserController {
   // POST /api/users/:id/validate
   async validateUser(req: Request, res: Response) {
     try {
-      const id = req.params.id as string;
+      const id = req.params.userId as string;
       
       if (!req.user) {
         return errorResponse(res, 'No autenticado', 401);
@@ -180,12 +190,20 @@ export class UserController {
     try {
       const { status, targetClanId } = req.query;
 
+      if (!req.user || (req.user.role !== UserRole.ADMIN && req.user.role !== UserRole.CLAN_LEADER)) {
+        return errorResponse(
+          res,
+          'Solo los administradores y líderes de clan pueden ver estas solicitudes',
+          403
+        );
+      }
+
       // Si es líder de clan, filtrar por su clan
       let filters: any = {
         status: status as string
       };
 
-      if (req.user?.role === UserRole.CLAN_LEADER && req.user.clanId) {
+      if (req.user?.role !== UserRole.ADMIN && req.user?.clanId) {
         filters.targetClanId = req.user.clanId;
       } else if (targetClanId) {
         filters.targetClanId = targetClanId as string;
@@ -214,6 +232,14 @@ export class UserController {
         return errorResponse(res, 'No autenticado', 401);
       }
 
+      if (req.user.role !== UserRole.ADMIN && req.user.role !== UserRole.CLAN_LEADER) {
+        return errorResponse(
+          res,
+          'Solo los administradores y líderes de clan pueden revisar estas solicitudes',
+          403
+        );
+      }
+
       if (typeof approved !== 'boolean') {
         return errorResponse(res, 'El campo "approved" es obligatorio y debe ser booleano', 400);
       }
@@ -237,6 +263,73 @@ export class UserController {
     }
   }
 
+  async getClanCreationRequests(req: Request, res: Response) {
+    try {
+      if (req.user?.role !== UserRole.ADMIN) {
+        return errorResponse(res, 'Solo los administradores pueden revisar estas solicitudes', 403);
+      }
+
+      const status = req.query.status as ClanCreationRequestStatus | undefined;
+      const requests = await userService.getClanCreationRequests({ status });
+
+      return successResponse(
+        res,
+        { requests, count: requests.length },
+        'Solicitudes de creación de clan obtenidas correctamente'
+      );
+    } catch (error: any) {
+      logger.error('Error in getClanCreationRequests', error);
+      return errorResponse(res, error.message || 'Error al obtener solicitudes', 500);
+    }
+  }
+
+  async reviewClanCreationRequest(req: Request, res: Response) {
+    try {
+      if (!req.user || req.user.role !== UserRole.ADMIN) {
+        return errorResponse(res, 'Solo los administradores pueden revisar estas solicitudes', 403);
+      }
+
+      const requestId = req.params.id as string;
+      const { approved, reviewNote } = req.body;
+
+      if (typeof approved !== 'boolean') {
+        return errorResponse(res, 'El campo "approved" es obligatorio y debe ser booleano', 400);
+      }
+
+      const request = await userService.reviewClanCreationRequest(
+        requestId,
+        req.user.id,
+        approved,
+        reviewNote ? String(reviewNote) : undefined
+      );
+
+      return successResponse(
+        res,
+        { request },
+        approved
+          ? 'Solicitud de creación de clan aprobada correctamente'
+          : 'Solicitud de creación de clan rechazada correctamente'
+      );
+    } catch (error: any) {
+      logger.error('Error in reviewClanCreationRequest', error);
+      return errorResponse(res, error.message || 'Error al revisar solicitud', 500);
+    }
+  }
+
+  async getCurrentApprovedClanCreationRequest(req: Request, res: Response) {
+    try {
+      if (!req.user) {
+        return errorResponse(res, 'No autenticado', 401);
+      }
+
+      const request = await userService.getCurrentUserApprovedClanCreationRequest(req.user.id);
+      return successResponse(res, { request }, 'Solicitud aprobada obtenida correctamente');
+    } catch (error: any) {
+      logger.error('Error in getCurrentApprovedClanCreationRequest', error);
+      return errorResponse(res, error.message || 'Error al obtener la solicitud aprobada', 404);
+    }
+  }
+
   // PUT /api/users/profile
   async updateProfile(req: Request, res: Response) {
     try {
@@ -245,7 +338,7 @@ export class UserController {
       }
 
       const userId = req.user.id;
-      const { nickname, email } = req.body;
+      const { nickname, email, timezone } = req.body;
 
       // Validaciones
       if (email) {
@@ -253,16 +346,25 @@ export class UserController {
           return errorResponse(res, 'Email inválido', 400);
         }
 
+        const normalizedEmail = normalizeEmail(String(email));
+
         // Verificar si el email ya está en uso por otro usuario
         const existingUser = await prisma.user.findFirst({
           where: {
-            email,
+            email: {
+              equals: normalizedEmail,
+              mode: 'insensitive',
+            },
             NOT: { id: userId },
           },
         });
 
         if (existingUser) {
-          return errorResponse(res, 'El email ya está en uso', 400);
+          return errorResponse(
+            res,
+            'Solo se permite una cuenta por correo electrónico. Ese email ya está en uso.',
+            400
+          );
         }
       }
 
@@ -277,10 +379,15 @@ export class UserController {
         }
       }
 
+      if (timezone !== undefined && !isValidTimezone(String(timezone))) {
+        return errorResponse(res, 'Zona horaria inválida', 400);
+      }
+
       // Actualizar usuario
       const updatedUser = await userService.updateProfile(userId, {
         nickname,
-        email,
+        email: email ? normalizeEmail(String(email)) : undefined,
+        timezone: timezone ? String(timezone) : undefined,
       });
 
       return successResponse(
@@ -295,6 +402,69 @@ export class UserController {
         error.message || 'Error al actualizar perfil',
         500
       );
+    }
+  }
+
+  async getCurrentUserGameIdentities(req: Request, res: Response) {
+    try {
+      if (!req.user) {
+        return errorResponse(res, 'No autenticado', 401);
+      }
+
+      const identities = await gameIdentityService.listUserIdentities(req.user.id);
+      return successResponse(res, { identities }, 'Identidades obtenidas correctamente');
+    } catch (error: any) {
+      logger.error('Error in getCurrentUserGameIdentities', error);
+      return errorResponse(res, error.message || 'Error al obtener identidades', 500);
+    }
+  }
+
+  async upsertCurrentUserGameIdentity(req: Request, res: Response) {
+    try {
+      if (!req.user) {
+        return errorResponse(res, 'No autenticado', 401);
+      }
+
+      const { gameId } = req.params;
+      const { providerKind, value } = req.body;
+
+      const identity = await gameIdentityService.upsertIdentity(req.user.id, gameId as string, {
+        providerKind: providerKind as GameIdentityProviderKind | undefined,
+        value,
+      });
+
+      return successResponse(res, { identity }, 'Identidad actualizada correctamente');
+    } catch (error: any) {
+      logger.error('Error in upsertCurrentUserGameIdentity', error);
+      return errorResponse(res, error.message || 'Error al actualizar identidad', 500);
+    }
+  }
+
+  async updateGameIdentityStatus(req: Request, res: Response) {
+    try {
+      if (!req.user) {
+        return errorResponse(res, 'No autenticado', 401);
+      }
+
+      const { identityId } = req.params;
+      const { status } = req.body;
+
+      if (!status || !Object.values(GameIdentityStatus).includes(status)) {
+        return errorResponse(res, 'Estado de identidad inválido', 400);
+      }
+
+      const identity = await gameIdentityService.setIdentityStatus(
+        identityId as string,
+        req.user.id,
+        req.user.role,
+        req.user.clanId,
+        status
+      );
+
+      return successResponse(res, { identity }, 'Estado de identidad actualizado');
+    } catch (error: any) {
+      logger.error('Error in updateGameIdentityStatus', error);
+      return errorResponse(res, error.message || 'Error al revisar identidad', 500);
     }
   }
 
@@ -337,6 +507,39 @@ export class UserController {
     }
   }
 
+  async selfResetPassword(req: Request, res: Response) {
+    try {
+      if (!req.user) {
+        return errorResponse(res, 'No autenticado', 401);
+      }
+
+      const { newPassword } = req.body;
+
+      if (!newPassword) {
+        return errorResponse(res, 'La nueva contraseña es obligatoria', 400);
+      }
+
+      if (!isStrongPassword(newPassword)) {
+        return errorResponse(
+          res,
+          'La contraseña debe tener mínimo 8 caracteres, una mayúscula, una minúscula y un número',
+          400
+        );
+      }
+
+      await userService.selfResetPassword(req.user.id, newPassword);
+
+      return successResponse(res, {}, 'Contraseña restablecida correctamente');
+    } catch (error: any) {
+      logger.error('Error in selfResetPassword', error);
+      return errorResponse(
+        res,
+        error.message || 'Error al restablecer contraseña',
+        400
+      );
+    }
+  }
+
   // Actualizar rol de usuario
   async updateRole(req: Request, res: Response) {
     try {
@@ -350,19 +553,24 @@ export class UserController {
         });
       }
 
-      const user = await userService.updateRole(userId, role);
+      if (!req.user) {
+        return errorResponse(res, 'No autenticado', 401);
+      }
 
-      res.json({
-        success: true,
-        data: { user },
-        message: 'Rol actualizado correctamente',
+      if (!Object.values(UserRole).includes(role)) {
+        return errorResponse(res, 'Rol inválido', 400);
+      }
+
+      const user = await userService.updateRole(userId, role, {
+        id: req.user.id,
+        role: req.user.role,
+        clanId: req.user.clanId,
       });
-    } catch (error) {
-      console.error('Error al actualizar rol:', error);
-      res.status(500).json({
-        success: false,
-        message: 'Error al actualizar rol',
-      });
+
+      return successResponse(res, { user }, 'Rol actualizado correctamente');
+    } catch (error: any) {
+      logger.error('Error in updateRole', error);
+      return errorResponse(res, error.message || 'Error al actualizar rol', 500);
     }
   }
 
@@ -394,6 +602,104 @@ export class UserController {
       });
     }
   }
+
+  async adminUpdateUserProfile(req: Request, res: Response) {
+    try {
+      if (!req.user) {
+        return errorResponse(res, 'No autenticado', 401);
+      }
+
+      const userId = req.params.userId as string;
+      const { nickname, email } = req.body;
+
+      if (nickname !== undefined) {
+        const sanitized = sanitizeNickname(String(nickname));
+        if (!sanitized || sanitized.length < 3) {
+          return errorResponse(res, 'Nickname inválido', 400);
+        }
+      }
+
+      if (email !== undefined && email !== null && email !== '') {
+        if (!isValidEmail(String(email))) {
+          return errorResponse(res, 'Email inválido', 400);
+        }
+      }
+
+      const user = await userService.adminUpdateUserProfile(
+        userId,
+        {
+          nickname:
+            nickname !== undefined ? sanitizeNickname(String(nickname)) : undefined,
+          email:
+            email === undefined ? undefined : email === '' ? null : String(email).trim(),
+        },
+        req.user.id
+      );
+
+      return successResponse(res, { user }, 'Perfil de usuario actualizado correctamente');
+    } catch (error: any) {
+      logger.error('Error in adminUpdateUserProfile', error);
+      return errorResponse(
+        res,
+        error.message || 'Error al actualizar perfil de usuario',
+        500
+      );
+    }
+  }
+
+  async adminResetUserPassword(req: Request, res: Response) {
+    try {
+      if (!req.user) {
+        return errorResponse(res, 'No autenticado', 401);
+      }
+
+      const userId = req.params.userId as string;
+      const result = await userService.adminResetUserPassword(userId, req.user.id);
+
+      return successResponse(
+        res,
+        result,
+        'Contraseña temporal generada correctamente'
+      );
+    } catch (error: any) {
+      logger.error('Error in adminResetUserPassword', error);
+      return errorResponse(
+        res,
+        error.message || 'Error al resetear la contraseña',
+        500
+      );
+    }
+  }
+
+  async adminUpdateUserPermissions(req: Request, res: Response) {
+    try {
+      if (!req.user) {
+        return errorResponse(res, 'No autenticado', 401);
+      }
+
+      const userId = req.params.userId as string;
+      const { permissions } = req.body;
+
+      if (!Array.isArray(permissions)) {
+        return errorResponse(res, 'La lista de permisos es obligatoria', 400);
+      }
+
+      const user = await userService.adminUpdateUserPermissions(
+        userId,
+        permissions.map((permission) => String(permission)),
+        req.user.id
+      );
+
+      return successResponse(res, { user }, 'Permisos actualizados correctamente');
+    } catch (error: any) {
+      logger.error('Error in adminUpdateUserPermissions', error);
+      return errorResponse(
+        res,
+        error.message || 'Error al actualizar permisos',
+        500
+      );
+    }
+  }
   // POST /api/users/external
   async createExternalUser(req: Request, res: Response) {
     try {
@@ -407,10 +713,10 @@ export class UserController {
         return errorResponse(res, 'El nombre es obligatorio', 400);
       }
 
-      // ClanLeader: forzar su propio clan
-      // Admin: puede especificar clan, o usar el suyo por defecto
+      // Cualquier rol de clan con permiso crea externos solo en su propio clan.
+      // Admin puede especificar cualquier clan.
       let targetClanId: string;
-      if (req.user.role === UserRole.CLAN_LEADER) {
+      if (req.user.role !== UserRole.ADMIN) {
         if (!req.user.clanId) {
           return errorResponse(res, 'No perteneces a ningún clan', 400);
         }
@@ -433,6 +739,22 @@ export class UserController {
     } catch (error: any) {
       logger.error('Error in createExternalUser', error);
       return errorResponse(res, error.message || 'Error al crear miembro externo', 400);
+    }
+  }
+
+  async deleteUser(req: Request, res: Response) {
+    try {
+      if (!req.user) {
+        return errorResponse(res, 'No autenticado', 401);
+      }
+
+      const userId = req.params.userId as string;
+      await userService.deleteUser(userId, req.user.id);
+
+      return successResponse(res, {}, 'Usuario eliminado correctamente');
+    } catch (error: any) {
+      logger.error('Error in deleteUser', error);
+      return errorResponse(res, error.message || 'Error al eliminar usuario', 400);
     }
   }
 }

@@ -3,25 +3,58 @@ import path from 'path';
 import { eventService } from '../services/event.service';
 import { successResponse, errorResponse } from '../utils/responses';
 import { logger } from '../utils/logger';
-import { EventStatus, GameType } from '@prisma/client';
+import { EventStatus, EventVisibility } from '@prisma/client';
 import { prisma } from '../index';
 import { validatePdfFile, sanitizeAndValidateModsetHtml, deleteFile } from '../config/multer.config';
+import { canManageEventScope, PERMISSIONS } from '../auth/rbac';
+
+const isValidTimezone = (value: string) => {
+  try {
+    Intl.DateTimeFormat('es-ES', { timeZone: value });
+    return true;
+  } catch {
+    return false;
+  }
+};
+
+const parseAndValidateScheduledDate = (value: unknown) => {
+  const parsedDate = new Date(String(value));
+
+  if (Number.isNaN(parsedDate.getTime())) {
+    return { error: 'Fecha del evento inválida' as const };
+  }
+
+  if (parsedDate.getTime() < Date.now()) {
+    return { error: 'No se puede programar un evento en una fecha pasada' as const };
+  }
+
+  return { parsedDate };
+};
 
 export class EventController {
   // GET /api/events
   async getAllEvents(req: Request, res: Response) {
     try {
-      const { status, gameType, upcoming, includeAll, deleted, search, page, limit } = req.query;
+      const { status, gameId, upcoming, includeAll, deleted, search, page, limit } = req.query;
+
+      if (deleted === 'true') {
+        const userRole = req.user?.role;
+        if (userRole !== 'ADMIN' && userRole !== 'CLAN_LEADER') {
+          return errorResponse(res, 'No tienes permisos para ver eventos eliminados', 403);
+        }
+      }
 
       const result = await eventService.getAllEvents({
         status: status as EventStatus,
-        gameType: gameType as GameType,
+        gameId: gameId as string | undefined,
         upcoming: upcoming === 'true',
         includeAll: includeAll === 'true',
         deleted: deleted === 'true',
         search: search as string,
         page: page ? parseInt(page as string, 10) : 1,
         limit: limit ? parseInt(limit as string, 10) : 12,
+        requesterRole: req.user?.role,
+        requesterClanId: req.user?.clanId,
       });
 
       return successResponse(res, {
@@ -41,7 +74,20 @@ export class EventController {
   async getEventById(req: Request, res: Response) {
     try {
       const id = req.params.id as string;
-      const event = await eventService.getEventById(id);
+      const includeDeleted = req.query.deleted === 'true';
+
+      if (includeDeleted) {
+        const userRole = req.user?.role;
+        if (userRole !== 'ADMIN' && userRole !== 'CLAN_LEADER') {
+          return errorResponse(res, 'No tienes permisos para ver eventos eliminados', 403);
+        }
+      }
+
+      const event = await eventService.getEventById(id, {
+        deleted: includeDeleted,
+        requesterRole: req.user?.role,
+        requesterClanId: req.user?.clanId,
+      });
       return successResponse(res, { event }, 'Evento obtenido correctamente');
     } catch (error: any) {
       logger.error('Error in getEventById', error);
@@ -56,15 +102,53 @@ export class EventController {
         return errorResponse(res, 'No autenticado', 401);
       }
 
-      const { name, description, briefing, gameType, scheduledDate, squads, serverName, serverIp, serverPort, serverPassword } = req.body;
+      const {
+        name,
+        description,
+        briefing,
+        gameId,
+        scheduledDate,
+        timezone,
+        visibility,
+        invitedClanIds,
+        squads,
+        serverName,
+        serverIp,
+        serverPort,
+        serverPassword,
+      } = req.body;
 
       // Validaciones
-      if (!name || !gameType || !scheduledDate || !squads || !Array.isArray(squads)) {
+      if (!name || !gameId || !scheduledDate || !squads || !Array.isArray(squads)) {
         return errorResponse(res, 'Datos incompletos o inválidos', 400);
       }
 
       if (squads.length === 0) {
         return errorResponse(res, 'Debes crear al menos una escuadra', 400);
+      }
+
+      if (timezone && !isValidTimezone(String(timezone))) {
+        return errorResponse(res, 'Timezone inválido', 400);
+      }
+
+      if (
+        visibility !== undefined &&
+        visibility !== EventVisibility.PUBLIC &&
+        visibility !== EventVisibility.PRIVATE
+      ) {
+        return errorResponse(res, 'Visibilidad inválida', 400);
+      }
+
+      if (
+        invitedClanIds !== undefined &&
+        (!Array.isArray(invitedClanIds) || invitedClanIds.some((clanId) => typeof clanId !== 'string'))
+      ) {
+        return errorResponse(res, 'Invitaciones de clan inválidas', 400);
+      }
+
+      const scheduledDateValidation = parseAndValidateScheduledDate(scheduledDate);
+      if (scheduledDateValidation.error) {
+        return errorResponse(res, scheduledDateValidation.error, 400);
       }
 
       // Validar que todas las escuadras tengan slots
@@ -78,9 +162,12 @@ export class EventController {
         name,
         description,
         briefing,
-        gameType,
-        scheduledDate: new Date(scheduledDate),
+        gameId,
+        scheduledDate: scheduledDateValidation.parsedDate,
+        timezone: timezone ? String(timezone) : 'UTC',
         creatorId: req.user.id,
+        visibility: visibility as EventVisibility | undefined,
+        invitedClanIds: invitedClanIds as string[] | undefined,
         serverName,
         serverIp,
         serverPort,
@@ -102,10 +189,19 @@ export class EventController {
         return errorResponse(res, 'No autenticado', 401);
       }
 
-      const { templateEventId, name, description, briefing, scheduledDate } = req.body;
+      const { templateEventId, name, description, briefing, scheduledDate, timezone } = req.body;
 
       if (!templateEventId || !name || !scheduledDate) {
         return errorResponse(res, 'Datos incompletos', 400);
+      }
+
+      if (timezone && !isValidTimezone(String(timezone))) {
+        return errorResponse(res, 'Timezone inválido', 400);
+      }
+
+      const scheduledDateValidation = parseAndValidateScheduledDate(scheduledDate);
+      if (scheduledDateValidation.error) {
+        return errorResponse(res, scheduledDateValidation.error, 400);
       }
 
       const event = await eventService.createEventFromTemplate({
@@ -113,7 +209,8 @@ export class EventController {
         name,
         description,
         briefing,
-        scheduledDate: new Date(scheduledDate),
+        scheduledDate: scheduledDateValidation.parsedDate,
+        timezone: timezone ? String(timezone) : undefined,
         creatorId: req.user.id
       });
 
@@ -149,15 +246,45 @@ export class EventController {
         return errorResponse(res, 'Evento no encontrado', 404);
       }
 
-      // Verificar permisos
       const isCreator = event.creatorId === userId;
       const isAdmin = userRole === 'ADMIN';
-      const isClanLeader =
-        userRole === 'CLAN_LEADER' &&
-        req.user!.clanId === event.creator?.clanId;
+      const canManageByClan = canManageEventScope(
+        req.user,
+        event.creator?.clanId,
+        PERMISSIONS.EVENT_EDIT
+      );
 
-      if (!isCreator && !isAdmin && !isClanLeader) {
+      if (!isCreator && !isAdmin && !canManageByClan) {
         return errorResponse(res, 'No tienes permisos para editar este evento', 403);
+      }
+
+      if (data.timezone !== undefined && !isValidTimezone(String(data.timezone))) {
+        return errorResponse(res, 'Timezone inválido', 400);
+      }
+
+      if (
+        data.visibility !== undefined &&
+        data.visibility !== EventVisibility.PUBLIC &&
+        data.visibility !== EventVisibility.PRIVATE
+      ) {
+        return errorResponse(res, 'Visibilidad inválida', 400);
+      }
+
+      if (
+        data.invitedClanIds !== undefined &&
+        (!Array.isArray(data.invitedClanIds) ||
+          data.invitedClanIds.some((clanId: unknown) => typeof clanId !== 'string'))
+      ) {
+        return errorResponse(res, 'Invitaciones de clan inválidas', 400);
+      }
+
+      if (data.scheduledDate !== undefined) {
+        const scheduledDateValidation = parseAndValidateScheduledDate(data.scheduledDate);
+        if (scheduledDateValidation.error) {
+          return errorResponse(res, scheduledDateValidation.error, 400);
+        }
+
+        data.scheduledDate = scheduledDateValidation.parsedDate;
       }
 
       // Actualizar evento
@@ -326,15 +453,14 @@ export class EventController {
         return errorResponse(res, 'No se puede modificar el estado de un evento finalizado', 403);
       }
 
-      // Verificar permisos:
-      // - Admin puede cambiar cualquier evento
-      // - Líder de clan puede cambiar eventos de su clan
       const isAdmin = userRole === 'ADMIN';
-      const isClanLeader =
-        userRole === 'CLAN_LEADER' &&
-        userClanId === event.creator?.clanId;
+      const canManageByClan = canManageEventScope(
+        req.user,
+        event.creator?.clanId,
+        PERMISSIONS.EVENT_STATUS_MANAGE
+      );
 
-      if (!isAdmin && !isClanLeader) {
+      if (!isAdmin && !canManageByClan) {
         return errorResponse(
           res,
           'No tienes permisos para cambiar el estado de este evento',
@@ -356,6 +482,35 @@ export class EventController {
         error.message || 'Error al cambiar estado del evento',
         500
       );
+    }
+  }
+
+  async getEventSlotlist(req: Request, res: Response) {
+    try {
+      const id = req.params.id as string;
+      const slotlist = await eventService.getEventSlotlist(id);
+      return successResponse(res, slotlist, 'Slotlist obtenida correctamente');
+    } catch (error: any) {
+      logger.error('Error in getEventSlotlist', error);
+      return errorResponse(res, error.message || 'Error al obtener slotlist', 500);
+    }
+  }
+
+  async getEventWhitelist(req: Request, res: Response) {
+    try {
+      const id = req.params.id as string;
+      const format = String(req.query.format || 'json').toLowerCase();
+      const whitelist = await eventService.getEventWhitelist(id);
+
+      if (format === 'txt') {
+        res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+        return res.status(200).send(whitelist.content);
+      }
+
+      return successResponse(res, whitelist, 'Whitelist obtenida correctamente');
+    } catch (error: any) {
+      logger.error('Error in getEventWhitelist', error);
+      return errorResponse(res, error.message || 'Error al obtener whitelist', 500);
     }
   }
 
@@ -387,9 +542,13 @@ export class EventController {
       // Verificar permisos
       const isCreator = event.creatorId === userId;
       const isAdmin = userRole === 'ADMIN';
-      const isClanLeader = userRole === 'CLAN_LEADER' && req.user!.clanId === event.creator?.clanId;
+      const canManageByClan = canManageEventScope(
+        req.user,
+        event.creator?.clanId,
+        PERMISSIONS.EVENT_FILES_MANAGE
+      );
 
-      if (!isCreator && !isAdmin && !isClanLeader) {
+      if (!isCreator && !isAdmin && !canManageByClan) {
         return errorResponse(res, 'No tienes permisos para modificar este evento', 403);
       }
 
@@ -459,9 +618,13 @@ export class EventController {
       // Verificar permisos
       const isCreator = event.creatorId === userId;
       const isAdmin = userRole === 'ADMIN';
-      const isClanLeader = userRole === 'CLAN_LEADER' && req.user!.clanId === event.creator?.clanId;
+      const canManageByClan = canManageEventScope(
+        req.user,
+        event.creator?.clanId,
+        PERMISSIONS.EVENT_FILES_MANAGE
+      );
 
-      if (!isCreator && !isAdmin && !isClanLeader) {
+      if (!isCreator && !isAdmin && !canManageByClan) {
         return errorResponse(res, 'No tienes permisos para modificar este evento', 403);
       }
 
@@ -534,9 +697,13 @@ export class EventController {
       // Verificar permisos
       const isCreator = event.creatorId === userId;
       const isAdmin = userRole === 'ADMIN';
-      const isClanLeader = userRole === 'CLAN_LEADER' && req.user!.clanId === event.creator?.clanId;
+      const canManageByClan = canManageEventScope(
+        req.user,
+        event.creator?.clanId,
+        PERMISSIONS.EVENT_FILES_MANAGE
+      );
 
-      if (!isCreator && !isAdmin && !isClanLeader) {
+      if (!isCreator && !isAdmin && !canManageByClan) {
         return errorResponse(res, 'No tienes permisos para modificar este evento', 403);
       }
 
@@ -586,9 +753,13 @@ export class EventController {
       // Verificar permisos
       const isCreator = event.creatorId === userId;
       const isAdmin = userRole === 'ADMIN';
-      const isClanLeader = userRole === 'CLAN_LEADER' && req.user!.clanId === event.creator?.clanId;
+      const canManageByClan = canManageEventScope(
+        req.user,
+        event.creator?.clanId,
+        PERMISSIONS.EVENT_FILES_MANAGE
+      );
 
-      if (!isCreator && !isAdmin && !isClanLeader) {
+      if (!isCreator && !isAdmin && !canManageByClan) {
         return errorResponse(res, 'No tienes permisos para modificar este evento', 403);
       }
 

@@ -1,6 +1,6 @@
 generator client {
   provider      = "prisma-client-js"
-  binaryTargets = ["native", "linux-musl-openssl-3.0.x"]
+  binaryTargets = ["native"]
 }
 
 datasource db {
@@ -21,8 +21,17 @@ enum UserStatus {
 
 enum UserRole {
   USER
+  OPERATIONS_OFFICER
+  RECRUITER
   CLAN_LEADER
   ADMIN
+}
+
+enum ClanCreationRequestStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  FULFILLED
 }
 
 enum EventStatus {
@@ -31,14 +40,37 @@ enum EventStatus {
   FINISHED
 }
 
-enum GameType {
-  ARMA_3
-  ARMA_REFORGER
+enum EventVisibility {
+  PUBLIC
+  PRIVATE
 }
 
 enum SlotStatus {
   FREE
   OCCUPIED
+}
+
+enum GameStatus {
+  ACTIVE
+  INACTIVE
+}
+
+enum GameIdentityMode {
+  STEAM64
+  MANUAL
+  NONE
+}
+
+enum GameIdentityProviderKind {
+  STEAM
+  MANUAL
+  NONE
+}
+
+enum GameIdentityStatus {
+  PENDING
+  VERIFIED
+  REJECTED
 }
 
 enum AttendanceStatus {
@@ -47,11 +79,21 @@ enum AttendanceStatus {
   NO_SHOW
 }
 
-enum NodeType {
-  COMMAND   // Mando principal (ej: ALPHA MANDO)
-  SQUAD     // Escuadra (ej: BRAVO, CHARLIE)
-  ELEMENT   // Elemento/sub-equipo (ej: HIERRO 1)
-  SUPPORT   // Apoyo (ej: AEREO, MEDICO)
+enum NotionSyncMode {
+  MANUAL
+  AUTO
+}
+
+enum FeedbackType {
+  BUG
+  SUGGESTION
+}
+
+enum FeedbackStatus {
+  OPEN
+  IN_REVIEW
+  DONE
+  REJECTED
 }
 
 // ===== MODELOS =====
@@ -61,6 +103,8 @@ model User {
   email             String?     @unique
   password          String?
   nickname          String
+  timezone          String      @default("Europe/Madrid")
+  mustCreateClanOnboarding Boolean @default(false)
   discordId         String?     @unique
   discordUsername   String?
 
@@ -77,10 +121,20 @@ model User {
   clanHistory       ClanHistory[]
   absences          Absence[]
   attendances       Attendance[]
+  participationSnapshots ParticipationSnapshot[]
   clanChangeRequests ClanChangeRequest[]
+  clanCreationRequests ClanCreationRequest[] @relation("ClanCreationRequester")
+  reviewedClanCreationRequests ClanCreationRequest[] @relation("ClanCreationReviewer")
+  eventInvitationsSent EventInvitation[]
   oauthAccounts     OAuthAccount[]
+  gameIdentities    GameIdentity[]
+  permissionOverrides UserPermissionOverride[]
+  passwordResetTokens PasswordResetToken[]
+  feedbackItems     FeedbackItem[] @relation("FeedbackAuthor")
+  reviewedFeedbackItems FeedbackItem[] @relation("FeedbackReviewer")
 
   blockedUntil      DateTime?   // Auto-block expiry for NO_SHOW accumulation
+  deletedAt         DateTime?
 
   createdAt         DateTime    @default(now())
   updatedAt         DateTime    @updatedAt
@@ -88,6 +142,41 @@ model User {
   @@index([clanId])
   @@index([status])
   @@index([discordId])
+  @@index([deletedAt])
+}
+
+model UserPermissionOverride {
+  id         String   @id @default(uuid())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  permission String
+  enabled    Boolean
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@unique([userId, permission])
+  @@index([userId])
+}
+
+model Game {
+  id                 String            @id @default(uuid())
+  slug               String            @unique
+  name               String
+  status             GameStatus        @default(ACTIVE)
+  supportsModsetHtml Boolean           @default(false)
+  identityMode       GameIdentityMode  @default(NONE)
+  identityLabel      String?
+  sortOrder          Int               @default(0)
+  createdAt          DateTime          @default(now())
+  updatedAt          DateTime          @updatedAt
+
+  clans              Clan[]
+  events             Event[]
+  identities         GameIdentity[]
+  clanCreationRequests ClanCreationRequest[]
+
+  @@index([status])
+  @@index([sortOrder])
 }
 
 model Clan {
@@ -96,16 +185,26 @@ model Clan {
   tag         String?
   description String?
   avatarUrl   String?
+  avatarArchivedPath String?
+  avatarArchivedAt   DateTime?
+  primaryGameId String
+  primaryGame   Game     @relation(fields: [primaryGameId], references: [id])
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
   deletedAt   DateTime?
 
   users              User[]
   clanChangeRequests ClanChangeRequest[]
+  clanCreationRequests ClanCreationRequest[] @relation("ClanCreationFulfilledClan")
   reservedSquads     Squad[]  @relation("ClanSquadReservation")
+  eventInvitations   EventInvitation[]
+  notionIntegration  ClanNotionIntegration?
+  participationSnapshots ParticipationSnapshot[]
+  feedbackItems      FeedbackItem[]
 
   @@index([name])
   @@index([deletedAt])
+  @@index([primaryGameId])
 }
 
 model Event {
@@ -116,10 +215,13 @@ model Event {
   briefingFileUrl String?     // URL del archivo PDF del briefing
   modsetFileUrl   String?     // URL del archivo HTML del modset (Arma 3)
 
-  gameType        GameType
+  gameId          String
+  game            Game        @relation(fields: [gameId], references: [id])
   status          EventStatus @default(ACTIVE)
+  visibility      EventVisibility @default(PRIVATE)
   
   scheduledDate   DateTime
+  timezone        String      @default("UTC")
   
   creatorId       String
   creator         User        @relation("EventCreator", fields: [creatorId], references: [id])
@@ -128,7 +230,8 @@ model Event {
   absences        Absence[]
   attendances     Attendance[]
   auditLogs       AuditLog[]
-  communicationNodes CommunicationNode[]
+  invitedClans      EventInvitation[]
+  participationSnapshots ParticipationSnapshot[]
 
   serverName        String?   // Nombre del servidor de juego
   serverIp          String?   // IP del servidor de juego
@@ -144,6 +247,50 @@ model Event {
   @@index([scheduledDate])
   @@index([creatorId])
   @@index([deletedAt])
+  @@index([gameId])
+}
+
+model FeedbackItem {
+  id          String         @id @default(uuid())
+  type        FeedbackType
+  status      FeedbackStatus @default(OPEN)
+  title       String
+  description String
+  pagePath    String?
+
+  userId      String
+  user        User           @relation("FeedbackAuthor", fields: [userId], references: [id], onDelete: Cascade)
+  clanId      String?
+  clan        Clan?          @relation(fields: [clanId], references: [id], onDelete: SetNull)
+
+  reviewedBy  String?
+  reviewer    User?          @relation("FeedbackReviewer", fields: [reviewedBy], references: [id], onDelete: SetNull)
+  reviewedAt  DateTime?
+  adminNote   String?
+
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+
+  @@index([userId])
+  @@index([clanId])
+  @@index([status])
+  @@index([type])
+  @@index([createdAt])
+}
+
+model EventInvitation {
+  id        String   @id @default(uuid())
+  eventId   String
+  event     Event    @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  clanId    String
+  clan      Clan     @relation(fields: [clanId], references: [id], onDelete: Cascade)
+  invitedBy String
+  inviter   User     @relation(fields: [invitedBy], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@unique([eventId, clanId])
+  @@index([eventId])
+  @@index([clanId])
 }
 
 model Squad {
@@ -272,37 +419,29 @@ model ClanChangeRequest {
   @@index([status])
 }
 
-model CommunicationNode {
-  id          String   @id @default(uuid())
-  
-  eventId     String
-  event       Event    @relation(fields: [eventId], references: [id], onDelete: Cascade)
-  
-  // Identificación del nodo
-  name        String   // "ALPHA MANDO", "BRAVO", "HIERRO 1", etc.
-  frequency   String?  // Formato: "xxx.xx" (ej: "123.45", "48.00")
-  type        NodeType // COMMAND, SQUAD, ELEMENT, SUPPORT
-  
-  // Jerarquía
-  parentId    String?
-  parent      CommunicationNode?  @relation("NodeHierarchy", fields: [parentId], references: [id], onDelete: Cascade)
-  children    CommunicationNode[] @relation("NodeHierarchy")
+model ClanCreationRequest {
+  id                String                    @id @default(uuid())
+  userId            String
+  user              User                      @relation("ClanCreationRequester", fields: [userId], references: [id], onDelete: Cascade)
+  requestedName     String
+  requestedTag      String?
+  requestedDescription String?
+  primaryGameId     String
+  primaryGame       Game                      @relation(fields: [primaryGameId], references: [id], onDelete: Restrict)
+  status            ClanCreationRequestStatus @default(PENDING)
+  reviewedBy        String?
+  reviewer          User?                     @relation("ClanCreationReviewer", fields: [reviewedBy], references: [id], onDelete: SetNull)
+  reviewNote        String?
+  reviewedAt        DateTime?
+  createdClanId     String?
+  createdClan       Clan?                     @relation("ClanCreationFulfilledClan", fields: [createdClanId], references: [id], onDelete: SetNull)
+  fulfilledAt       DateTime?
+  createdAt         DateTime                  @default(now())
+  updatedAt         DateTime                  @updatedAt
 
-  // Frecuencia padre
-  parentFrequency String?
-  
-  // Posición visual (para guardar el layout del árbol)
-  positionX   Float    @default(0)
-  positionY   Float    @default(0)
-  
-  // Orden de visualización
-  order       Int      @default(0)
-  
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  
-  @@index([eventId])
-  @@index([parentId])
+  @@index([userId])
+  @@index([status])
+  @@index([primaryGameId])
 }
 
 model AuditLog {
@@ -346,4 +485,85 @@ model OAuthAccount {
 
   @@unique([provider, providerAccountId])
   @@index([userId])
+}
+
+model GameIdentity {
+  id              String                   @id @default(uuid())
+  userId          String
+  user            User                     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  gameId          String
+  game            Game                     @relation(fields: [gameId], references: [id], onDelete: Cascade)
+  providerKind    GameIdentityProviderKind
+  value           String
+  normalizedValue String?
+  status          GameIdentityStatus       @default(PENDING)
+  verifiedBy      String?
+  verifiedAt      DateTime?
+  createdAt       DateTime                 @default(now())
+  updatedAt       DateTime                 @updatedAt
+
+  @@index([userId])
+  @@index([gameId])
+  @@index([status])
+  @@unique([gameId, providerKind, normalizedValue])
+  @@unique([userId, gameId])
+}
+
+model PasswordResetToken {
+  id         String   @id @default(uuid())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash  String   @unique
+  expiresAt  DateTime
+  usedAt     DateTime?
+  createdAt  DateTime @default(now())
+
+  @@index([userId])
+  @@index([expiresAt])
+  @@index([usedAt])
+}
+
+model ClanNotionIntegration {
+  id                       String         @id @default(uuid())
+  clanId                   String         @unique
+  clan                     Clan           @relation(fields: [clanId], references: [id], onDelete: Cascade)
+  enabled                  Boolean        @default(false)
+  notionToken              String?        @db.Text
+  parentPageId             String?
+  missionsDatabaseId       String?
+  participationsDatabaseId String?
+  syncMode                 NotionSyncMode @default(MANUAL)
+  createdAt                DateTime       @default(now())
+  updatedAt                DateTime       @updatedAt
+
+  @@index([enabled])
+}
+
+model ParticipationSnapshot {
+  id                String           @id @default(uuid())
+  clanId            String
+  clan              Clan             @relation(fields: [clanId], references: [id], onDelete: Cascade)
+  eventId           String
+  event             Event            @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  userId            String
+  user              User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userNickname      String
+  eventName         String
+  eventDate         DateTime
+  attendanceStatus  AttendanceStatus
+  slotRole          String?
+  squadName         String?
+  exportedToNotion  Boolean          @default(false)
+  exportedToNotionAt DateTime?
+  notionLastSyncAt  DateTime?
+  notionLastError   String?
+  createdAt         DateTime         @default(now())
+  updatedAt         DateTime         @updatedAt
+
+  @@unique([clanId, eventId, userId])
+  @@index([clanId])
+  @@index([eventId])
+  @@index([userId])
+  @@index([eventDate])
+  @@index([exportedToNotion])
 }

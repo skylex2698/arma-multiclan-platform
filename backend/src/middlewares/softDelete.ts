@@ -1,7 +1,7 @@
 import { PrismaClient, Prisma } from '@prisma/client';
 
 // Modelos que usan soft delete (tienen campo deletedAt)
-const SOFT_DELETE_MODELS: Prisma.ModelName[] = ['Event', 'Clan', 'Squad', 'Slot'];
+const SOFT_DELETE_MODELS: Prisma.ModelName[] = ['Event', 'Clan', 'Squad', 'Slot', 'User'];
 
 /**
  * Middleware de Prisma que implementa soft deletes:

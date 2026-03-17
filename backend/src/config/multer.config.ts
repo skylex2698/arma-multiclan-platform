@@ -30,6 +30,11 @@ if (!fs.existsSync(uploadDir)) {
   fs.mkdirSync(uploadDir, { recursive: true });
 }
 
+const clanArchiveDir = path.join(process.cwd(), 'storage', 'archived', 'clans');
+if (!fs.existsSync(clanArchiveDir)) {
+  fs.mkdirSync(clanArchiveDir, { recursive: true });
+}
+
 // Configuración de almacenamiento seguro
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
@@ -116,6 +121,39 @@ export const deleteFile = (filePath: string): void => {
   } catch (error) {
     console.error('Error deleting file:', error);
   }
+};
+
+export const archiveClanAvatar = (publicUrl: string): { archivedPath: string; archivedFilename: string } | null => {
+  const filename = path.basename(publicUrl);
+  const currentPath = path.join(uploadDir, filename);
+
+  if (!fs.existsSync(currentPath)) {
+    return null;
+  }
+
+  const archivedFilename = `archived-${Date.now()}-${filename}`;
+  const archivedPath = path.join(clanArchiveDir, archivedFilename);
+  fs.renameSync(currentPath, archivedPath);
+
+  return { archivedPath, archivedFilename };
+};
+
+export const restoreArchivedClanAvatar = (archivedFilename: string): string | null => {
+  const archivedPath = path.join(clanArchiveDir, archivedFilename);
+  if (!fs.existsSync(archivedPath)) {
+    return null;
+  }
+
+  const restoredFilename = archivedFilename.replace(/^archived-\d+-/, '');
+  const restoredPath = path.join(uploadDir, restoredFilename);
+  fs.renameSync(archivedPath, restoredPath);
+
+  return `/uploads/clans/${restoredFilename}`;
+};
+
+export const purgeArchivedClanAvatar = (archivedFilename: string): void => {
+  const archivedPath = path.join(clanArchiveDir, archivedFilename);
+  deleteFile(archivedPath);
 };
 
 // ==========================================

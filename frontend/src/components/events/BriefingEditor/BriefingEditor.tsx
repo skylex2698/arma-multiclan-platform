@@ -1,7 +1,7 @@
 // frontend/src/components/events/BriefingEditor/BriefingEditor.tsx
 // VERSIÓN CORREGIDA - Sin duplicados + mejor configuración
 
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { useEditor, EditorContent } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import { Image } from '@tiptap/extension-image';
@@ -39,7 +39,29 @@ interface BriefingEditorProps {
   placeholder?: string;
 }
 
+const parseRawHtmlIfPossible = (rawText: string) => {
+  const trimmed = rawText.trim();
+  if (!trimmed || !trimmed.includes('<') || !trimmed.includes('>')) {
+    return null;
+  }
+
+  const parser = new DOMParser();
+  const document = parser.parseFromString(trimmed, 'text/html');
+  const hasRenderableElements = Array.from(document.body.childNodes).some((node) => {
+    return node.nodeType === Node.ELEMENT_NODE;
+  });
+
+  if (!hasRenderableElements) {
+    return null;
+  }
+
+  const normalizedHtml = document.body.innerHTML.trim();
+  return normalizedHtml || null;
+};
+
 export function BriefingEditor({ content, onChange, placeholder = 'Escribe el briefing aquí...' }: BriefingEditorProps) {
+  const isNormalizingHtmlRef = useRef(false);
+
   const editor = useEditor({
     extensions: [
       StarterKit.configure({
@@ -74,7 +96,24 @@ export function BriefingEditor({ content, onChange, placeholder = 'Escribe el br
     ],
     content,
     onUpdate: ({ editor }) => {
-      onChange(editor.getHTML());
+      const currentHtml = editor.getHTML();
+
+      if (isNormalizingHtmlRef.current) {
+        isNormalizingHtmlRef.current = false;
+        onChange(currentHtml);
+        return;
+      }
+
+      const rawText = editor.getText({ blockSeparator: '\n' });
+      const parsedHtml = parseRawHtmlIfPossible(rawText);
+
+      if (parsedHtml && parsedHtml !== currentHtml) {
+        isNormalizingHtmlRef.current = true;
+        editor.commands.setContent(parsedHtml);
+        return;
+      }
+
+      onChange(currentHtml);
     },
     editorProps: {
       attributes: {

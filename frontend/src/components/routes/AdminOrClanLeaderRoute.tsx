@@ -1,6 +1,7 @@
 import { Navigate } from 'react-router-dom';
 import { useAuthStore } from '../../store/authStore';
 import { MainLayout } from '../layout/MainLayout';
+import { hasPermission, PERMISSIONS } from '../../utils/permissions';
 
 interface AdminOrClanLeaderRouteProps {
   children: React.ReactNode;
@@ -14,8 +15,7 @@ export function AdminOrClanLeaderRoute({ children }: AdminOrClanLeaderRouteProps
     return <Navigate to="/login" replace />;
   }
 
-  // Permitir acceso a ADMIN y CLAN_LEADER
-  if (user?.role !== 'ADMIN' && user?.role !== 'CLAN_LEADER') {
+  if (!hasPermission(user, PERMISSIONS.USER_VIEW)) {
     return <Navigate to="/dashboard" replace />;
   }
 

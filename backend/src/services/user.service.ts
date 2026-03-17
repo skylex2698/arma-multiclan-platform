@@ -1,9 +1,47 @@
 import { prisma } from '../index';
 import { logger } from '../utils/logger';
-import { UserRole, UserStatus } from '@prisma/client';
+import { ClanCreationRequestStatus, UserRole, UserStatus } from '@prisma/client';
 import { hashPassword, comparePassword } from '../utils/password';
+import { normalizeEmail } from '../utils/validators';
+import {
+  getDelegablePermissionsForRole,
+  getEffectivePermissions,
+  isClanBoundRole,
+  Permission,
+} from '../auth/rbac';
 
 export class UserService {
+  private normalizeClanTag(tag?: string | null) {
+    if (!tag) {
+      return null;
+    }
+
+    const sanitized = tag.replace(/[\[\]\(\)\{\}]/g, '').trim().toUpperCase();
+    return sanitized || null;
+  }
+
+  private withEffectivePermissions<
+    T extends { role: UserRole; permissionOverrides?: Array<{ permission: string; enabled: boolean }> }
+  >(user: T) {
+    const permissionOverrides = user.permissionOverrides || [];
+    return {
+      ...user,
+      permissions: getEffectivePermissions(user.role, permissionOverrides),
+    };
+  }
+
+  private generateTemporaryPassword(length = 14) {
+    const alphabet =
+      'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789!@#$%';
+    let password = '';
+
+    for (let i = 0; i < length; i += 1) {
+      password += alphabet[Math.floor(Math.random() * alphabet.length)];
+    }
+
+    return password;
+  }
+
   // Listar usuarios con filtros y paginación
   async getAllUsers(filters?: {
     clanId?: string;
@@ -46,6 +84,7 @@ export class UserService {
           id: true,
           email: true,
           nickname: true,
+          timezone: true,
           role: true,
           status: true,
           clanId: true,
@@ -53,9 +92,26 @@ export class UserService {
           discordUsername: true,
           clan: {
             select: {
+              id: true,
               name: true,
-              tag: true
+              tag: true,
+              primaryGameId: true,
+              primaryGame: true,
             }
+          },
+          gameIdentities: {
+            include: {
+              game: true,
+            },
+            orderBy: {
+              createdAt: 'asc',
+            },
+          },
+          permissionOverrides: {
+            select: {
+              permission: true,
+              enabled: true,
+            },
           },
           createdAt: true
         },
@@ -69,7 +125,7 @@ export class UserService {
     ]);
 
     return {
-      users,
+      users: users.map((user) => this.withEffectivePermissions(user)),
       total,
       page,
       limit,
@@ -85,6 +141,7 @@ export class UserService {
         id: true,
         email: true,
         nickname: true,
+        timezone: true,
         role: true,
         status: true,
         clanId: true,
@@ -95,8 +152,24 @@ export class UserService {
             id: true,
             name: true,
             tag: true,
-            description: true
+            description: true,
+            primaryGameId: true,
+            primaryGame: true,
           }
+        },
+        gameIdentities: {
+          include: {
+            game: true,
+          },
+          orderBy: {
+            createdAt: 'asc',
+          },
+        },
+        permissionOverrides: {
+          select: {
+            permission: true,
+            enabled: true,
+          },
         },
         createdAt: true,
         updatedAt: true
@@ -107,7 +180,7 @@ export class UserService {
       throw new Error('Usuario no encontrado');
     }
 
-    return user;
+    return this.withEffectivePermissions(user);
   }
 
   // Validar usuario (PENDING -> ACTIVE)
@@ -124,8 +197,8 @@ export class UserService {
       throw new Error('El usuario no está pendiente de validación');
     }
 
-    // Si es líder de clan, solo puede validar usuarios de su mismo clan
-    if (validatorRole === UserRole.CLAN_LEADER) {
+    // Cualquier rol de clan no-admin solo puede validar usuarios de su mismo clan.
+    if (validatorRole !== UserRole.ADMIN) {
       if (!validatorClanId || user.clanId !== validatorClanId) {
         throw new Error('Solo puedes validar usuarios de tu propio clan');
       }
@@ -166,14 +239,17 @@ export class UserService {
       throw new Error('El usuario ya tiene ese rol');
     }
 
-    // Si se cambia a CLAN_LEADER, verificar que tenga clan
-    if (newRole === UserRole.CLAN_LEADER && !user.clanId) {
-      throw new Error('El usuario debe pertenecer a un clan para ser líder');
+    if (isClanBoundRole(newRole) && !user.clanId) {
+      throw new Error('El usuario debe pertenecer a un clan para tener un rol de clan');
     }
 
     const updatedUser = await prisma.user.update({
       where: { id: userId },
       data: { role: newRole }
+    });
+
+    await prisma.userPermissionOverride.deleteMany({
+      where: { userId },
     });
 
     // Registrar en audit log
@@ -249,9 +325,9 @@ export class UserService {
       }
     }
 
-    // Si era líder de clan y se le quita el clan, cambiar rol a USER
+    // Si tenía un rol de clan y se le quita el clan, volver a USER.
     let newRole = user.role;
-    if (user.role === UserRole.CLAN_LEADER && !newClanId) {
+    if (isClanBoundRole(user.role) && !newClanId) {
       newRole = UserRole.USER;
     }
 
@@ -436,8 +512,11 @@ export class UserService {
       throw new Error('Esta solicitud ya fue revisada');
     }
 
-    // Si es líder de clan, solo puede aprobar si es del clan destino
-    if (reviewerRole === UserRole.CLAN_LEADER) {
+    if (reviewerRole !== UserRole.ADMIN) {
+      if (reviewerRole !== UserRole.CLAN_LEADER) {
+        throw new Error('Solo el líder del clan o un administrador pueden revisar solicitudes');
+      }
+
       if (!reviewerClanId || request.targetClanId !== reviewerClanId) {
         throw new Error('Solo puedes aprobar solicitudes para tu clan');
       }
@@ -508,23 +587,206 @@ export class UserService {
     return updatedRequest;
   }
 
+  async getClanCreationRequests(filters?: {
+    status?: ClanCreationRequestStatus;
+  }) {
+    return prisma.clanCreationRequest.findMany({
+      where: {
+        ...(filters?.status ? { status: filters.status } : {}),
+      },
+      include: {
+        user: {
+          select: {
+            id: true,
+            nickname: true,
+            email: true,
+            status: true,
+          },
+        },
+        primaryGame: {
+          select: {
+            id: true,
+            name: true,
+          },
+        },
+        createdClan: {
+          select: {
+            id: true,
+            name: true,
+            tag: true,
+          },
+        },
+      },
+      orderBy: {
+        createdAt: 'desc',
+      },
+    });
+  }
+
+  async reviewClanCreationRequest(
+    requestId: string,
+    reviewerId: string,
+    approved: boolean,
+    reviewNote?: string
+  ) {
+    const request = await prisma.clanCreationRequest.findUnique({
+      where: { id: requestId },
+      include: {
+        user: {
+          select: {
+            id: true,
+            status: true,
+          },
+        },
+        primaryGame: {
+          select: {
+            id: true,
+            name: true,
+          },
+        },
+      },
+    });
+
+    if (!request) {
+      throw new Error('Solicitud no encontrada');
+    }
+
+    if (request.status !== ClanCreationRequestStatus.PENDING) {
+      throw new Error('Esta solicitud ya fue revisada');
+    }
+
+    return prisma.$transaction(async (tx) => {
+      let createdClanId: string | null = null;
+
+      if (approved) {
+        const clan = await tx.clan.create({
+          data: {
+            name: request.requestedName,
+            tag: this.normalizeClanTag(request.requestedTag),
+            description: request.requestedDescription || null,
+            primaryGameId: request.primaryGameId,
+          },
+        });
+
+        createdClanId = clan.id;
+      }
+
+      const updatedRequest = await tx.clanCreationRequest.update({
+        where: { id: requestId },
+        data: {
+          status: approved
+            ? ClanCreationRequestStatus.FULFILLED
+            : ClanCreationRequestStatus.REJECTED,
+          reviewedBy: reviewerId,
+          reviewedAt: new Date(),
+          reviewNote: reviewNote || null,
+          ...(approved
+            ? {
+                createdClanId,
+                fulfilledAt: new Date(),
+              }
+            : {}),
+        },
+        include: {
+          user: {
+            select: {
+              id: true,
+              nickname: true,
+              email: true,
+              status: true,
+            },
+          },
+          primaryGame: {
+            select: {
+              id: true,
+              name: true,
+            },
+          },
+        },
+      });
+
+      await tx.user.update({
+        where: { id: request.userId },
+        data: approved
+          ? {
+              status: UserStatus.ACTIVE,
+              mustCreateClanOnboarding: false,
+              clanId: createdClanId,
+              role: UserRole.CLAN_LEADER,
+            }
+          : {
+              status: UserStatus.BLOCKED,
+              mustCreateClanOnboarding: false,
+            },
+      });
+
+      await tx.auditLog.create({
+        data: {
+          action: approved
+            ? 'CLAN_CREATION_REQUEST_APPROVED'
+            : 'CLAN_CREATION_REQUEST_REJECTED',
+          entity: 'ClanCreationRequest',
+          entityId: requestId,
+          userId: reviewerId,
+          details: JSON.stringify({
+            requestUserId: request.userId,
+            requestedName: request.requestedName,
+            createdClanId,
+          }),
+        },
+      });
+
+      return updatedRequest;
+    });
+  }
+
+  async getCurrentUserApprovedClanCreationRequest(userId: string) {
+    const request = await prisma.clanCreationRequest.findFirst({
+      where: {
+        userId,
+        status: ClanCreationRequestStatus.APPROVED,
+        createdClanId: null,
+      },
+      include: {
+        primaryGame: {
+          select: {
+            id: true,
+            name: true,
+          },
+        },
+      },
+      orderBy: {
+        createdAt: 'desc',
+      },
+    });
+
+    if (!request) {
+      throw new Error('No hay una solicitud aprobada pendiente de crear clan');
+    }
+
+    return request;
+  }
+
   async updateProfile(
     userId: string,
     data: {
       nickname?: string;
       email?: string;
+      timezone?: string;
     }
   ) {
     const updatedUser = await prisma.user.update({
       where: { id: userId },
       data: {
         ...(data.nickname && { nickname: data.nickname }),
-        ...(data.email && { email: data.email }),
+        ...(data.email && { email: normalizeEmail(data.email) }),
+        ...(data.timezone && { timezone: data.timezone }),
       },
       select: {
         id: true,
         email: true,
         nickname: true,
+        timezone: true,
         role: true,
         status: true,
         clanId: true,
@@ -538,6 +800,16 @@ export class UserService {
             tag: true,
             description: true,
             avatarUrl: true,
+            primaryGameId: true,
+            primaryGame: true,
+          },
+        },
+        gameIdentities: {
+          include: {
+            game: true,
+          },
+          orderBy: {
+            createdAt: 'asc',
           },
         },
       },
@@ -586,10 +858,399 @@ export class UserService {
     logger.info('User password changed', { userId });
   }
 
-  async updateRole(userId: string, role: UserRole) {
-    const user = await prisma.user.update({
+  async selfResetPassword(userId: string, newPassword: string) {
+    const user = await prisma.user.findUnique({
       where: { id: userId },
-      data: { role },
+      select: {
+        id: true,
+      },
+    });
+
+    if (!user) {
+      throw new Error('Usuario no encontrado');
+    }
+
+    const hashedPassword = await hashPassword(newPassword);
+
+    await prisma.user.update({
+      where: { id: userId },
+      data: {
+        password: hashedPassword,
+      },
+    });
+
+    await prisma.auditLog.create({
+      data: {
+        action: 'USER_SELF_PASSWORD_RESET',
+        entity: 'User',
+        entityId: userId,
+        userId,
+        details: JSON.stringify({
+          method: 'authenticated_self_reset',
+        }),
+      },
+    });
+
+    logger.info('User password self-reset', { userId });
+  }
+
+  async adminUpdateUserProfile(
+    userId: string,
+    data: {
+      nickname?: string;
+      email?: string | null;
+      timezone?: string;
+    },
+    adminId: string
+  ) {
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        id: true,
+        nickname: true,
+        email: true,
+        timezone: true,
+      },
+    });
+
+    if (!user) {
+      throw new Error('Usuario no encontrado');
+    }
+
+    const updateData: Record<string, string | null> = {};
+
+    if (data.nickname !== undefined) {
+      const nickname = data.nickname.trim();
+      if (nickname.length < 3) {
+        throw new Error('El nickname debe tener al menos 3 caracteres');
+      }
+      updateData.nickname = nickname;
+    }
+
+    if (data.email !== undefined) {
+      const email = data.email ? normalizeEmail(data.email) : null;
+
+      if (email) {
+        const existingUser = await prisma.user.findFirst({
+          where: {
+            email: {
+              equals: email,
+              mode: 'insensitive',
+            },
+            id: { not: userId },
+          },
+          select: { id: true },
+        });
+
+        if (existingUser) {
+          throw new Error('Solo se permite una cuenta por correo electrónico. Ese email ya está en uso por otro usuario.');
+        }
+      }
+
+      updateData.email = email;
+    }
+
+    if (data.timezone !== undefined) {
+      updateData.timezone = data.timezone.trim() || 'Europe/Madrid';
+    }
+
+    const updatedUser = await prisma.user.update({
+      where: { id: userId },
+      data: updateData,
+      include: {
+        clan: {
+          select: {
+            id: true,
+            name: true,
+            tag: true,
+            avatarUrl: true,
+            primaryGameId: true,
+            primaryGame: true,
+          },
+        },
+        gameIdentities: {
+          include: {
+            game: true,
+          },
+          orderBy: {
+            createdAt: 'asc',
+          },
+        },
+        permissionOverrides: {
+          select: {
+            permission: true,
+            enabled: true,
+          },
+        },
+      },
+    });
+
+    await prisma.auditLog.create({
+      data: {
+        action: 'USER_ADMIN_UPDATED',
+        entity: 'User',
+        entityId: userId,
+        userId: adminId,
+        details: JSON.stringify({
+          previous: {
+            nickname: user.nickname,
+            email: user.email,
+          },
+          next: {
+            nickname: updatedUser.nickname,
+            email: updatedUser.email,
+            timezone: updatedUser.timezone,
+          },
+        }),
+      },
+    });
+
+    logger.info('User admin profile updated', { userId, adminId });
+
+    return this.withEffectivePermissions(updatedUser);
+  }
+
+  async adminResetUserPassword(userId: string, adminId: string) {
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        id: true,
+        nickname: true,
+      },
+    });
+
+    if (!user) {
+      throw new Error('Usuario no encontrado');
+    }
+
+    const temporaryPassword = this.generateTemporaryPassword();
+    const hashedPassword = await hashPassword(temporaryPassword);
+
+    await prisma.user.update({
+      where: { id: userId },
+      data: {
+        password: hashedPassword,
+      },
+    });
+
+    await prisma.auditLog.create({
+      data: {
+        action: 'USER_PASSWORD_RESET',
+        entity: 'User',
+        entityId: userId,
+        userId: adminId,
+        details: JSON.stringify({
+          nickname: user.nickname,
+        }),
+      },
+    });
+
+    logger.info('User password reset by admin', { userId, adminId });
+
+    return {
+      temporaryPassword,
+    };
+  }
+
+  async adminUpdateUserPermissions(
+    userId: string,
+    requestedPermissions: string[],
+    adminId: string
+  ) {
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        id: true,
+        role: true,
+        permissionOverrides: {
+          select: {
+            permission: true,
+            enabled: true,
+          },
+        },
+      },
+    });
+
+    if (!user) {
+      throw new Error('Usuario no encontrado');
+    }
+
+    if (user.role === UserRole.ADMIN) {
+      throw new Error('Los permisos del administrador de plataforma no se editan desde overrides');
+    }
+
+    const delegablePermissions = getDelegablePermissionsForRole(user.role);
+    const defaultPermissions = new Set(
+      getEffectivePermissions(user.role, []).filter((permission) =>
+        delegablePermissions.includes(permission)
+      )
+    );
+    const nextPermissions = new Set(
+      requestedPermissions.filter((permission): permission is Permission =>
+        delegablePermissions.includes(permission as Permission)
+      )
+    );
+
+    await prisma.$transaction(async (tx) => {
+      for (const permission of delegablePermissions) {
+        const defaultHas = defaultPermissions.has(permission);
+        const requestedHas = nextPermissions.has(permission);
+
+        if (defaultHas === requestedHas) {
+          await tx.userPermissionOverride.deleteMany({
+            where: {
+              userId,
+              permission,
+            },
+          });
+          continue;
+        }
+
+        await tx.userPermissionOverride.upsert({
+          where: {
+            userId_permission: {
+              userId,
+              permission,
+            },
+          },
+          create: {
+            userId,
+            permission,
+            enabled: requestedHas,
+          },
+          update: {
+            enabled: requestedHas,
+          },
+        });
+      }
+
+      await tx.auditLog.create({
+        data: {
+          action: 'USER_PERMISSIONS_UPDATED',
+          entity: 'User',
+          entityId: userId,
+          userId: adminId,
+          details: JSON.stringify({
+            permissions: Array.from(nextPermissions),
+          }),
+        },
+      });
+    });
+
+    const updatedUser = await prisma.user.findUnique({
+      where: { id: userId },
+      include: {
+        clan: {
+          select: {
+            id: true,
+            name: true,
+            tag: true,
+            avatarUrl: true,
+            primaryGameId: true,
+            primaryGame: true,
+          },
+        },
+        gameIdentities: {
+          include: {
+            game: true,
+          },
+          orderBy: {
+            createdAt: 'asc',
+          },
+        },
+        permissionOverrides: {
+          select: {
+            permission: true,
+            enabled: true,
+          },
+        },
+      },
+    });
+
+    if (!updatedUser) {
+      throw new Error('Usuario no encontrado');
+    }
+
+    logger.info('User permission overrides updated', { userId, adminId });
+
+    return this.withEffectivePermissions(updatedUser);
+  }
+
+  async updateRole(
+    userId: string,
+    role: UserRole,
+    actor: {
+      id: string;
+      role: UserRole;
+      clanId?: string | null;
+    }
+  ) {
+    const targetUser = await prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        id: true,
+        role: true,
+        clanId: true,
+        status: true,
+      },
+    });
+
+    if (!targetUser) {
+      throw new Error('Usuario no encontrado');
+    }
+
+    if (targetUser.role === UserRole.ADMIN && actor.role !== UserRole.ADMIN) {
+      throw new Error('No puedes modificar a un administrador de plataforma');
+    }
+
+    if (isClanBoundRole(role) && !targetUser.clanId) {
+      throw new Error('El usuario debe pertenecer a un clan para recibir un rol de clan');
+    }
+
+    if (actor.role === UserRole.CLAN_LEADER) {
+      if (!actor.clanId) {
+        throw new Error('No perteneces a ningún clan');
+      }
+
+      if (role === UserRole.ADMIN) {
+        throw new Error('Como líder no puedes asignar el rol de administrador');
+      }
+
+      if (targetUser.clanId !== actor.clanId) {
+        throw new Error('Solo puedes gestionar roles de miembros de tu propio clan');
+      }
+
+      if (isClanBoundRole(role) && targetUser.status !== UserStatus.ACTIVE) {
+        throw new Error('El miembro debe estar activo para recibir un rol de clan');
+      }
+    }
+
+    await prisma.$transaction(async (tx) => {
+      await tx.user.update({
+        where: { id: targetUser.id },
+        data: { role },
+      });
+
+      await tx.userPermissionOverride.deleteMany({
+        where: { userId: targetUser.id },
+      });
+
+      await tx.auditLog.create({
+        data: {
+          action: 'USER_ROLE_UPDATED',
+          entity: 'User',
+          entityId: targetUser.id,
+          userId: actor.id,
+          details: JSON.stringify({
+            previousRole: targetUser.role,
+            newRole: role,
+          }),
+        },
+      });
+    });
+
+    const user = await prisma.user.findUnique({
+      where: { id: targetUser.id },
       include: {
         clan: {
           select: {
@@ -599,10 +1260,20 @@ export class UserService {
             avatarUrl: true,
           },
         },
+        permissionOverrides: {
+          select: {
+            permission: true,
+            enabled: true,
+          },
+        },
       },
     });
 
-    return user;
+    if (!user) {
+      throw new Error('Usuario no encontrado');
+    }
+
+    return this.withEffectivePermissions(user);
   }
 
   async updateStatus(userId: string, status: UserStatus) {
@@ -622,6 +1293,44 @@ export class UserService {
     });
 
     return user;
+  }
+
+  async deleteUser(userId: string, actorId: string) {
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        id: true,
+        nickname: true,
+        role: true,
+      },
+    });
+
+    if (!user) {
+      throw new Error('Usuario no encontrado');
+    }
+
+    if (user.id === actorId) {
+      throw new Error('No puedes eliminar tu propia cuenta desde esta pantalla');
+    }
+
+    await prisma.$transaction(async (tx) => {
+      await tx.user.delete({
+        where: { id: userId },
+      });
+
+      await tx.auditLog.create({
+        data: {
+          action: 'USER_DELETED',
+          entity: 'User',
+          entityId: userId,
+          userId: actorId,
+          details: JSON.stringify({
+            nickname: user.nickname,
+            previousRole: user.role,
+          }),
+        },
+      });
+    });
   }
 
   async createExternalUser(nickname: string, clanId: string, createdById: string) {

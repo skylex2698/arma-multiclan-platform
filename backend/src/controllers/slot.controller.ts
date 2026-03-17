@@ -3,6 +3,7 @@ import { slotService } from '../services/slot.service';
 import { successResponse, errorResponse } from '../utils/responses';
 import { logger } from '../utils/logger';
 import { prisma } from '../index';
+import { hasPermission, PERMISSIONS } from '../auth/rbac';
 
 export class SlotController {
   // POST /api/slots/:id/assign
@@ -223,7 +224,7 @@ export class SlotController {
       const userRole = req.user.role;
       const userClanId = req.user.clanId;
 
-      if (userRole !== 'ADMIN' && userRole !== 'CLAN_LEADER') {
+      if (!hasPermission(req.user, PERMISSIONS.SLOT_MANAGE)) {
         return errorResponse(
           res,
           'No tienes permisos para asignar usuarios',
@@ -232,7 +233,7 @@ export class SlotController {
       }
 
       // Si es líder de clan, verificar que el usuario sea de su clan
-      if (userRole === 'CLAN_LEADER') {
+      if (userRole !== 'ADMIN') {
         const targetUser = await prisma.user.findUnique({
           where: { id: userId },
           select: { clanId: true },
@@ -275,7 +276,7 @@ export class SlotController {
       const userRole = req.user.role;
       const userClanId = req.user.clanId;
 
-      if (userRole !== 'ADMIN' && userRole !== 'CLAN_LEADER') {
+      if (!hasPermission(req.user, PERMISSIONS.SLOT_MANAGE)) {
         return errorResponse(
           res,
           'No tienes permisos para desasignar usuarios',
@@ -305,7 +306,7 @@ export class SlotController {
       }
 
       // Si es líder de clan, verificar que el usuario sea de su clan
-      if (userRole === 'CLAN_LEADER') {
+      if (userRole !== 'ADMIN') {
         if (!slot.user || slot.user.clanId !== userClanId) {
           return errorResponse(
             res,
@@ -342,16 +343,11 @@ export class SlotController {
       const squadId = req.params.id as string;
       const { clanId } = req.body;
 
-      // Verificar permisos: ADMIN, creador del evento, o CLAN_LEADER del clan del creador
       const squad = await prisma.squad.findUnique({
         where: { id: squadId },
         include: {
-          event: {
-            include: {
-              creator: {
-                select: { id: true, clanId: true },
-              },
-            },
+          reservedForClan: {
+            select: { id: true, name: true },
           },
         },
       });
@@ -361,22 +357,42 @@ export class SlotController {
       }
 
       const userRole = req.user.role;
-      const userId = req.user.id;
       const userClanId = req.user.clanId;
 
       const isAdmin = userRole === 'ADMIN';
-      const isCreator = squad.event.creatorId === userId;
-      const isCreatorClanLeader =
-        userRole === 'CLAN_LEADER' &&
-        userClanId &&
-        userClanId === squad.event.creator.clanId;
 
-      if (!isAdmin && !isCreator && !isCreatorClanLeader) {
+      if (!hasPermission(req.user, PERMISSIONS.SLOT_MANAGE)) {
         return errorResponse(
           res,
           'No tienes permisos para reservar escuadras en este evento',
           403
         );
+      }
+
+      if (!isAdmin) {
+        if (!userClanId) {
+          return errorResponse(
+            res,
+            'Debes pertenecer a un clan para gestionar reservas de escuadra',
+            403
+          );
+        }
+
+        if (clanId) {
+          if (clanId !== userClanId) {
+            return errorResponse(
+              res,
+              'Solo puedes reservar escuadras para tu propio clan',
+              403
+            );
+          }
+        } else if (squad.reservedForClanId !== userClanId) {
+          return errorResponse(
+            res,
+            'Solo puedes quitar la reserva de una escuadra reservada para tu clan',
+            403
+          );
+        }
       }
 
       const updatedSquad = await slotService.reserveSquad(

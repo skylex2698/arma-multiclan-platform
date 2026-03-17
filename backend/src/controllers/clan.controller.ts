@@ -2,7 +2,12 @@ import { Request, Response } from 'express';
 import path from 'path';
 import { clanService } from '../services/clan.service';
 import { prisma } from '../index';
-import { validateFileType, deleteFile } from '../config/multer.config';
+import {
+  validateFileType,
+  deleteFile,
+  archiveClanAvatar,
+  restoreArchivedClanAvatar,
+} from '../config/multer.config';
 import { logger } from '../utils/logger';
 
 const handleError = (res: Response, error: unknown, context?: string) => {
@@ -71,7 +76,41 @@ class ClanController {
   async create(req: Request, res: Response) {
     try {
       const data = req.body;
-      const clan = await clanService.createClan(data);
+      if (!data.name || !data.primaryGameId) {
+        return res.status(400).json({
+          success: false,
+          message: 'Nombre y juego principal son obligatorios',
+        });
+      }
+
+      let clan;
+      if (req.user?.mustCreateClanOnboarding) {
+        const approvedRequest = await prisma.clanCreationRequest.findFirst({
+          where: {
+            userId: req.user.id,
+            status: 'APPROVED',
+            createdClanId: null,
+          },
+          orderBy: {
+            createdAt: 'desc',
+          },
+        });
+
+        if (!approvedRequest) {
+          return res.status(400).json({
+            success: false,
+            message: 'No tienes una solicitud aprobada pendiente para crear clan',
+          });
+        }
+
+        clan = await clanService.createClanFromApprovedRequest(
+          approvedRequest.id,
+          req.user.id,
+          data
+        );
+      } else {
+        clan = await clanService.createClan(data);
+      }
 
       return res.status(201).json({
         success: true,
@@ -130,7 +169,27 @@ class ClanController {
         });
       }
 
-      await clanService.deleteClan(id as string);
+      const currentClan = await prisma.clan.findFirst({
+        where: { id: id as string },
+      });
+
+      if (!currentClan) {
+        return res.status(404).json({
+          success: false,
+          message: 'Clan no encontrado',
+        });
+      }
+
+      let avatarArchivedPath: string | null = null;
+      if (currentClan.avatarUrl) {
+        const archived = archiveClanAvatar(currentClan.avatarUrl);
+        avatarArchivedPath = archived?.archivedFilename || null;
+      }
+
+      await clanService.deleteClan(id as string, {
+        avatarArchivedPath,
+        avatarArchivedAt: avatarArchivedPath ? new Date() : null,
+      });
 
       return res.status(200).json({
         success: true,
@@ -154,7 +213,26 @@ class ClanController {
         });
       }
 
-      const clan = await clanService.restoreClan(id as string);
+      const deletedClan = await prisma.clan.findFirst({
+        where: { id: id as string, deletedAt: { not: null } },
+      });
+
+      if (!deletedClan) {
+        return res.status(404).json({
+          success: false,
+          message: 'Clan eliminado no encontrado',
+        });
+      }
+
+      const restoredAvatarUrl = deletedClan.avatarArchivedPath
+        ? restoreArchivedClanAvatar(deletedClan.avatarArchivedPath)
+        : null;
+
+      const clan = await clanService.restoreClan(id as string, {
+        avatarUrl: restoredAvatarUrl,
+        avatarArchivedPath: null,
+        avatarArchivedAt: null,
+      });
 
       return res.status(200).json({
         success: true,

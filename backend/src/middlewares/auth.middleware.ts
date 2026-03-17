@@ -4,6 +4,7 @@ import { prisma } from '../index';
 import { errorResponse } from '../utils/responses';
 import { UserRole, UserStatus } from '@prisma/client';
 import { AuthUser } from '../types';
+import { getEffectivePermissions } from '../auth/rbac';
 
 // Extender Request para incluir user
 declare global {
@@ -53,10 +54,18 @@ export const authenticate = async (
         id: true,
         email: true,
         nickname: true,
+        timezone: true,
+        mustCreateClanOnboarding: true,
         role: true,
         status: true,
         clanId: true,
-        discordId: true
+        discordId: true,
+        permissionOverrides: {
+          select: {
+            permission: true,
+            enabled: true,
+          },
+        },
       }
     });
 
@@ -74,11 +83,82 @@ export const authenticate = async (
     }
 
     // Agregar usuario a request
-    req.user = user;
+    req.user = {
+      ...user,
+      permissions: getEffectivePermissions(user.role, user.permissionOverrides),
+    };
     next();
   } catch (error) {
     return errorResponse(res, 'Error de autenticación', 500);
   }
+};
+
+export const authenticateOptional = async (
+  req: Request,
+  _res: Response,
+  next: NextFunction
+) => {
+  try {
+    let token: string | undefined;
+
+    if (req.cookies && req.cookies.token) {
+      token = req.cookies.token;
+    }
+
+    if (!token) {
+      const authHeader = req.headers.authorization;
+      if (authHeader && authHeader.startsWith('Bearer ')) {
+        token = authHeader.substring(7);
+      }
+    }
+
+    if (!token) {
+      next();
+      return;
+    }
+
+    const payload = verifyToken(token);
+
+    if (!payload) {
+      next();
+      return;
+    }
+
+    const user = await prisma.user.findUnique({
+      where: { id: payload.userId },
+      select: {
+        id: true,
+        email: true,
+        nickname: true,
+        timezone: true,
+        mustCreateClanOnboarding: true,
+        role: true,
+        status: true,
+        clanId: true,
+        discordId: true,
+        permissionOverrides: {
+          select: {
+            permission: true,
+            enabled: true,
+          },
+        },
+      }
+    });
+
+    if (!user || user.status === UserStatus.BANNED || user.status === UserStatus.PENDING) {
+      next();
+      return;
+    }
+
+    req.user = {
+      ...user,
+      permissions: getEffectivePermissions(user.role, user.permissionOverrides),
+    };
+  } catch {
+    // En endpoints públicos, un token inválido no debe bloquear la respuesta.
+  }
+
+  next();
 };
 
 // Middleware para verificar roles

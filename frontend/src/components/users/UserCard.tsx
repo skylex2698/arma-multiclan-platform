@@ -2,6 +2,7 @@ import { User as UserIcon, Shield, Crown, Mail } from 'lucide-react';
 import { Card } from '../ui/Card';
 import { Badge } from '../ui/Badge';
 import type { User, UserRole, UserStatus } from '../../types';
+import { getRoleDisplayName } from '../../utils/permissions';
 
 interface UserCardProps {
   user: User;
@@ -21,11 +22,15 @@ export function UserCard({
   const getRoleBadge = (role: string) => {
     switch (role) {
       case 'ADMIN':
-        return <Badge variant="danger">Admin</Badge>;
+        return <Badge variant="danger">{getRoleDisplayName(role)}</Badge>;
+      case 'OPERATIONS_OFFICER':
+        return <Badge variant="info">{getRoleDisplayName(role)}</Badge>;
+      case 'RECRUITER':
+        return <Badge variant="success">{getRoleDisplayName(role)}</Badge>;
       case 'CLAN_LEADER':
-        return <Badge variant="warning">Líder</Badge>;
+        return <Badge variant="warning">{getRoleDisplayName(role)}</Badge>;
       default:
-        return <Badge variant="default">Miembro</Badge>;
+        return <Badge variant="default">{getRoleDisplayName(role)}</Badge>;
     }
   };
 
@@ -50,6 +55,10 @@ export function UserCard({
     switch (role) {
       case 'ADMIN':
         return <Crown className="h-5 w-5 text-red-600" />;
+      case 'OPERATIONS_OFFICER':
+        return <Shield className="h-5 w-5 text-blue-600" />;
+      case 'RECRUITER':
+        return <Shield className="h-5 w-5 text-green-600" />;
       case 'CLAN_LEADER':
         return <Shield className="h-5 w-5 text-yellow-600" />;
       default:
@@ -108,9 +117,11 @@ export function UserCard({
               disabled={isLoading}
               className="input text-sm"
             >
-              <option value="USER">Usuario</option>
-              <option value="CLAN_LEADER">Líder</option>
-              <option value="ADMIN">Admin</option>
+              <option value="USER">Operador</option>
+              <option value="OPERATIONS_OFFICER">Oficial de operaciones</option>
+              <option value="RECRUITER">Oficial de personal</option>
+              <option value="CLAN_LEADER">Administrador de clan</option>
+              <option value="ADMIN">Administrador de plataforma</option>
             </select>
           )}
 

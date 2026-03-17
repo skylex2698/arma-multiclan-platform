@@ -1,5 +1,6 @@
 import { User as UserIcon } from 'lucide-react';
 import type { User } from '../../types';
+import { getAssetUrl } from '../../utils/url';
 
 interface UserAvatarProps {
   user: User;
@@ -9,10 +10,10 @@ interface UserAvatarProps {
 
 export function UserAvatar({ user, size = 'md', showBorder = true }: UserAvatarProps) {
   const sizeClasses = {
-    sm: 'w-8 h-8',
-    md: 'w-10 h-10',
-    lg: 'w-12 h-12',
-    xl: 'w-16 h-16',
+    sm: 'h-8 w-8 min-h-8 min-w-8',
+    md: 'h-10 w-10 min-h-10 min-w-10',
+    lg: 'h-12 w-12 min-h-12 min-w-12',
+    xl: 'h-16 w-16 min-h-16 min-w-16',
   };
 
   const iconSizes = {
@@ -29,6 +30,10 @@ export function UserAvatar({ user, size = 'md', showBorder = true }: UserAvatarP
     switch (user.role) {
       case 'ADMIN':
         return 'border-4 border-red-500';
+      case 'RECRUITER':
+        return 'border-4 border-green-500';
+      case 'OPERATIONS_OFFICER':
+        return 'border-4 border-blue-500';
       case 'CLAN_LEADER':
         return 'border-4 border-yellow-500';
       default:
@@ -37,12 +42,10 @@ export function UserAvatar({ user, size = 'md', showBorder = true }: UserAvatarP
   };
 
   // Usar logo del clan si existe
-  const avatarUrl = user.clan?.avatarUrl
-    ? `http://localhost:3000${user.clan.avatarUrl}`
-    : null;
+  const avatarUrl = getAssetUrl(user.clan?.avatarUrl);
 
   return (
-    <div className={`${sizeClasses[size]} rounded-full overflow-hidden ${getBorderColor()}`}>
+    <div className={`${sizeClasses[size]} shrink-0 rounded-full overflow-hidden aspect-square ${getBorderColor()}`}>
       {avatarUrl ? (
         <img
           src={avatarUrl}

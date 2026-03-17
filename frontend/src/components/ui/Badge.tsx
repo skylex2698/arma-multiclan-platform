@@ -7,7 +7,8 @@ interface BadgeProps {
 }
 
 export function Badge({ children, variant = 'default', className }: BadgeProps) {
-  const baseClasses = 'inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold shadow-sm transition-all';
+  const baseClasses =
+    'inline-flex items-center rounded-md px-2.5 py-1 text-xs font-medium leading-none transition-colors';
 
   const variants = {
     // Miembro - Azul

@@ -21,7 +21,7 @@ interface TemplateSelectorProps {
 
 export function TemplateSelector({ isOpen, onClose, onSelect }: TemplateSelectorProps) {
   const [selectedTemplate, setSelectedTemplate] = useState<BriefingTemplate | null>(null);
-  const [showPreview, setShowPreview] = useState(false);
+  const [showPreview, setShowPreview] = useState(true);
 
   if (!isOpen) return null;
 
@@ -78,30 +78,30 @@ export function TemplateSelector({ isOpen, onClose, onSelect }: TemplateSelector
         }
       }}
     >
-      <div className="bg-white rounded-lg shadow-xl max-w-6xl w-full max-h-[90vh] overflow-hidden flex flex-col">
+      <div className="max-h-[90vh] w-full max-w-6xl overflow-hidden rounded-lg bg-white shadow-xl dark:bg-gray-800">
         {/* Header */}
-        <div className="flex items-center justify-between p-6 border-b border-gray-200">
+        <div className="flex items-center justify-between border-b border-gray-200 p-6 dark:border-gray-700">
           <div>
-            <h2 className="text-2xl font-bold text-gray-900">
+            <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100">
               Seleccionar Plantilla de Briefing
             </h2>
-            <p className="text-sm text-gray-600 mt-1">
+            <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
               Elige una plantilla para empezar más rápido
             </p>
           </div>
           <button
             type="button"
             onClick={onClose}
-            className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+            className="rounded-lg p-2 transition-colors hover:bg-gray-100 dark:hover:bg-gray-700"
           >
-            <X className="w-6 h-6" />
+            <X className="h-6 w-6 text-gray-700 dark:text-gray-200" />
           </button>
         </div>
 
         {/* Content */}
         <div className="flex-1 overflow-hidden flex">
           {/* Lista de plantillas */}
-          <div className="w-1/2 border-r border-gray-200 overflow-y-auto p-6">
+          <div className="w-1/2 overflow-y-auto border-r border-gray-200 p-6 dark:border-gray-700 dark:bg-gray-800">
             <div className="space-y-3">
               {briefingTemplates.map((template) => (
                 <button
@@ -109,12 +109,12 @@ export function TemplateSelector({ isOpen, onClose, onSelect }: TemplateSelector
                   type="button"
                   onClick={() => {
                     setSelectedTemplate(template);
-                    setShowPreview(false);
+                    setShowPreview(true);
                   }}
                   className={`w-full text-left p-4 rounded-lg border-2 transition-all ${
                     selectedTemplate?.id === template.id
-                      ? 'border-blue-500 bg-blue-50'
-                      : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
+                      ? 'border-blue-500 bg-blue-50 dark:bg-blue-950/40'
+                      : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50 dark:border-gray-700 dark:hover:border-gray-600 dark:hover:bg-gray-700/60'
                   }`}
                 >
                   <div className="flex items-start gap-3">
@@ -129,10 +129,10 @@ export function TemplateSelector({ isOpen, onClose, onSelect }: TemplateSelector
 
                     {/* Info */}
                     <div className="flex-1 min-w-0">
-                      <h3 className="font-bold text-gray-900">
+                      <h3 className="font-bold text-gray-900 dark:text-gray-100">
                         {template.name}
                       </h3>
-                      <p className="text-sm text-gray-600 mt-1">
+                      <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
                         {template.description}
                       </p>
                     </div>
@@ -152,17 +152,17 @@ export function TemplateSelector({ isOpen, onClose, onSelect }: TemplateSelector
           </div>
 
           {/* Preview */}
-          <div className="w-1/2 overflow-y-auto p-6 bg-gray-50">
+          <div className="w-1/2 overflow-y-auto bg-gray-50 p-6 dark:bg-gray-900">
             {selectedTemplate ? (
               <div>
                 <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-lg font-bold text-gray-900">
+                  <h3 className="text-lg font-bold text-gray-900 dark:text-gray-100">
                     Vista Previa
                   </h3>
                   <button
                     type="button"
                     onClick={() => setShowPreview(!showPreview)}
-                    className="text-sm text-blue-600 hover:text-blue-700 font-medium"
+                    className="text-sm font-medium text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300"
                   >
                     {showPreview ? 'Ver HTML' : 'Ver Renderizado'}
                   </button>
@@ -170,19 +170,21 @@ export function TemplateSelector({ isOpen, onClose, onSelect }: TemplateSelector
 
                 {showPreview ? (
                   /* Vista renderizada */
-                  <div
-                    className="prose prose-sm max-w-none bg-white p-6 rounded-lg border border-gray-200"
-                    dangerouslySetInnerHTML={{ __html: selectedTemplate.content }}
-                  />
+                  <div className="max-h-[60vh] overflow-y-auto rounded-lg border border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-800">
+                    <div
+                      className="briefing-content prose prose-sm max-w-none p-6 dark:prose-invert"
+                      dangerouslySetInnerHTML={{ __html: selectedTemplate.content }}
+                    />
+                  </div>
                 ) : (
                   /* Vista HTML */
-                  <pre className="bg-gray-900 text-gray-100 p-4 rounded-lg overflow-x-auto text-xs">
+                  <pre className="max-h-[60vh] overflow-auto rounded-lg bg-gray-900 p-4 text-xs text-gray-100 dark:bg-gray-950">
                     <code>{selectedTemplate.content}</code>
                   </pre>
                 )}
               </div>
             ) : (
-              <div className="flex flex-col items-center justify-center h-full text-gray-400">
+              <div className="flex h-full flex-col items-center justify-center text-gray-400 dark:text-gray-500">
                 <FileText className="w-16 h-16 mb-4" />
                 <p className="text-center">
                   Selecciona una plantilla para ver la vista previa
@@ -193,8 +195,8 @@ export function TemplateSelector({ isOpen, onClose, onSelect }: TemplateSelector
         </div>
 
         {/* Footer */}
-        <div className="flex items-center justify-between p-6 border-t border-gray-200 bg-gray-50">
-          <p className="text-sm text-gray-600">
+        <div className="flex items-center justify-between border-t border-gray-200 bg-gray-50 p-6 dark:border-gray-700 dark:bg-gray-800">
+          <p className="text-sm text-gray-600 dark:text-gray-400">
             {selectedTemplate
               ? `${selectedTemplate.name} seleccionada`
               : 'Ninguna plantilla seleccionada'}
@@ -203,7 +205,7 @@ export function TemplateSelector({ isOpen, onClose, onSelect }: TemplateSelector
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-100 transition-colors"
+              className="rounded-lg border border-gray-300 px-4 py-2 transition-colors hover:bg-gray-100 dark:border-gray-600 dark:text-gray-200 dark:hover:bg-gray-700"
             >
               Cancelar
             </button>

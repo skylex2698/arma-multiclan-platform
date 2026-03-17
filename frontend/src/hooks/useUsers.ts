@@ -1,7 +1,8 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { userService } from '../services/userService';
-import type { User, UserRole, UserStatus } from '../types';
+import type { ClanCreationRequest, User, UserRole, UserStatus } from '../types';
 import { useAuthStore } from '../store/authStore';
+import { authService } from '../services/authService';
 
 export function useUsers(filters?: {
   clanId?: string;
@@ -77,6 +78,47 @@ export function useChangeUserClan() {
   });
 }
 
+export function useAdminUpdateUserProfile() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({
+      userId,
+      data,
+    }: {
+      userId: string;
+      data: { nickname?: string; email?: string | null; timezone?: string };
+    }) => userService.adminUpdateProfile(userId, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['users'] });
+    },
+  });
+}
+
+export function useAdminResetUserPassword() {
+  return useMutation({
+    mutationFn: (userId: string) => userService.adminResetPassword(userId),
+  });
+}
+
+export function useAdminUpdateUserPermissions() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({
+      userId,
+      permissions,
+    }: {
+      userId: string;
+      permissions: string[];
+    }) => userService.adminUpdatePermissions(userId, permissions),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['users'] });
+      queryClient.invalidateQueries({ queryKey: ['auth', 'me'] });
+    },
+  });
+}
+
 export function useClanChangeRequests(filters?: { status?: string }) {
   return useQuery({
     queryKey: ['clan-change-requests', filters],
@@ -121,7 +163,7 @@ export function useUpdateProfile() {
   const setAuth = useAuthStore((state) => state.setAuth);
 
   return useMutation({
-    mutationFn: (data: { nickname?: string; email?: string }) =>
+    mutationFn: (data: { nickname?: string; email?: string; timezone?: string }) =>
       userService.updateProfile(data),
     onSuccess: (response) => {
       // Actualizar el usuario en el store
@@ -139,14 +181,29 @@ export function useChangePassword() {
   });
 }
 
+export function useSelfResetPassword() {
+  return useMutation({
+    mutationFn: (data: { newPassword: string }) =>
+      userService.selfResetPassword(data),
+  });
+}
+
 export function useUpdateUserRole() {
   const queryClient = useQueryClient();
+  const setAuth = useAuthStore((state) => state.setAuth);
 
   return useMutation({
     mutationFn: ({ userId, role }: { userId: string; role: UserRole }) =>
       userService.updateRole(userId, role),
-    onSuccess: () => {
+    onSuccess: async () => {
+      try {
+        const response = await authService.getMe();
+        setAuth(response.user);
+      } catch {
+        // Ignore auth refresh failures here.
+      }
       queryClient.invalidateQueries({ queryKey: ['users'] });
+      queryClient.invalidateQueries({ queryKey: ['auth', 'me'] });
     },
   });
 }
@@ -172,5 +229,54 @@ export function useCreateExternalUser() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['users'] });
     },
+  });
+}
+
+export function useDeleteUser() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (userId: string) => userService.deleteUser(userId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['users'] });
+    },
+  });
+}
+
+export function useClanCreationRequests(filters?: { status?: string }) {
+  return useQuery({
+    queryKey: ['clan-creation-requests', filters],
+    queryFn: () => userService.getClanCreationRequests(filters),
+  });
+}
+
+export function useReviewClanCreationRequest() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({
+      requestId,
+      approved,
+      reviewNote,
+    }: {
+      requestId: string;
+      approved: boolean;
+      reviewNote?: string;
+    }) => userService.reviewClanCreationRequest(requestId, approved, reviewNote),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['clan-creation-requests'] });
+      queryClient.invalidateQueries({ queryKey: ['users'] });
+    },
+  });
+}
+
+export function useCurrentApprovedClanCreationRequest(
+  enabled = true
+) {
+  return useQuery<{ request: ClanCreationRequest }>({
+    queryKey: ['current-approved-clan-creation-request'],
+    queryFn: () => userService.getCurrentApprovedClanCreationRequest(),
+    enabled,
+    retry: false,
   });
 }

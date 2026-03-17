@@ -1,0 +1,111 @@
+# Tarea: Implementar Integración Opcional con Notion por Clan en CCT
+
+## Contexto del Proyecto
+
+CCT (Centro de Coordinación Táctica) es una plataforma web multiclan para comunidades de simulación militar (ArmA 3 / Reforger). Los clanes crean eventos con misiones, los usuarios reservan puestos (slots) dentro de escuadras, y al finalizar el evento un administrador pasa lista registrando la asistencia.
+
+**Tu primera tarea es explorar el código fuente completo del proyecto** — esquema de Prisma, modelos, servicios, controladores, rutas, middlewares y frontend — para entender la arquitectura existente, las convenciones de código, los patrones utilizados y cómo se relacionan las entidades antes de escribir una sola línea.
+
+---
+
+## Qué quiero que exista cuando termines
+
+### 1. Configuración de Notion por Clan
+
+Cada clan puede, opcionalmente, conectar su propia cuenta de Notion. La configuración incluye:
+
+- Un flag de activación (`enabled`/`disabled`).
+- Un token de integración de Notion (debe almacenarse **cifrado** en base de datos, nunca en texto plano).
+- El ID de una base de datos de Notion donde se registrarán las misiones/eventos.
+- El ID de una base de datos de Notion donde se registrarán las participaciones individuales.
+- Un modo de sincronización: `MANUAL` (el admin pulsa un botón) o `AUTO` (se dispara automáticamente al cerrar asistencia).
+
+Solo los administradores del clan pueden ver y modificar esta configuración. El token nunca debe devolverse completo en ninguna respuesta de la API; como máximo se muestra enmascarado (ej: `ntn_****abcd`).
+
+### 2. Snapshot histórico de participación (ParticipationSnapshot)
+
+Cuando se cierra la asistencia de un evento (estado `FINISHED`), el sistema debe generar automáticamente un registro inmutable por cada participante que cumpla **todas** estas condiciones:
+
+- El usuario es miembro activo del clan que organiza el evento (misma relación `clanId`). Se excluyen invitados, aliados o usuarios de otros clanes.
+- Tiene un registro de asistencia para ese evento.
+
+Cada snapshot debe congelar en el momento de su creación:
+
+- Nombre del evento y fecha.
+- Estado de asistencia (PRESENT, ABSENT_JUSTIFIED, NO_SHOW, etc.).
+- El **rol/puesto exacto** que ocupó en la misión (sacado del Slot asignado, ej: "Médico", "Líder de Escuadra"). Esto es independiente de su rango permanente.
+- El nombre de la escuadra a la que pertenecía el slot.
+- El rango permanente que tenía el usuario en ese momento.
+- Un flag indicando si ya fue exportado a Notion.
+
+**Restricción de unicidad:** Solo puede existir un snapshot por combinación de `(clanId, eventId, userId)`. Si se vuelve a pasar lista, se actualiza el existente (upsert), no se duplica.
+
+### 3. Sincronización unidireccional CCT → Notion
+
+CCT es la fuente de verdad. Notion es la capa de auditoría y automatización del clan. La sincronización es solo de escritura (CCT escribe en Notion, nunca lee de vuelta).
+
+**Qué se exporta:**
+- Solo snapshots donde el usuario es miembro del clan Y su asistencia es `PRESENT` (asistencia válida).
+
+**Idempotencia obligatoria:**
+- Cada participación se identifica en Notion mediante un ID externo único con el formato: `cct:{clanId}:{eventId}:{userId}`.
+- Antes de crear una página en Notion, se consulta si ya existe una con ese ID externo.
+- Si existe → se actualiza (upsert).
+- Si no existe → se crea.
+- Esto garantiza que pulsar "sincronizar" varias veces nunca genere duplicados.
+
+**Propiedades que debe tener cada página de participación en Notion:**
+
+| Propiedad en Notion           | Tipo Notion  | Valor                                              |
+|-------------------------------|--------------|-----------------------------------------------------|
+| Nombre                        | title        | `"{Nombre del Evento} - {Nombre del Usuario}"`      |
+| ID Externo Participación      | rich_text    | `cct:{clanId}:{eventId}:{userId}`                   |
+| Fecha misión                  | date         | Fecha del evento                                     |
+| Asistencia válida             | checkbox     | `true`                                               |
+| Rol de Misión                 | rich_text    | Texto del rol del slot (ej: "Médico")                |
+| Escuadra                      | rich_text    | Nombre de la escuadra                                |
+| Rango del Miembro             | rich_text    | Rango permanente del usuario en ese momento          |
+| Origen                        | select       | `"CCT_AUTO"`                                         |
+
+Al completarse la exportación de un snapshot, se marca como exportado con la fecha.
+
+### 4. Endpoints necesarios
+
+La API debe exponer estos endpoints, todos protegidos para que solo los administradores del clan puedan usarlos:
+
+- **Obtener configuración de Notion del clan:** Devuelve el estado de la integración sin revelar el token completo.
+- **Guardar/actualizar configuración de Notion:** Recibe token (lo cifra antes de persistir), IDs de bases de datos y modo de sincronización.
+- **Probar conexión:** Recibe un token y verifica contra la API de Notion que es válido (llamando a `users.me` del SDK de Notion).
+- **Sincronizar evento manualmente:** Dado un evento finalizado, ejecuta la exportación a Notion de todos los snapshots pendientes de ese evento para ese clan. Devuelve un resumen de cuántos se crearon/actualizaron/fallaron.
+
+### 5. Frontend
+
+En el panel de administración del clan, debe existir una sección de "Integraciones" (o pestaña equivalente) donde el admin pueda:
+
+- Activar/desactivar la integración con Notion.
+- Introducir el token (campo tipo password).
+- Introducir los IDs de las bases de datos de Notion.
+- Elegir el modo de sincronización (Manual / Automático).
+- Probar la conexión con un botón que dé feedback visual (éxito/error).
+
+En la vista de asistencia de un evento (para admins), si el clan tiene Notion habilitado y el modo es MANUAL, debe aparecer un botón "Sincronizar con Notion" que lance la exportación y muestre el resultado.
+
+---
+
+## Reglas de negocio innegociables
+
+1. **Aislamiento por clan:** Un clan jamás puede ver ni afectar la configuración o datos de otro clan. La exportación solo incluye miembros del clan organizador.
+2. **El token se cifra:** Usar cifrado simétrico (AES-256 o equivalente) con una clave de entorno. Nunca texto plano en la base de datos.
+3. **Idempotencia total:** Ni en la base de datos local (upsert por unique constraint) ni en Notion (consulta + upsert por ID externo) se deben generar duplicados bajo ninguna circunstancia.
+4. **CCT no calcula galardones:** CCT exporta hechos objetivos (quién, cuándo, qué rol, qué estado). La lógica de galardones es responsabilidad exclusiva del clan dentro de Notion.
+5. **Resiliencia:** Si la API de Notion falla durante la sincronización, el error debe registrarse en el snapshot correspondiente pero no debe impedir el cierre de asistencia ni corromper datos locales. El admin debe poder reintentar.
+
+---
+
+## Cómo abordar esta tarea
+
+1. **Primero investiga:** Lee el schema de Prisma, los modelos, servicios, controladores, rutas y el frontend. Identifica patrones, convenciones de nombres, estructura de carpetas, cómo se manejan errores, cómo se validan permisos, cómo se organizan los tests.
+2. **Después planifica:** Propón los cambios necesarios y pide confirmación antes de implementar.
+3. **Luego implementa:** Sigue las convenciones existentes del proyecto. No inventes patrones nuevos si ya hay uno establecido. El código nuevo debe parecer escrito por el mismo equipo que escribió el existente.
+4. **Usa `@notionhq/client`** como SDK de Notion.
+5. **Maneja errores** de forma consistente con el resto del proyecto.

@@ -1,9 +1,14 @@
 import { Link } from 'react-router-dom';
-import { Calendar, Clock, MapPin, Users, RotateCcw } from 'lucide-react';
+import { RotateCcw } from 'lucide-react';
 import { Badge } from '../ui/Badge';
 import type { Event } from '../../types';
-import { format } from 'date-fns';
-import { es } from 'date-fns/locale';
+import { useAuthStore } from '../../store/authStore';
+import {
+  formatDateInTimezone,
+  formatTimeInTimezone,
+  getTimezoneShortName,
+  getUserTimezone,
+} from '../../utils/eventTime';
 
 interface EventCardProps {
   event: Event;
@@ -12,147 +17,126 @@ interface EventCardProps {
   isRestoring?: boolean;
 }
 
-export function EventCard({ event, isDeleted, onRestore, isRestoring }: EventCardProps) {
-  const getStatusBadge = () => {
-    if (isDeleted) {
-      return <Badge variant="danger">Eliminado</Badge>;
-    }
-    switch (event.status) {
-      case 'ACTIVE':
-        return <Badge variant="success">Activo</Badge>;
-      case 'INACTIVE':
-        return <Badge variant="warning">Inactivo</Badge>;
-      case 'FINISHED':
-        return <Badge variant="default">Finalizado</Badge>;
-      default:
-        return null;
-    }
-  };
+const getStatusBadge = (event: Event, isDeleted?: boolean) => {
+  if (isDeleted) {
+    return <Badge variant="danger">Eliminado</Badge>;
+  }
 
-  const cardContent = (
+  switch (event.status) {
+    case 'ACTIVE':
+      return <Badge variant="success">Activo</Badge>;
+    case 'INACTIVE':
+      return <Badge variant="warning">Inactivo</Badge>;
+    case 'FINISHED':
+      return <Badge variant="default">Finalizado</Badge>;
+    default:
+      return null;
+  }
+};
+
+export function EventCard({
+  event,
+  isDeleted,
+  onRestore,
+  isRestoring,
+}: EventCardProps) {
+  const user = useAuthStore((state) => state.user);
+  const userTimezone = user?.timezone || getUserTimezone();
+  const occupancyPercentage = event.totalSlots
+    ? Math.round(((event.occupiedSlots ?? 0) / event.totalSlots) * 100)
+    : 0;
+
+  const creatorLabel = event.creator
+    ? `${event.creator.clan?.tag ? `${event.creator.clan.tag} ` : ''}${event.creator.nickname}`
+    : null;
+
+  const content = (
     <>
-      {/* Header con estado */}
-      <div className={`px-4 py-3 border-b ${isDeleted ? 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800' : 'bg-primary-50 dark:bg-gray-700 border-military-200 dark:border-gray-600'}`}>
-        <div className="flex items-center justify-between">
-          <h3 className={`text-xl font-bold ${isDeleted ? 'text-red-900 dark:text-red-200' : 'text-military-900 dark:text-gray-100'}`}>
-            {event.name}
-          </h3>
-          <div className="flex gap-2">
-            {getStatusBadge()}
+      <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-start gap-2">
+            <h3 className="min-w-0 break-words text-base font-semibold text-military-900 dark:text-gray-100">
+              {event.name}
+            </h3>
+            {getStatusBadge(event, isDeleted)}
           </div>
-        </div>
-      </div>
 
-      {/* Contenido */}
-      <div className="p-4">
-        {event.description && (
-          <p className="text-military-600 dark:text-gray-300 text-sm mb-4 line-clamp-2">
-            {event.description}
-          </p>
-        )}
+          {event.description && (
+            <p className="mt-1 line-clamp-1 break-words text-sm text-military-600 dark:text-gray-400">
+              {event.description}
+            </p>
+          )}
 
-        {/* Info grid */}
-        <div className="grid grid-cols-2 gap-3 mb-4">
-          <div className="flex items-center gap-2 text-sm text-military-600 dark:text-gray-400">
-            <Calendar className="h-4 w-4" />
+          <div className="meta-inline mt-2">
+            <span>{formatDateInTimezone(event.scheduledDate, userTimezone)}</span>
+            <span aria-hidden="true">·</span>
             <span>
-              {format(new Date(event.scheduledDate), "d 'de' MMM", {
-                locale: es,
-              })}
+              {formatTimeInTimezone(event.scheduledDate, userTimezone)}{' '}
+              {getTimezoneShortName(event.scheduledDate, userTimezone)}
             </span>
-          </div>
-
-          <div className="flex items-center gap-2 text-sm text-military-600 dark:text-gray-400">
-            <Clock className="h-4 w-4" />
+            <span aria-hidden="true">·</span>
+            <span>{event.game.name}</span>
+            <span aria-hidden="true">·</span>
             <span>
-              {format(new Date(event.scheduledDate), 'HH:mm', { locale: es })}
+              {event.occupiedSlots ?? 0}/{event.totalSlots ?? 0} slots
             </span>
-          </div>
-
-          <div className="flex items-center gap-2 text-sm text-military-600 dark:text-gray-400">
-            <MapPin className="h-4 w-4" />
-            <span>{event.gameType === 'ARMA_3' ? 'Arma 3' : 'Arma Reforger'}</span>
-          </div>
-
-          <div className="flex items-center gap-2 text-sm text-military-600 dark:text-gray-400">
-            <Users className="h-4 w-4" />
-            <span>
-              {event.occupiedSlots}/{event.totalSlots} slots
-            </span>
+            {creatorLabel && (
+              <>
+                <span aria-hidden="true">·</span>
+                <span>
+                  Por <strong>{creatorLabel}</strong>
+                </span>
+              </>
+            )}
           </div>
         </div>
 
-        {/* Progress bar */}
-        <div className="flex items-center gap-3">
-          <div className="flex-1 bg-military-200 dark:bg-gray-700 rounded-full h-2">
-            <div
-              className="bg-primary-600 dark:bg-tactical-600 h-2 rounded-full transition-all"
-              style={{
-                width: `${
-                  event.totalSlots
-                    ? (event.occupiedSlots! / event.totalSlots) * 100
-                    : 0
-                }%`,
-              }}
-            />
-          </div>
-          <span className="text-xs text-military-600 dark:text-gray-400 font-medium">
-            {event.totalSlots
-              ? Math.round((event.occupiedSlots! / event.totalSlots) * 100)
-              : 0}
-            %
+        <div className="flex min-w-[96px] flex-col items-start gap-2 lg:items-end">
+          <span className="text-sm font-semibold text-military-800 dark:text-gray-200">
+            {occupancyPercentage}%
           </span>
         </div>
-
-        {/* Creador */}
-        {event.creator && (
-          <div className="mt-3 pt-3 border-t border-military-200 dark:border-gray-700">
-            <p className="text-xs text-military-500 dark:text-gray-500">
-              Creado por{' '}
-              <span className="font-medium text-military-700 dark:text-gray-300">
-                {event.creator.clan?.tag && `${event.creator.clan.tag} `}
-                {event.creator.nickname}
-              </span>
-            </p>
-          </div>
-        )}
-
-        {/* Botón restaurar (solo para eventos eliminados) */}
-        {isDeleted && onRestore && (
-          <div className="mt-3 pt-3 border-t border-red-200 dark:border-red-800">
-            <button
-              type="button"
-              onClick={(e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                onRestore();
-              }}
-              disabled={isRestoring}
-              className="btn btn-primary w-full flex items-center justify-center"
-            >
-              <RotateCcw className={`h-4 w-4 mr-2 ${isRestoring ? 'animate-spin' : ''}`} />
-              {isRestoring ? 'Restaurando...' : 'Restaurar Evento'}
-            </button>
-          </div>
-        )}
       </div>
+
+      <div className="mt-1 flex items-center gap-3">
+        <div className="h-1.5 flex-1 rounded-full bg-military-200 dark:bg-gray-700">
+          <div
+            className="h-1.5 rounded-full bg-primary-600 transition-all dark:bg-tactical-500"
+            style={{ width: `${occupancyPercentage}%` }}
+          />
+        </div>
+      </div>
+
+      {isDeleted && onRestore && (
+        <div className="mt-1 flex justify-end">
+          <button
+            type="button"
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              onRestore();
+            }}
+            disabled={isRestoring}
+            className="btn btn-primary btn-sm"
+          >
+            <RotateCcw className={`h-4 w-4 ${isRestoring ? 'animate-spin' : ''}`} />
+            {isRestoring ? 'Restaurando' : 'Restaurar'}
+          </button>
+        </div>
+      )}
     </>
   );
 
   if (isDeleted) {
-    return (
-      <div className="block bg-white dark:bg-gray-800 rounded-lg shadow-md border-2 border-red-300 dark:border-red-800 opacity-75 hover:opacity-100 transition-all overflow-hidden">
-        {cardContent}
-      </div>
-    );
+    return <div className="list-row opacity-80">{content}</div>;
   }
 
   return (
     <Link
-      to={`/events/${event.id}`}
-      className="block bg-white dark:bg-gray-800 rounded-lg shadow-md border-2 border-military-200 dark:border-gray-700 hover:shadow-lg transition-all overflow-hidden"
+      to={isDeleted ? `/events/${event.id}?deleted=true` : `/events/${event.id}`}
+      className={`list-row ${isDeleted ? 'opacity-80' : 'cursor-pointer'}`}
     >
-      {cardContent}
+      {content}
     </Link>
   );
 }

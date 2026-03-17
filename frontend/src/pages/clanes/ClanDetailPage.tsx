@@ -10,6 +10,7 @@ import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { getAssetUrl } from '../../utils/url';
 
 export default function ClanDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -70,14 +71,16 @@ export default function ClanDetailPage() {
         <div className="flex items-start justify-between mb-4">
           <div className="flex items-center gap-4">
             {clan.avatarUrl ? (
-              <img
-                src={`http://localhost:3000${clan.avatarUrl}`}
-                alt={clan.name}
-                className="w-20 h-20 rounded-full object-cover border-4 border-primary-200 dark:border-tactical-600"
-                onError={(e) => {
-                  e.currentTarget.style.display = 'none';
-                }}
-              />
+              <div className="flex h-20 w-20 shrink-0 items-center justify-center rounded-full border-4 border-military-700 bg-military-900 p-1.5 shadow-sm dark:border-gray-500 dark:bg-gray-800">
+                <img
+                  src={getAssetUrl(clan.avatarUrl) || undefined}
+                  alt={clan.name}
+                  className="h-full w-full rounded-full object-contain"
+                  onError={(e) => {
+                    e.currentTarget.style.display = 'none';
+                  }}
+                />
+              </div>
             ) : (
               <div className="bg-primary-100 dark:bg-tactical-900 p-4 rounded-full">
                 <Shield className="h-8 w-8 text-primary-600 dark:text-tactical-400" />
@@ -119,6 +122,12 @@ export default function ClanDetailPage() {
               <p className="text-xs text-military-500 dark:text-gray-500">Miembros</p>
               <p className="font-medium text-military-900 dark:text-gray-100">{members.length}</p>
             </div>
+          </div>
+          <div className="text-military-600 dark:text-gray-400">
+            <p className="text-xs text-military-500 dark:text-gray-500">Juego principal</p>
+            <p className="font-medium text-military-900 dark:text-gray-100">
+              {clan.primaryGame?.name}
+            </p>
           </div>
           <div className="text-military-600 dark:text-gray-400">
             <p className="text-xs text-military-500 dark:text-gray-500">Creado</p>

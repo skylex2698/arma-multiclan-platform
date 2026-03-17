@@ -3,13 +3,18 @@ import {
   CheckCircle,
   XCircle,
   AlertTriangle,
+  RefreshCw,
   UserPlus,
   Save,
   X,
 } from 'lucide-react';
 import { Card } from '../ui/Card';
 import { UserAvatar } from '../ui/UserAvatar';
-import { useEventAttendance, useSaveAttendance } from '../../hooks/useAttendance';
+import {
+  useEventAttendance,
+  useSaveAttendance,
+  useSyncEventToNotion,
+} from '../../hooks/useAttendance';
 import { useAuthStore } from '../../store/authStore';
 import type { AttendanceStatus, User } from '../../types';
 import { useUsers, useCreateExternalUser } from '../../hooks/useUsers';
@@ -46,6 +51,7 @@ export function AttendanceTab({ eventId }: AttendanceTabProps) {
   const currentUser = useAuthStore((state) => state.user);
   const { data, isLoading } = useEventAttendance(eventId);
   const saveAttendance = useSaveAttendance(eventId);
+  const syncEventToNotion = useSyncEventToNotion(eventId);
 
   const [rows, setRows] = useState<AttendanceRow[]>([]);
   const [showAddUser, setShowAddUser] = useState(false);
@@ -55,6 +61,9 @@ export function AttendanceTab({ eventId }: AttendanceTabProps) {
 
   const isClanLeader = currentUser?.role === 'CLAN_LEADER';
   const currentUserClanId = currentUser?.clan?.id || null;
+  const canSyncToNotion = Boolean(
+    data?.notionIntegration.enabled && data.notionIntegration.syncMode === 'MANUAL'
+  );
 
   // Users for walk-in feature (incluye externos)
   const { data: usersData } = useUsers({
@@ -190,16 +199,35 @@ export function AttendanceTab({ eventId }: AttendanceTabProps) {
 
       if (result.blockedUsers.length > 0) {
         setActionSuccess(
-          `Asistencia guardada. ${result.blockedUsers.length} usuario(s) bloqueado(s) automáticamente por ausencias reiteradas.`
+          `Asistencia guardada. ${result.blockedUsers.length} usuario(s) bloqueado(s) automáticamente por ausencias reiteradas. Snapshots actualizados: ${result.snapshotsGenerated}.`
         );
       } else {
-        setActionSuccess('Asistencia guardada correctamente');
+        setActionSuccess(
+          `Asistencia guardada correctamente. Snapshots actualizados: ${result.snapshotsGenerated}.`
+        );
       }
       setTimeout(() => setActionSuccess(''), 5000);
     } catch (err) {
       const error = err as { response?: { data?: { message?: string } } };
       setActionError(
         error.response?.data?.message || 'Error al guardar asistencia'
+      );
+    }
+  };
+
+  const handleSyncToNotion = async () => {
+    setActionError('');
+    setActionSuccess('');
+
+    try {
+      const result = await syncEventToNotion.mutateAsync();
+      setActionSuccess(
+        `Sincronización completada. Creados: ${result.created}, actualizados: ${result.updated}, fallidos: ${result.failed}.`
+      );
+    } catch (err) {
+      const error = err as { response?: { data?: { message?: string } } };
+      setActionError(
+        error.response?.data?.message || 'Error al sincronizar participaciones con Notion'
       );
     }
   };
@@ -304,7 +332,7 @@ export function AttendanceTab({ eventId }: AttendanceTabProps) {
       </Card>
 
       {/* Quick actions */}
-      <div className="flex gap-2">
+      <div className="flex flex-wrap gap-2">
         {summary.unmarked > 0 && (
           <button
             onClick={handleMarkAllPresent}
@@ -321,6 +349,16 @@ export function AttendanceTab({ eventId }: AttendanceTabProps) {
           <UserPlus className="h-3.5 w-3.5 mr-1" />
           Agregar usuario
         </button>
+        {canSyncToNotion && (
+          <button
+            onClick={handleSyncToNotion}
+            disabled={syncEventToNotion.isPending}
+            className="btn btn-outline btn-sm"
+          >
+            <RefreshCw className="h-3.5 w-3.5 mr-1" />
+            {syncEventToNotion.isPending ? 'Sincronizando...' : 'Sincronizar con Notion'}
+          </button>
+        )}
       </div>
 
       {/* Walk-in user selector */}

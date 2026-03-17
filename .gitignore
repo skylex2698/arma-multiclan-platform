@@ -16,6 +16,8 @@ dist/
 .env.development.local
 .env.test.local
 .env.production.local
+docker/certs/*.crt
+docker/certs/*.key
 
 # Logs
 logs/
@@ -35,10 +37,6 @@ Thumbs.db
 *.swp
 *.swo
 *~
-
-# Prisma
-backend/prisma/migrations/
-!backend/prisma/migrations/.gitkeep
 
 # Uploads
 backend/public/uploads/*

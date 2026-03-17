@@ -1,6 +1,5 @@
 import { api } from './api';
 import type { ApiResponse, Event, CreateEventForm } from '../types';
-import type { GameType } from '../types';
 
 export interface PaginatedEventsResponse {
   events: Event[];
@@ -14,7 +13,7 @@ export const eventService = {
   // Obtener todos los eventos con paginación
   getAll: async (filters?: {
     status?: string;
-    gameType?: string;
+    gameId?: string;
     upcoming?: boolean;
     includeAll?: boolean;
     deleted?: boolean;
@@ -24,7 +23,7 @@ export const eventService = {
   }): Promise<PaginatedEventsResponse> => {
     const params = new URLSearchParams();
     if (filters?.status) params.append('status', filters.status);
-    if (filters?.gameType) params.append('gameType', filters.gameType);
+    if (filters?.gameId) params.append('gameId', filters.gameId);
     if (filters?.upcoming) params.append('upcoming', 'true');
     if (filters?.includeAll) params.append('includeAll', 'true');
     if (filters?.deleted) params.append('deleted', 'true');
@@ -39,8 +38,13 @@ export const eventService = {
   },
 
   // Obtener evento por ID
-  getById: async (id: string): Promise<{ event: Event }> => {
-    const response = await api.get<ApiResponse<{ event: Event }>>(`/events/${id}`);
+  getById: async (id: string, filters?: { deleted?: boolean }): Promise<{ event: Event }> => {
+    const params = new URLSearchParams();
+    if (filters?.deleted) params.append('deleted', 'true');
+    const query = params.toString();
+    const response = await api.get<ApiResponse<{ event: Event }>>(
+      `/events/${id}${query ? `?${query}` : ''}`
+    );
     return response.data.data;
   },
 
@@ -57,6 +61,7 @@ export const eventService = {
     description?: string;
     briefing?: string;
     scheduledDate: Date;
+    timezone?: string;
   }): Promise<{ event: Event }> => {
     const response = await api.post<ApiResponse<{ event: Event }>>(
       '/events/from-template',
@@ -72,8 +77,11 @@ export const eventService = {
       name?: string;
       description?: string;
       briefing?: string;
-      gameType?: GameType;
+      gameId?: string;
       scheduledDate?: Date;
+      timezone?: string;
+      visibility?: 'PUBLIC' | 'PRIVATE';
+      invitedClanIds?: string[];
       serverName?: string;
       serverIp?: string;
       serverPort?: string;
@@ -82,6 +90,11 @@ export const eventService = {
         id?: string;
         name: string;
         order: number;
+        frequency?: string;
+        isCommand?: boolean;
+        parentSquadId?: string;
+        parentFrequency?: string;
+        reservedForClanId?: string | null;
         slots: Array<{
           id?: string;
           role: string;
@@ -168,5 +181,17 @@ export const eventService = {
   generateShareToken: async (eventId: string): Promise<{ token: string }> => {
     const response = await api.post<ApiResponse<{ token: string }>>(`/events/${eventId}/share-token`);
     return response.data.data;
+  },
+
+  getSlotlist: async (eventId: string): Promise<unknown> => {
+    const response = await api.get<ApiResponse<unknown>>(`/events/${eventId}/slotlist`);
+    return response.data.data;
+  },
+
+  getWhitelistTxt: async (eventId: string): Promise<string> => {
+    const response = await api.get(`/events/${eventId}/whitelist?format=txt`, {
+      responseType: 'text',
+    });
+    return response.data as string;
   },
 };

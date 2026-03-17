@@ -1,10 +1,20 @@
-import { useState, useEffect } from 'react';
-import { useNavigate, useParams, Link } from 'react-router-dom';
-import { useEvent, useCreateEventFromTemplate } from '../../hooks/useEvents';
-import { ArrowLeft, Save, Copy } from 'lucide-react';
-import { Card } from '../../components/ui/Card';
+import { useEffect, useState } from 'react';
+import { Link, useNavigate, useParams } from 'react-router-dom';
+import { ArrowLeft, Copy, Save } from 'lucide-react';
+import {
+  useCreateEventFromTemplate,
+  useEvent,
+} from '../../hooks/useEvents';
 import { LoadingSpinner } from '../../components/ui/LoadingSpinner';
 import { BriefingEditorWithTemplates } from '../../components/events/BriefingEditor/BriefingEditorWithTemplates';
+import {
+  createUtcDateFromTimezone,
+  getNearestUpcomingFridayDateInput,
+  getTodayDateInputInTimezone,
+  getUserTimezone,
+  isDateTimeInPast,
+} from '../../utils/eventTime';
+import { useAuthStore } from '../../store/authStore';
 import '../../components/events/BriefingEditor/BriefingEditor.css';
 
 export default function CreateEventFromTemplatePage() {
@@ -12,6 +22,7 @@ export default function CreateEventFromTemplatePage() {
   const navigate = useNavigate();
   const { data: templateData, isLoading: loadingTemplate } = useEvent(templateId!);
   const createEvent = useCreateEventFromTemplate();
+  const user = useAuthStore((state) => state.user);
 
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
@@ -20,33 +31,42 @@ export default function CreateEventFromTemplatePage() {
   const [scheduledTime, setScheduledTime] = useState('');
   const [error, setError] = useState('');
 
-  // Cargar datos de la plantilla
   useEffect(() => {
-    if (templateData?.event) {
-      const event = templateData.event;
-      setName(`${event.name} (Copia)`);
-      setDescription(event.description || '');
-      setBriefing(event.briefing || '');
-      
-      // Poner fecha de hoy por defecto
-      const today = new Date();
-      setScheduledDate(today.toISOString().split('T')[0]);
-      setScheduledTime('20:00'); // Hora por defecto
-    }
-  }, [templateData]);
+    if (!templateData?.event) return;
+
+    const event = templateData.event;
+    const effectiveTimezone = event.timezone || user?.timezone || getUserTimezone();
+
+    setName(`${event.name} (Copia)`);
+    setDescription(event.description || '');
+    setBriefing(event.briefing || '');
+    setScheduledDate(getNearestUpcomingFridayDateInput(effectiveTimezone, '20:00'));
+    setScheduledTime('20:00');
+  }, [templateData, user?.timezone]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
 
-    // Validaciones
     if (!name || !scheduledDate || !scheduledTime) {
-      setError('Por favor completa todos los campos obligatorios');
+      setError('Completa los campos obligatorios.');
       return;
     }
 
     try {
-      const dateTime = new Date(`${scheduledDate}T${scheduledTime}`);
+      const effectiveTimezone =
+        templateData?.event?.timezone || user?.timezone || getUserTimezone();
+
+      if (isDateTimeInPast(scheduledDate, scheduledTime, effectiveTimezone)) {
+        setError('No se puede crear un evento con una fecha y hora en el pasado.');
+        return;
+      }
+
+      const dateTime = createUtcDateFromTimezone(
+        scheduledDate,
+        scheduledTime,
+        effectiveTimezone
+      );
 
       await createEvent.mutateAsync({
         templateEventId: templateId!,
@@ -58,8 +78,8 @@ export default function CreateEventFromTemplatePage() {
 
       navigate('/events');
     } catch (err) {
-      const error = err as { response?: { data?: { message?: string } } };
-      setError(error.response?.data?.message || 'Error al crear el evento');
+      const requestError = err as { response?: { data?: { message?: string } } };
+      setError(requestError.response?.data?.message || 'Error al crear el evento');
     }
   };
 
@@ -69,111 +89,101 @@ export default function CreateEventFromTemplatePage() {
 
   if (!templateData?.event) {
     return (
-      <div className="card bg-red-50 border border-red-200">
-        <p className="text-red-700">Plantilla no encontrada</p>
-        <Link
-          to="/events"
-          className="text-primary-600 hover:text-primary-700 mt-2 inline-block"
-        >
+      <section className="panel">
+        <p className="text-sm text-red-600 dark:text-red-400">
+          Plantilla no encontrada.
+        </p>
+        <Link to="/events" className="toolbar-link mt-2 inline-flex">
           Volver a eventos
         </Link>
-      </div>
+      </section>
     );
   }
 
   const template = templateData.event;
+  const effectiveTimezone = template.timezone || user?.timezone || getUserTimezone();
+  const minScheduledDate = getTodayDateInputInTimezone(effectiveTimezone);
 
   return (
-    <div>
-      <Link
-        to="/events"
-        className="inline-flex items-center text-military-600 dark:text-gray-400 hover:text-military-900 dark:hover:text-gray-200 mb-6"
-      >
-        <ArrowLeft className="h-4 w-4 mr-2" />
+    <div className="mx-auto max-w-4xl space-y-6">
+      <Link to="/events" className="inline-flex items-center gap-2 toolbar-link">
+        <ArrowLeft className="h-4 w-4" />
         Volver a eventos
       </Link>
 
-      <h1 className="text-3xl font-bold text-military-900 dark:text-gray-100 mb-6">
-        Crear Evento desde Plantilla
-      </h1>
+      <header className="space-y-1">
+        <h1 className="page-title">Crear evento desde plantilla</h1>
+        <p className="page-subtitle">
+          Se duplica la estructura de escuadras manteniendo los slots libres.
+        </p>
+      </header>
 
       {error && (
-        <div className="card bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 mb-6">
-          <p className="text-red-700 dark:text-red-400">{error}</p>
-        </div>
+        <section className="panel border-red-300 bg-red-50/80 dark:border-red-700 dark:bg-red-900/20">
+          <p className="text-sm text-red-700 dark:text-red-300">{error}</p>
+        </section>
       )}
 
-      {/* Información de la plantilla */}
-      <Card className="mb-6 bg-blue-50 dark:bg-blue-900/30 border-blue-200 dark:border-blue-800">
-        <div className="flex items-center gap-3 mb-2">
-          <Copy className="h-5 w-5 text-blue-600 dark:text-blue-400" />
-          <h2 className="text-lg font-bold text-blue-900 dark:text-blue-100">
-            Usando como plantilla: {template.name}
-          </h2>
+      <section className="panel border-blue-300 bg-blue-50/70 dark:border-blue-700 dark:bg-blue-900/20">
+        <div className="flex items-start gap-3">
+          <Copy className="mt-0.5 h-5 w-5 flex-shrink-0 text-blue-700 dark:text-blue-400" />
+          <div>
+            <h2 className="section-title">Plantilla base: {template.name}</h2>
+            <div className="meta-inline mt-1">
+              <span>{template.squads.length} escuadras</span>
+              <span aria-hidden="true">·</span>
+              <span>{template.totalSlots ?? 0} slots totales</span>
+            </div>
+          </div>
         </div>
-        <p className="text-sm text-blue-700 dark:text-blue-300">
-          Se copiará la estructura de escuadras y slots. Los slots estarán libres
-          para que los usuarios se apunten.
-        </p>
-        <div className="mt-2 text-sm text-blue-600 dark:text-blue-400">
-          <strong>Estructura:</strong> {template.squads.length} escuadras,{' '}
-          {template.totalSlots} slots totales
-        </div>
-      </Card>
+      </section>
 
-      <form onSubmit={handleSubmit}>
-        {/* Información básica */}
-        <Card className="mb-6">
-          <h2 className="text-xl font-bold text-military-900 dark:text-gray-100 mb-4">
-            Información del Nuevo Evento
-          </h2>
+      <form onSubmit={handleSubmit} className="space-y-6">
+        <section className="panel">
+          <div className="panel-header">
+            <div>
+              <h2 className="section-title">Datos del nuevo evento</h2>
+              <p className="section-caption">Solo editas nombre, fecha, hora y briefing.</p>
+            </div>
+          </div>
 
           <div className="space-y-4">
             <div>
-              <label className="block text-sm font-medium text-military-700 dark:text-gray-300 mb-1">
-                Nombre del Evento *
-              </label>
+              <label className="field-label">Nombre del evento *</label>
               <input
                 type="text"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 className="input"
-                placeholder="Operación Tormenta del Desierto"
                 required
               />
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-military-700 dark:text-gray-300 mb-1">
-                Descripción
-              </label>
+              <label className="field-label">Descripcion</label>
               <textarea
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
-                className="input"
-                rows={3}
-                placeholder="Breve descripción del evento..."
+                className="input min-h-[96px]"
+                rows={4}
               />
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="form-grid-2">
               <div>
-                <label className="block text-sm font-medium text-military-700 dark:text-gray-300 mb-1">
-                  Fecha *
-                </label>
+                <label className="field-label">Fecha *</label>
                 <input
                   type="date"
                   value={scheduledDate}
                   onChange={(e) => setScheduledDate(e.target.value)}
+                  min={minScheduledDate}
                   className="input"
                   required
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-military-700 dark:text-gray-300 mb-1">
-                  Hora *
-                </label>
+                <label className="field-label">Hora *</label>
                 <input
                   type="time"
                   value={scheduledTime}
@@ -183,69 +193,80 @@ export default function CreateEventFromTemplatePage() {
                 />
               </div>
             </div>
+          </div>
+        </section>
 
+        <section className="panel">
+          <div className="panel-header">
             <div>
-              <label className="block text-sm font-medium text-military-700 dark:text-gray-300 mb-2">
-                Briefing del Evento
-              </label>
-              <BriefingEditorWithTemplates
-                content={briefing}
-                onChange={setBriefing}
-                placeholder="Edita el briefing del evento..."
-              />
-              <p className="text-xs text-military-500 dark:text-gray-500 mt-2">
-                El briefing se ha copiado de la plantilla. Puedes editarlo libremente.
+              <h2 className="section-title">Briefing</h2>
+              <p className="section-caption">
+                Copiado desde la plantilla y editable antes de publicar.
               </p>
             </div>
           </div>
-        </Card>
 
-        {/* Vista previa de estructura */}
-        <Card className="mb-6">
-          <h2 className="text-xl font-bold text-military-900 dark:text-gray-100 mb-4">
-            Vista Previa de la Estructura
-          </h2>
+          <BriefingEditorWithTemplates
+            content={briefing}
+            onChange={setBriefing}
+            placeholder="Edita el briefing del evento..."
+          />
+        </section>
+
+        <section className="panel">
+          <div className="panel-header">
+            <div>
+              <h2 className="section-title">Estructura incluida</h2>
+              <p className="section-caption">
+                Vista previa compacta de las escuadras que se copiaran.
+              </p>
+            </div>
+          </div>
+
           <div className="space-y-3">
             {template.squads
               .sort((a, b) => a.order - b.order)
               .map((squad) => (
                 <div
                   key={squad.id}
-                  className="p-3 bg-military-50 dark:bg-gray-700 rounded-lg border border-military-200 dark:border-gray-600"
+                  className="rounded-md border border-military-200 px-4 py-3 dark:border-gray-700"
                 >
-                  <p className="font-medium text-military-900 dark:text-gray-100 mb-2">
-                    {squad.name} - {squad.slots.length} slots
-                  </p>
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <p className="text-sm font-semibold text-military-900 dark:text-gray-100">
+                      {squad.name}
+                    </p>
+                    <span className="section-caption">
+                      {squad.slots.length} slots
+                    </span>
+                  </div>
+                  <div className="meta-inline mt-2">
                     {squad.slots
                       .sort((a, b) => a.order - b.order)
-                      .map((slot) => (
-                        <div
-                          key={slot.id}
-                          className="text-xs px-2 py-1 bg-white dark:bg-gray-800 rounded border border-military-200 dark:border-gray-600 text-military-700 dark:text-gray-300"
-                        >
+                      .map((slot, index) => (
+                        <span key={slot.id}>
                           {slot.role}
-                        </div>
+                          {index < squad.slots.length - 1 ? ' · ' : ''}
+                        </span>
                       ))}
                   </div>
                 </div>
               ))}
           </div>
-        </Card>
+        </section>
 
-        {/* Botones */}
-        <div className="flex gap-4">
-          <button
-            type="submit"
-            disabled={createEvent.isPending}
-            className="btn btn-primary flex items-center"
-          >
-            <Save className="h-4 w-4 mr-2" />
-            {createEvent.isPending ? 'Creando...' : 'Crear Evento'}
-          </button>
+        <div className="flex flex-wrap items-center justify-between gap-3">
           <Link to="/events" className="btn btn-outline">
             Cancelar
           </Link>
+
+          <button
+            type="submit"
+            disabled={createEvent.isPending}
+            className="btn btn-primary"
+          >
+            <Save className="h-4 w-4" />
+            {createEvent.isPending ? 'Creando...' : 'Crear evento'}
+          </button>
         </div>
       </form>
     </div>

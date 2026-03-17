@@ -1,34 +1,24 @@
 import { APP_CONFIG } from '../../config/app.config';
-import { Logo } from '../ui/Logo';
 
 export function Footer() {
   return (
-    <footer className="bg-white dark:bg-gray-800 border-t border-military-200 dark:border-gray-700 mt-auto">
-      <div className="container mx-auto px-4 py-6">
-        <div className="flex flex-col md:flex-row items-center justify-between gap-4">
-          {/* Logo y nombre */}
-          <div className="flex items-center gap-2">
-            <Logo size="lg" withGlow />
-            <span className="font-bold text-military-900 dark:text-gray-100">
+    <footer className="mt-auto border-t border-military-200 bg-gradient-to-r from-white via-military-50 to-white dark:border-gray-700 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900">
+      <div className="container mx-auto px-4 py-5">
+        <div className="flex flex-col items-center justify-center gap-2 text-center md:flex-row md:gap-4">
+            <span className="text-lg font-black tracking-[0.28em] text-military-900 dark:text-gray-100">
               {APP_CONFIG.shortName}
             </span>
-          </div>
-
-          {/* Copyright */}
-          <div className="text-center text-sm text-military-600 dark:text-gray-400">
-            <p>
+            <span className="hidden h-1 w-1 rounded-full bg-military-400 md:inline-block dark:bg-gray-500" />
+            <p className="text-sm text-military-700 dark:text-gray-300">
               {APP_CONFIG.name} © {APP_CONFIG.year}
             </p>
-            <p>
-              Desarrollado por <span className="font-semibold text-primary-600 dark:text-tactical-400">{APP_CONFIG.author}</span>
+            <span className="hidden h-1 w-1 rounded-full bg-military-400 md:inline-block dark:bg-gray-500" />
+            <p className="text-sm text-military-700 dark:text-gray-300">
+              Desarrollado por{' '}
+              <span className="font-semibold text-military-950 dark:text-white">
+                B.E.A.R
+              </span>
             </p>
-          </div>
-
-          {/* Info */}
-          <div className="text-center md:text-right text-xs text-military-500 dark:text-gray-500">
-            <p>Para la comunidad española de</p>
-            <p className="font-medium">{APP_CONFIG.games.join(' / ')}</p>
-          </div>
         </div>
       </div>
     </footer>

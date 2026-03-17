@@ -1,8 +1,37 @@
 import { prisma } from '../index';
 import { logger } from '../utils/logger';
-import { SlotStatus, UserRole, EventStatus } from '@prisma/client';
+import { EventStatus, EventVisibility, SlotStatus, UserRole } from '@prisma/client';
+import { gameIdentityService } from './gameIdentity.service';
 
 export class SlotService {
+  private canUserAccessPrivateEvent(
+    event: {
+      visibility: EventVisibility;
+      creator?: { clanId: string | null } | null;
+      invitedClans?: Array<{ clanId: string }>;
+    },
+    clanId: string | null,
+    reservedForClanId?: string | null
+  ) {
+    if (event.visibility !== EventVisibility.PRIVATE) {
+      return true;
+    }
+
+    if (!clanId) {
+      return false;
+    }
+
+    if (event.creator?.clanId === clanId) {
+      return true;
+    }
+
+    if ((event.invitedClans || []).some((invitation) => invitation.clanId === clanId)) {
+      return true;
+    }
+
+    return reservedForClanId === clanId;
+  }
+
   // Apuntarse a un slot
   async assignSlot(
     slotId: string,
@@ -18,7 +47,20 @@ export class SlotService {
         include: {
           squad: {
             include: {
-              event: true
+              event: {
+                include: {
+                  creator: {
+                    select: {
+                      clanId: true,
+                    },
+                  },
+                  invitedClans: {
+                    select: {
+                      clanId: true,
+                    },
+                  },
+                },
+              },
             }
           },
           user: true
@@ -45,6 +87,23 @@ export class SlotService {
       if (!userToAssign) {
         throw new Error('Usuario no encontrado');
       }
+
+      if (
+        assignerRole !== UserRole.ADMIN &&
+        !this.canUserAccessPrivateEvent(
+          slot.squad.event,
+          userToAssign.clanId,
+          slot.squad.reservedForClanId
+        )
+      ) {
+        throw new Error('Este usuario no puede participar en este evento privado');
+      }
+
+      await gameIdentityService.ensureUserCanParticipateInGame(
+        tx,
+        userId,
+        slot.squad.event.gameId
+      );
 
       // Verificar bloqueo temporal por ausencias reiteradas
       if (userToAssign.blockedUntil && new Date(userToAssign.blockedUntil) > new Date()) {
@@ -610,7 +669,20 @@ export class SlotService {
         include: {
           squad: {
             include: {
-              event: true,
+              event: {
+                include: {
+                  creator: {
+                    select: {
+                      clanId: true,
+                    },
+                  },
+                  invitedClans: {
+                    select: {
+                      clanId: true,
+                    },
+                  },
+                },
+              },
             },
           },
         },
@@ -637,8 +709,30 @@ export class SlotService {
         throw new Error('Usuario no encontrado');
       }
 
+      await gameIdentityService.ensureUserCanParticipateInGame(
+        tx,
+        userId,
+        slot.squad.event.gameId
+      );
+
       if (user.status !== 'ACTIVE' && user.status !== 'EXTERNAL') {
         throw new Error('El usuario no está activo');
+      }
+
+      const assigner = await tx.user.findUnique({
+        where: { id: assignedBy },
+        select: { role: true }
+      });
+
+      if (
+        assigner?.role !== UserRole.ADMIN &&
+        !this.canUserAccessPrivateEvent(
+          slot.squad.event,
+          user.clanId,
+          slot.squad.reservedForClanId
+        )
+      ) {
+        throw new Error('Este usuario no puede participar en este evento privado');
       }
 
       // Verificar bloqueo temporal por ausencias reiteradas
@@ -651,11 +745,6 @@ export class SlotService {
       // adminAssignSlot es llamado por ADMIN y CLAN_LEADER
       // ADMIN puede forzar, CLAN_LEADER no puede asignar a escuadra reservada de otro clan
       if (slot.squad.reservedForClanId && user.clanId !== slot.squad.reservedForClanId) {
-        // Verificar quién está haciendo la asignación
-        const assigner = await tx.user.findUnique({
-          where: { id: assignedBy },
-          select: { role: true }
-        });
         if (assigner?.role !== UserRole.ADMIN) {
           throw new Error('Esta escuadra está reservada para otro clan');
         }
@@ -889,6 +978,46 @@ export class SlotService {
       const clan = await prisma.clan.findUnique({ where: { id: clanId } });
       if (!clan) {
         throw new Error('Clan no encontrado');
+      }
+
+      const conflictingAssignments = await prisma.slot.findMany({
+        where: {
+          squadId,
+          userId: { not: null },
+          user: {
+            OR: [
+              { clanId: null },
+              { clanId: { not: clanId } },
+            ],
+          },
+        },
+        include: {
+          user: {
+            select: {
+              nickname: true,
+              clan: {
+                select: {
+                  name: true,
+                  tag: true,
+                },
+              },
+            },
+          },
+        },
+        orderBy: { order: 'asc' },
+      });
+
+      if (conflictingAssignments.length > 0) {
+        const conflictingUsers = conflictingAssignments
+          .map((slot) => {
+            const clanLabel = slot.user?.clan?.tag || slot.user?.clan?.name || 'sin clan';
+            return `${slot.user?.nickname || 'Usuario'} (${clanLabel})`;
+          })
+          .join(', ');
+
+        throw new Error(
+          `No puedes reservar esta escuadra para ese clan mientras tenga slots ocupados por otros jugadores: ${conflictingUsers}`
+        );
       }
     }
 

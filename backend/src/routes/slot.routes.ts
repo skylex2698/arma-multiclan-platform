@@ -1,7 +1,8 @@
 import { Router } from 'express';
 import { slotController } from '../controllers/slot.controller';
-import { authenticate, authorize } from '../middlewares/auth.middleware';
-import { UserRole } from '@prisma/client';
+import { authenticate } from '../middlewares/auth.middleware';
+import { requirePermission } from '../middlewares/permissions';
+import { PERMISSIONS } from '../auth/rbac';
 
 const router = Router();
 
@@ -14,13 +15,13 @@ router.post('/:id/unassign', slotController.unassignSlot.bind(slotController));
 
 router.put(
   '/:id',
-  authorize(UserRole.ADMIN, UserRole.CLAN_LEADER),
+  requirePermission(PERMISSIONS.SLOT_MANAGE),
   slotController.updateSlot.bind(slotController)
 );
 
 router.delete(
   '/:id',
-  authorize(UserRole.ADMIN, UserRole.CLAN_LEADER),
+  requirePermission(PERMISSIONS.SLOT_MANAGE),
   slotController.deleteSlot.bind(slotController)
 );
 
@@ -30,40 +31,40 @@ const squadRouter = Router();
 squadRouter.put(
   '/:id',
   authenticate,
-  authorize(UserRole.ADMIN, UserRole.CLAN_LEADER),
+  requirePermission(PERMISSIONS.SLOT_MANAGE),
   slotController.updateSquad.bind(slotController)
 );
 
 squadRouter.delete(
   '/:id',
   authenticate,
-  authorize(UserRole.ADMIN, UserRole.CLAN_LEADER),
+  requirePermission(PERMISSIONS.SLOT_MANAGE),
   slotController.deleteSquad.bind(slotController)
 );
 
 squadRouter.post(
   '/:id/slots',
   authenticate,
-  authorize(UserRole.ADMIN, UserRole.CLAN_LEADER),
+  requirePermission(PERMISSIONS.SLOT_MANAGE),
   slotController.createSlot.bind(slotController)
 );
 
 squadRouter.patch(
   '/:id/reserve',
   authenticate,
-  authorize(UserRole.ADMIN, UserRole.CLAN_LEADER),
+  requirePermission(PERMISSIONS.SLOT_MANAGE),
   slotController.reserveSquad.bind(slotController)
 );
 
 // SEGURIDAD: Rutas admin requieren autorización explícita
 router.post(
   '/:id/admin-assign',
-  authorize(UserRole.ADMIN, UserRole.CLAN_LEADER),
+  requirePermission(PERMISSIONS.SLOT_MANAGE),
   slotController.adminAssignSlot.bind(slotController)
 );
 router.post(
   '/:id/admin-unassign',
-  authorize(UserRole.ADMIN, UserRole.CLAN_LEADER),
+  requirePermission(PERMISSIONS.SLOT_MANAGE),
   slotController.adminUnassignSlot.bind(slotController)
 );
 

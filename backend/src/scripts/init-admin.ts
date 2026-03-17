@@ -21,25 +21,28 @@ dotenv.config();
 const prisma = new PrismaClient();
 
 async function initAdmin(): Promise<void> {
-  console.log('🔍 Comprobando si existe algún administrador...');
-
-  const adminCount = await prisma.user.count({
-    where: { role: UserRole.ADMIN },
-  });
-
-  if (adminCount > 0) {
-    console.log(
-      `✅ Ya existe${adminCount > 1 ? 'n' : ''} ${adminCount} administrador${adminCount > 1 ? 'es' : ''}. No se crea ninguno nuevo.`
-    );
-    return;
-  }
-
   // Leer credenciales de las variables de entorno o usar valores por defecto
   const adminEmail    = process.env.ADMIN_EMAIL    || 'admin@arma.com';
   const adminPassword = process.env.ADMIN_PASSWORD || 'Admin123!';
   const adminNickname = process.env.ADMIN_NICKNAME || 'Admin';
 
-  console.log('⚙️  No se encontró ningún administrador. Creando usuario admin por defecto...');
+  console.log(`🔍 Comprobando administrador bootstrap configurado: ${adminEmail}`);
+
+  const existingAdmin = await prisma.user.findUnique({
+    where: { email: adminEmail },
+    select: {
+      id: true,
+      role: true,
+      status: true,
+    },
+  });
+
+  if (existingAdmin) {
+    console.log('✅ El administrador bootstrap ya existe. No se crea ninguno nuevo.');
+    return;
+  }
+
+  console.log('⚙️  Creando usuario admin bootstrap...');
   console.log(`   Email:    ${adminEmail}`);
   console.log(`   Nickname: ${adminNickname}`);
 
@@ -56,7 +59,7 @@ async function initAdmin(): Promise<void> {
   });
 
   console.log('');
-  console.log('✅ Usuario administrador creado correctamente.');
+  console.log('✅ Usuario administrador bootstrap creado correctamente.');
   console.log('');
   console.log('⚠️  IMPORTANTE: Cambia la contraseña tras el primer acceso,');
   console.log('   o configura ADMIN_EMAIL y ADMIN_PASSWORD en tu .env antes de arrancar.');

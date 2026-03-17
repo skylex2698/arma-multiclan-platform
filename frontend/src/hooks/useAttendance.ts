@@ -29,6 +29,17 @@ export function useSaveAttendance(eventId: string) {
   });
 }
 
+export function useSyncEventToNotion(eventId: string) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: () => attendanceService.syncEventToNotion(eventId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['attendance', eventId] });
+    },
+  });
+}
+
 export function useUserReliability(userId: string) {
   return useQuery({
     queryKey: ['reliability', userId],

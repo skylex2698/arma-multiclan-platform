@@ -22,8 +22,10 @@ export default function DiscordCallbackPage() {
           // Actualizar Zustand store (sin token, solo user)
           setAuth(user, ''); // Token vacío porque ahora está en cookie httpOnly
 
-          // Redirigir al dashboard
-          navigate('/dashboard', { replace: true });
+          navigate(
+            user.mustCreateClanOnboarding ? '/clanes/create?onboarding=true' : '/dashboard',
+            { replace: true }
+          );
         } else {
           throw new Error('No se pudo obtener la información del usuario');
         }

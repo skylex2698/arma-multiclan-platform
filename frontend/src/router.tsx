@@ -1,10 +1,13 @@
-import { createBrowserRouter, Navigate } from 'react-router-dom';
+import { createBrowserRouter, Navigate, useLocation } from 'react-router-dom';
 import { useAuthStore } from './store/authStore';
 import { MainLayout } from './components/layout/MainLayout';
 import { AdminOrClanLeaderRoute } from './components/routes/AdminOrClanLeaderRoute';
+import { ClanLeaderOrAdminRoute } from './components/routes/ClanLeaderOrAdminRoute';
+import { PermissionRoute } from './components/routes/PermissionRoute';
 import LoginPage from './pages/auth/LoginPage';
 import RegisterPage from './pages/auth/RegisterPage';
 import DiscordCallbackPage from './pages/auth/DiscordCallbackPage';
+import DiscordCompleteRegistrationPage from './pages/auth/DiscordCompleteRegistrationPage';
 import PendingApprovalPage from './pages/auth/PendingApprovalPage';
 import DashboardPage from './pages/dashboard/DashboardPage';
 import EventsPage from './pages/events/EventsPage';
@@ -17,17 +20,27 @@ import ClanesPage from './pages/clanes/ClanesPage';
 import ClanDetailPage from './pages/clanes/ClanDetailPage';
 import CreateClanPage from './pages/clanes/CreateClanPage';
 import EditClanPage from './pages/clanes/EditClanPage';
+import GamesPage from './pages/games/GamesPage';
+import FeedbackAdminPage from './pages/feedback/FeedbackAdminPage';
+import HelpManualPage from './pages/help/HelpManualPage';
 import UsersPage from './pages/users/UsersPage';
 import ClanChangeRequestsPage from './pages/users/ClanChangeRequestsPage';
+import ClanCreationRequestsPage from './pages/users/ClanCreationRequestsPage';
 import ProfilePage from './pages/profile/ProfilePage';
-import EditCommunicationTreePage from './pages/events/EditCommunicationTreePage';
+import { hasPermission, PERMISSIONS } from './utils/permissions';
 
 // Protected Route wrapper
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
+  const location = useLocation();
+  const user = useAuthStore((state) => state.user);
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
 
   if (!isAuthenticated) {
     return <Navigate to="/login" replace />;
+  }
+
+  if (user?.mustCreateClanOnboarding && location.pathname !== '/clanes/create') {
+    return <Navigate to="/clanes/create?onboarding=true" replace />;
   }
 
   return <MainLayout>{children}</MainLayout>;
@@ -42,7 +55,25 @@ function AdminRoute({ children }: { children: React.ReactNode }) {
     return <Navigate to="/login" replace />;
   }
 
-  if (user?.role !== 'ADMIN') {
+  if (!hasPermission(user, PERMISSIONS.GAME_MANAGE)) {
+    return <Navigate to="/dashboard" replace />;
+  }
+
+  return <MainLayout>{children}</MainLayout>;
+}
+
+function CreateClanRoute({ children }: { children: React.ReactNode }) {
+  const user = useAuthStore((state) => state.user);
+  const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
+
+  if (!isAuthenticated) {
+    return <Navigate to="/login" replace />;
+  }
+
+  const canCreateClan =
+    hasPermission(user, PERMISSIONS.CLAN_CREATE) || user?.mustCreateClanOnboarding;
+
+  if (!canCreateClan) {
     return <Navigate to="/dashboard" replace />;
   }
 
@@ -71,6 +102,10 @@ export const router = createBrowserRouter([
     element: <DiscordCallbackPage />,
   },
   {
+    path: '/auth/discord/complete',
+    element: <DiscordCompleteRegistrationPage />,
+  },
+  {
     path: '/auth/pending',
     element: <PendingApprovalPage />,
   },
@@ -91,6 +126,14 @@ export const router = createBrowserRouter([
     ),
   },
   {
+    path: '/help/manual',
+    element: (
+      <ProtectedRoute>
+        <HelpManualPage />
+      </ProtectedRoute>
+    ),
+  },
+  {
     path: '/events/public/:token',
     element: <PublicEventPage />,
   },
@@ -105,17 +148,17 @@ export const router = createBrowserRouter([
   {
     path: '/events/create',
     element: (
-      <AdminOrClanLeaderRoute>
+      <PermissionRoute permission={PERMISSIONS.EVENT_CREATE}>
         <CreateEventPage />
-      </AdminOrClanLeaderRoute>
+      </PermissionRoute>
     ),
   },
   {
     path: '/events/from-template/:templateId',
     element: (
-      <AdminOrClanLeaderRoute>
+      <PermissionRoute permission={PERMISSIONS.EVENT_CREATE}>
         <CreateEventFromTemplatePage />
-      </AdminOrClanLeaderRoute>
+      </PermissionRoute>
     ),
   },
   {
@@ -123,14 +166,6 @@ export const router = createBrowserRouter([
     element: (
       <ProtectedRoute>
         <EditEventPage />
-      </ProtectedRoute>
-    ),
-  },
-  {
-    path: '/events/:id/communications/edit',
-    element: (
-      <ProtectedRoute>
-        <EditCommunicationTreePage />
       </ProtectedRoute>
     ),
   },
@@ -153,9 +188,9 @@ export const router = createBrowserRouter([
   {
     path: '/clanes/create',
     element: (
-      <AdminRoute>
+      <CreateClanRoute>
         <CreateClanPage />
-      </AdminRoute>
+      </CreateClanRoute>
     ),
   },
   {
@@ -175,6 +210,22 @@ export const router = createBrowserRouter([
     ),
   },
   {
+    path: '/games',
+    element: (
+      <AdminRoute>
+        <GamesPage />
+      </AdminRoute>
+    ),
+  },
+  {
+    path: '/feedback',
+    element: (
+      <PermissionRoute permission={PERMISSIONS.FEEDBACK_MANAGE}>
+        <FeedbackAdminPage />
+      </PermissionRoute>
+    ),
+  },
+  {
     path: '/users',
     element: (
       <AdminOrClanLeaderRoute>
@@ -185,9 +236,17 @@ export const router = createBrowserRouter([
   {
     path: '/users/requests',
     element: (
-      <AdminOrClanLeaderRoute>
+      <ClanLeaderOrAdminRoute>
         <ClanChangeRequestsPage />
-      </AdminOrClanLeaderRoute>
+      </ClanLeaderOrAdminRoute>
+    ),
+  },
+  {
+    path: '/users/clan-creation-requests',
+    element: (
+      <AdminRoute>
+        <ClanCreationRequestsPage />
+      </AdminRoute>
     ),
   },
   {

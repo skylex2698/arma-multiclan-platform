@@ -1,6 +1,8 @@
 import { prisma } from '../index';
 import { logger } from '../utils/logger';
 import { AttendanceStatus, EventStatus, UserRole } from '@prisma/client';
+import { participationSnapshotService } from './participationSnapshot.service';
+import { notionIntegrationService } from './notionIntegration.service';
 
 class AttendanceService {
   /**
@@ -12,6 +14,21 @@ class AttendanceService {
     const event = await prisma.event.findUnique({
       where: { id: eventId },
       include: {
+        creator: {
+          select: {
+            clanId: true,
+            clan: {
+              select: {
+                notionIntegration: {
+                  select: {
+                    enabled: true,
+                    syncMode: true,
+                  },
+                },
+              },
+            },
+          },
+        },
         squads: {
           where: { deletedAt: null },
           include: {
@@ -54,11 +71,17 @@ class AttendanceService {
       throw new Error('Solo se puede ver la asistencia de eventos finalizados');
     }
 
+    const notionIntegration = {
+      enabled: event.creator?.clan?.notionIntegration?.enabled ?? false,
+      syncMode: event.creator?.clan?.notionIntegration?.syncMode ?? 'MANUAL',
+    };
+
     // If attendance records already exist, return them
     if (event.attendances.length > 0) {
       return {
         attendances: event.attendances,
         summary: this.calculateSummary(event.attendances),
+        notionIntegration,
       };
     }
 
@@ -75,7 +98,7 @@ class AttendanceService {
             slotId: slot.id,
             squadName: squad.name,
             slotRole: slot.role,
-            status: absenceUserIds.has(slot.user.id) ? ('ABSENT_JUSTIFIED' as const) : null,
+            status: absenceUserIds.has(slot.user.id) ? ('ABSENT_JUSTIFIED' as const) : ('PRESENT' as const),
             note: null,
           });
         }
@@ -86,6 +109,7 @@ class AttendanceService {
       attendances: [],
       prePopulated,
       summary: null,
+      notionIntegration,
     };
   }
 
@@ -104,14 +128,25 @@ class AttendanceService {
     markerRole: UserRole,
     markerClanId: string | null
   ) {
-    const event = await prisma.event.findUnique({ where: { id: eventId } });
+    const event = await prisma.event.findUnique({
+      where: { id: eventId },
+      select: {
+        id: true,
+        status: true,
+        creator: {
+          select: {
+            clanId: true,
+          },
+        },
+      },
+    });
     if (!event) throw new Error('Evento no encontrado');
     if (event.status !== EventStatus.FINISHED) {
       throw new Error('Solo se puede registrar asistencia en eventos finalizados');
     }
 
-    // ClanLeader can only mark their own clan members
-    if (markerRole === UserRole.CLAN_LEADER && markerClanId) {
+    // Cualquier rol de clan no-admin solo puede marcar miembros de su propio clan.
+    if (markerRole !== UserRole.ADMIN && markerClanId) {
       const userIds = entries.map((e) => e.userId);
       const users = await prisma.user.findMany({
         where: { id: { in: userIds } },
@@ -194,20 +229,30 @@ class AttendanceService {
         },
       });
 
-      return { attendances: savedAttendances, blockedUsers };
+      const snapshotResult = await participationSnapshotService.upsertEventSnapshots(tx, eventId);
+
+      return {
+        attendances: savedAttendances,
+        blockedUsers,
+        snapshotsGenerated: snapshotResult.eligibleSnapshotCount,
+      };
     });
+
+    await notionIntegrationService.triggerAutoSyncIfEnabled(eventId);
 
     logger.info('Attendance recorded', {
       eventId,
       markedBy,
       count: entries.length,
       blockedUsers: result.blockedUsers,
+      snapshotsGenerated: result.snapshotsGenerated,
     });
 
     return {
       attendances: result.attendances,
       summary: this.calculateSummary(result.attendances),
       blockedUsers: result.blockedUsers,
+      snapshotsGenerated: result.snapshotsGenerated,
     };
   }
 

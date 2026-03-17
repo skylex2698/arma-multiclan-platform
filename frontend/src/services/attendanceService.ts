@@ -4,6 +4,7 @@ import type {
   AttendanceResponse,
   SaveAttendanceResponse,
   AttendanceStatus,
+  NotionSyncSummary,
   ReliabilityScore,
 } from '../types';
 
@@ -29,6 +30,13 @@ export const attendanceService = {
     const response = await api.post<ApiResponse<SaveAttendanceResponse>>(
       `/events/${eventId}/attendance`,
       { entries }
+    );
+    return response.data.data;
+  },
+
+  syncEventToNotion: async (eventId: string): Promise<NotionSyncSummary> => {
+    const response = await api.post<ApiResponse<NotionSyncSummary>>(
+      `/events/${eventId}/notion/sync`
     );
     return response.data.data;
   },

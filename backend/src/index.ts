@@ -5,13 +5,15 @@ import path from 'path';
 import dotenv from 'dotenv';
 import cookieParser from 'cookie-parser';
 import { PrismaClient } from '@prisma/client';
+import type { Server } from 'http';
 import { authRoutes } from './routes/auth.routes';
 import { discordRoutes } from './routes/discord.routes';
 import { clanRoutes } from './routes/clan.routes';
+import { gameRoutes } from './routes/game.routes';
 import { userRoutes } from './routes/user.routes';
+import { feedbackRoutes } from './routes/feedback.routes';
 import eventRoutes from './routes/event.routes';
 import { slotRoutes, squadRouter } from './routes/slot.routes';
-import communicationTreeRoutes from './routes/communicationTree.routes';
 import { generalLimiter, loginLimiter, registerLimiter, uploadLimiter, sensitiveLimiter } from './middlewares/rateLimiter';
 import { logger } from './utils/logger';
 import { softDeleteMiddleware } from './middlewares/softDelete';
@@ -24,6 +26,52 @@ softDeleteMiddleware(prisma);
 const app = express();
 const PORT = process.env.PORT || 3000;
 const isProduction = process.env.NODE_ENV === 'production';
+let server: Server | null = null;
+
+const normalizeOrigin = (value?: string): string | null => {
+  if (!value) return null;
+
+  try {
+    const url = new URL(value);
+    return url.origin;
+  } catch {
+    return null;
+  }
+};
+
+const frontendConnectOrigin =
+  process.env.FRONTEND_URL || 'http://localhost:5173';
+
+const buildAllowedOrigins = (): string[] => {
+  const origins = new Set<string>();
+  const frontendOrigin = normalizeOrigin(process.env.FRONTEND_URL);
+  const frontendPort = process.env.FRONTEND_PORT;
+
+  if (frontendOrigin) {
+    origins.add(frontendOrigin);
+
+    if (frontendPort) {
+      const frontendUrl = new URL(frontendOrigin);
+      const defaultPort =
+        frontendUrl.protocol === 'https:' ? '443' : '80';
+
+      if (!frontendUrl.port && frontendPort !== defaultPort) {
+        frontendUrl.port = frontendPort;
+        origins.add(frontendUrl.origin);
+      }
+    }
+  }
+
+  const extraOrigins = (process.env.CORS_EXTRA_ORIGINS || '')
+    .split(',')
+    .map(origin => normalizeOrigin(origin))
+    .filter((origin): origin is string => Boolean(origin));
+
+  extraOrigins.forEach(origin => origins.add(origin));
+  origins.add('http://localhost:5173');
+
+  return Array.from(origins);
+};
 
 // ============================================
 // Trust proxy (necesario detrás de nginx/reverse proxy)
@@ -40,7 +88,7 @@ app.use(helmet({
       scriptSrc: ["'self'"],
       styleSrc: ["'self'", "'unsafe-inline'"],
       imgSrc: ["'self'", "data:", "https:", "blob:"],
-      connectSrc: ["'self'", process.env.FRONTEND_URL || 'http://localhost:5173'],
+      connectSrc: ["'self'", frontendConnectOrigin],
       fontSrc: ["'self'", "https:", "data:"],
       objectSrc: ["'none'"],
       mediaSrc: ["'self'"],
@@ -64,11 +112,7 @@ app.use(generalLimiter);
 // ============================================
 // CORS configuración segura
 // ============================================
-const allowedOrigins = [
-  process.env.FRONTEND_URL,
-  'http://localhost:5173', // Desarrollo
-  ...(process.env.CORS_EXTRA_ORIGINS ? process.env.CORS_EXTRA_ORIGINS.split(',') : []),
-].filter(Boolean) as string[];
+const allowedOrigins = buildAllowedOrigins();
 
 app.use(cors({
   origin: (origin, callback) => {
@@ -121,14 +165,17 @@ app.use('/uploads', express.static(path.join(process.cwd(), 'public', 'uploads')
 // ============================================
 // Health check (sin rate limit)
 // ============================================
-app.get('/health', (req, res) => {
+const healthHandler = (req: express.Request, res: express.Response) => {
   res.json({
     status: 'OK',
     message: 'Arma Events Platform API is running',
     timestamp: new Date().toISOString(),
     environment: process.env.NODE_ENV || 'development',
   });
-});
+};
+
+app.get('/health', healthHandler);
+app.get('/api/health', healthHandler);
 
 // ============================================
 // Rutas con Rate Limiting específico
@@ -137,6 +184,8 @@ app.get('/health', (req, res) => {
 // Auth con rate limiting estricto
 app.use('/api/auth/login', loginLimiter);
 app.use('/api/auth/register', registerLimiter);
+app.use('/api/auth/forgot-password', sensitiveLimiter);
+app.use('/api/auth/reset-password', sensitiveLimiter);
 app.use('/api/auth', authRoutes);
 
 // Discord
@@ -145,9 +194,15 @@ app.use('/api/discord', discordRoutes);
 // Clanes con rate limit para uploads
 app.use('/api/clans', clanRoutes);
 
+// Catálogo de juegos
+app.use('/api/games', gameRoutes);
+
 // Usuarios con rate limit para operaciones sensibles
 app.use('/api/users/change-password', sensitiveLimiter);
 app.use('/api/users', userRoutes);
+
+// Feedback de plataforma
+app.use('/api/feedback', feedbackRoutes);
 
 // Eventos
 app.use('/api/events', eventRoutes);
@@ -155,9 +210,6 @@ app.use('/api/events', eventRoutes);
 // Slots y escuadras
 app.use('/api/slots', slotRoutes);
 app.use('/api/squads', squadRouter);
-
-// Árbol de comunicaciones
-app.use('/api/events', communicationTreeRoutes);
 
 // ============================================
 // Manejo de errores global (sin exponer detalles en producción)
@@ -197,26 +249,52 @@ app.use((req, res) => {
 // ============================================
 // Inicio del servidor
 // ============================================
-app.listen(PORT, () => {
-  logger.info(`Server running on port ${PORT}`, {
-    environment: process.env.NODE_ENV || 'development',
-    port: PORT,
+export const startServer = () => {
+  if (server) {
+    return server;
+  }
+
+  server = app.listen(PORT, () => {
+    logger.info(`Server running on port ${PORT}`, {
+      environment: process.env.NODE_ENV || 'development',
+      port: PORT,
+    });
+
+    if (!isProduction) {
+      console.log('Health check: http://localhost:' + PORT + '/health');
+      console.log('API Base: http://localhost:' + PORT + '/api');
+    }
   });
 
-  if (!isProduction) {
-    console.log('Health check: http://localhost:' + PORT + '/health');
-    console.log('API Base: http://localhost:' + PORT + '/api');
-  }
-});
+  return server;
+};
 
 // ============================================
 // Graceful shutdown
 // ============================================
 const gracefulShutdown = async () => {
   logger.info('Shutting down gracefully...');
+  if (server) {
+    await new Promise<void>((resolve, reject) => {
+      server!.close((error) => {
+        if (error) {
+          reject(error);
+          return;
+        }
+        resolve();
+      });
+    });
+    server = null;
+  }
   await prisma.$disconnect();
   process.exit(0);
 };
 
 process.on('SIGINT', gracefulShutdown);
 process.on('SIGTERM', gracefulShutdown);
+
+if (require.main === module) {
+  startServer();
+}
+
+export { app };

@@ -33,7 +33,13 @@ api.interceptors.response.use(
 
       // Solo redirigir si no estamos ya en la página de login
       const currentPath = window.location.pathname;
-      const publicPaths = ['/login', '/register', '/auth/pending', '/auth/discord/success'];
+      const publicPaths = [
+        '/login',
+        '/register',
+        '/auth/pending',
+        '/auth/discord/success',
+        '/auth/discord/complete',
+      ];
 
       if (!publicPaths.some(path => currentPath.startsWith(path))) {
         // Usar replace para no agregar al historial

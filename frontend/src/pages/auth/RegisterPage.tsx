@@ -1,75 +1,19 @@
-import { useState } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { authService } from '../../services/authService';
 import { useClans } from '../../hooks/useClans';
+import { useGames } from '../../hooks/useGames';
 import { APP_CONFIG } from '../../config/app.config';
 import { UserPlus, Loader2, AlertCircle } from 'lucide-react';
 import { LoadingSpinner } from '../../components/ui/LoadingSpinner';
 import { Logo } from '../../components/ui/Logo';
 
-export default function RegisterPage() {
-  const { data: clansData, isLoading: loadingClans } = useClans();
+const normalizeEmail = (value: string) => value.trim().toLowerCase();
 
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
-  const [nickname, setNickname] = useState('');
-  const [clanId, setClanId] = useState('');
-  const [error, setError] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [success, setSuccess] = useState(false);
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError('');
-
-    // Validaciones
-    if (password !== confirmPassword) {
-      setError('Las contraseñas no coinciden');
-      return;
-    }
-
-    if (password.length < 8) {
-      setError('La contraseña debe tener al menos 8 caracteres');
-      return;
-    }
-
-    if (nickname.length < 3) {
-      setError('El nickname debe tener al menos 3 caracteres');
-      return;
-    }
-
-    if (!clanId) {
-      setError('Debes seleccionar un clan');
-      return;
-    }
-
-    setLoading(true);
-
-    try {
-      await authService.register({
-        email,
-        password,
-        nickname,
-        clanId,
-      });
-
-      setSuccess(true);
-    } catch (err) {
-      const error = err as { response?: { data?: { message?: string } } };
-      setError(
-        error.response?.data?.message || 'Error al registrar usuario'
-      );
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Wrapper común para todo el contenido
-  const PageWrapper = ({ children }: { children: React.ReactNode }) => (
+function RegisterPageShell({ children }: { children: ReactNode }) {
+  return (
     <div className="min-h-screen bg-gradient-to-br from-military-900 via-military-800 to-military-900 dark:from-gray-900 dark:via-gray-800 dark:to-black flex items-center justify-center p-4">
       <div className="w-full max-w-md">
-        {/* Logo y título */}
         <div className="text-center mb-6">
           <div className="flex justify-center mb-3">
             <Logo size="3xl" withGlow />
@@ -92,18 +36,112 @@ export default function RegisterPage() {
       </div>
     </div>
   );
+}
 
-  if (loadingClans) {
+export default function RegisterPage() {
+  const { data: clansData, isLoading: loadingClans } = useClans();
+  const { data: gamesData, isLoading: loadingGames } = useGames({
+    includeInactive: true,
+  });
+
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [nickname, setNickname] = useState('');
+  const [clanId, setClanId] = useState('');
+  const [registerMode, setRegisterMode] = useState<'existing' | 'new'>('existing');
+  const [newClanName, setNewClanName] = useState('');
+  const [newClanTag, setNewClanTag] = useState('');
+  const [newClanDescription, setNewClanDescription] = useState('');
+  const [newClanPrimaryGameId, setNewClanPrimaryGameId] = useState('');
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [success, setSuccess] = useState(false);
+
+  useEffect(() => {
+    if (!newClanPrimaryGameId && gamesData?.games?.length) {
+      setNewClanPrimaryGameId(gamesData.games[0].id);
+    }
+  }, [gamesData?.games, newClanPrimaryGameId]);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError('');
+
+    const normalizedEmail = normalizeEmail(email);
+
+    // Validaciones
+    if (!normalizedEmail) {
+      setError('Debes indicar un email válido');
+      return;
+    }
+
+    if (password !== confirmPassword) {
+      setError('Las contraseñas no coinciden');
+      return;
+    }
+
+    if (password.length < 8) {
+      setError('La contraseña debe tener al menos 8 caracteres');
+      return;
+    }
+
+    if (nickname.length < 3) {
+      setError('El nickname debe tener al menos 3 caracteres');
+      return;
+    }
+
+    if (registerMode === 'existing') {
+      if (!clanId) {
+        setError('Debes seleccionar un clan');
+        return;
+      }
+    } else {
+      if (!newClanName || !newClanPrimaryGameId) {
+        setError('Debes completar los datos básicos del nuevo clan');
+        return;
+      }
+    }
+
+    setLoading(true);
+
+    try {
+      await authService.register({
+        email: normalizedEmail,
+        password,
+        nickname,
+        clanId: registerMode === 'existing' ? clanId : undefined,
+        requestNewClan: registerMode === 'new',
+        newClanName: registerMode === 'new' ? newClanName : undefined,
+        newClanTag: registerMode === 'new' ? newClanTag : undefined,
+        newClanDescription:
+          registerMode === 'new' ? newClanDescription : undefined,
+        newClanPrimaryGameId:
+          registerMode === 'new' ? newClanPrimaryGameId : undefined,
+      });
+
+      setSuccess(true);
+    } catch (err) {
+      const error = err as { response?: { data?: { message?: string } } };
+      setError(
+        error.response?.data?.message || 'Error al registrar usuario'
+      );
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (loadingClans || loadingGames) {
     return (
-      <PageWrapper>
+      <RegisterPageShell>
         <LoadingSpinner />
-      </PageWrapper>
+      </RegisterPageShell>
     );
   }
 
   if (success) {
     return (
-      <PageWrapper>
+      <RegisterPageShell>
         <div className="text-center py-4">
           <div className="bg-green-500 p-3 rounded-full inline-flex mb-4">
             <UserPlus className="h-8 w-8 text-white" />
@@ -115,8 +153,9 @@ export default function RegisterPage() {
             Tu cuenta ha sido creada correctamente.
           </p>
           <p className="text-green-700 dark:text-green-500 text-xs mb-4">
-            Un administrador o líder de clan debe validar tu cuenta.
-            Recibirás un email cuando esté activada.
+            {registerMode === 'new'
+              ? 'Un administrador debe aprobar la solicitud del nuevo clan antes de que puedas iniciar sesión.'
+              : 'Un administrador o líder de clan debe validar tu cuenta. Recibirás un email cuando esté activada.'}
           </p>
           <Link
             to="/login"
@@ -125,12 +164,12 @@ export default function RegisterPage() {
             Ir al Login
           </Link>
         </div>
-      </PageWrapper>
+      </RegisterPageShell>
     );
   }
 
   return (
-    <PageWrapper>
+    <RegisterPageShell>
       <h2 className="text-xl font-bold text-military-900 dark:text-gray-100 mb-4 text-center">
         Crear Cuenta
       </h2>
@@ -157,11 +196,15 @@ export default function RegisterPage() {
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
+              onBlur={(e) => setEmail(normalizeEmail(e.target.value))}
               className="input text-sm"
               placeholder="tu@email.com"
               required
               disabled={loading}
             />
+            <p className="mt-1 text-xs text-military-500 dark:text-gray-400">
+              Solo se permite una cuenta por correo electrónico.
+            </p>
           </div>
 
           <div>
@@ -231,29 +274,132 @@ export default function RegisterPage() {
           Mínimo 8 caracteres con mayúsculas, minúsculas y números
         </p>
 
-        <div>
-          <label
-            htmlFor="clan"
-            className="block text-sm font-medium text-military-700 dark:text-gray-300 mb-1"
-          >
-            Clan *
-          </label>
-          <select
-            id="clan"
-            value={clanId}
-            onChange={(e) => setClanId(e.target.value)}
-            className="input text-sm"
-            required
-            disabled={loading}
-          >
-            <option value="">Selecciona un clan</option>
-            {clansData?.clans.map((clan) => (
-              <option key={clan.id} value={clan.id}>
-                {clan.tag ? `${clan.tag} - ` : ''}
-                {clan.name}
-              </option>
-            ))}
-          </select>
+        <div className="space-y-3">
+          <div>
+            <label className="block text-sm font-medium text-military-700 dark:text-gray-300 mb-1">
+              Modalidad de acceso *
+            </label>
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+              <button
+                type="button"
+                onClick={() => setRegisterMode('existing')}
+                className={`rounded-lg border px-3 py-2 text-left text-sm ${
+                  registerMode === 'existing'
+                    ? 'border-primary-500 bg-primary-50 text-primary-700'
+                    : 'border-military-200 text-military-700'
+                }`}
+                disabled={loading}
+              >
+                Unirme a un clan existente
+              </button>
+              <button
+                type="button"
+                onClick={() => setRegisterMode('new')}
+                className={`rounded-lg border px-3 py-2 text-left text-sm ${
+                  registerMode === 'new'
+                    ? 'border-primary-500 bg-primary-50 text-primary-700'
+                    : 'border-military-200 text-military-700'
+                }`}
+                disabled={loading}
+              >
+                Solicitar un nuevo clan
+              </button>
+            </div>
+          </div>
+
+          {registerMode === 'existing' ? (
+            <div>
+              <label
+                htmlFor="clan"
+                className="block text-sm font-medium text-military-700 dark:text-gray-300 mb-1"
+              >
+                Clan *
+              </label>
+              <select
+                id="clan"
+                value={clanId}
+                onChange={(e) => setClanId(e.target.value)}
+                className="input text-sm"
+                required
+                disabled={loading}
+              >
+                <option value="">Selecciona un clan</option>
+                {clansData?.clans.map((clan) => (
+                  <option key={clan.id} value={clan.id}>
+                    {clan.tag ? `${clan.tag} - ` : ''}
+                    {clan.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          ) : (
+            <div className="space-y-3 rounded-lg border border-military-200 p-3">
+              <div>
+                <label className="block text-sm font-medium text-military-700 dark:text-gray-300 mb-1">
+                  Nombre del clan *
+                </label>
+                <input
+                  value={newClanName}
+                  onChange={(e) => setNewClanName(e.target.value)}
+                  className="input text-sm"
+                  placeholder="Nombre del nuevo clan"
+                  disabled={loading}
+                />
+              </div>
+
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <div>
+                  <label className="block text-sm font-medium text-military-700 dark:text-gray-300 mb-1">
+                    Tag
+                  </label>
+                  <input
+                    value={newClanTag}
+                    onChange={(e) => setNewClanTag(e.target.value)}
+                    className="input text-sm"
+                    placeholder="TAG"
+                    disabled={loading}
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-military-700 dark:text-gray-300 mb-1">
+                    Juego principal *
+                  </label>
+                  <select
+                    value={newClanPrimaryGameId}
+                    onChange={(e) => setNewClanPrimaryGameId(e.target.value)}
+                    className="input text-sm"
+                    disabled={loading}
+                  >
+                    <option value="">Selecciona un juego</option>
+                    {(gamesData?.games || []).map((game) => (
+                      <option key={game.id} value={game.id}>
+                        {game.name}
+                      </option>
+                    ))}
+                  </select>
+                  {!(gamesData?.games || []).length && (
+                    <p className="mt-1 text-xs text-amber-600 dark:text-amber-400">
+                      No hay juegos disponibles ahora mismo. Contacta con un administrador.
+                    </p>
+                  )}
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-military-700 dark:text-gray-300 mb-1">
+                  Descripción inicial
+                </label>
+                <textarea
+                  value={newClanDescription}
+                  onChange={(e) => setNewClanDescription(e.target.value)}
+                  className="input min-h-[96px] text-sm"
+                  placeholder="Describe brevemente el clan que quieres registrar"
+                  disabled={loading}
+                />
+              </div>
+            </div>
+          )}
         </div>
 
         <button
@@ -296,6 +442,6 @@ export default function RegisterPage() {
           Completa el formulario → Selecciona tu clan → Espera validación → Recibe confirmación por email
         </p>
       </div>
-    </PageWrapper>
+    </RegisterPageShell>
   );
 }
